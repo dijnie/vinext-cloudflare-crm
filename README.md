@@ -181,3 +181,34 @@ original creator may edit, change sharing, or delete a view; membership removal
 or record reassignment does not transfer that authority. See
 [SavedViewService](src/views/saved-view-service.ts) and
 [the saved-state contract](src/views/saved-view-contracts.ts).
+
+### Currency and dashboard
+
+Open the dashboard at `/{locale}/{workspaceSlug}` and currency settings at
+`/{locale}/{workspaceSlug}/settings/currencies`. Start with
+[DashboardSummary](src/components/dashboard/dashboard-summary.tsx) for the
+shareable personal/everyone scope and
+[CurrencySettings](src/components/settings/currency-settings.tsx) for owner-managed
+rates and reporting currency.
+
+Rates are maintained manually; there is no external rate fetch. Manual rates take
+precedence over any stored fetched rates. Frozen deal conversions keep reports
+from drifting when rates change: updating a rate can fill missing conversions,
+but does not revalue already converted deals. Original amounts and currencies,
+including legacy unconverted records, are retained. See
+[CurrencyService](src/currency/currency-service.ts) for these rules and
+[the conversion owner](src/currency/conversion-service.ts) for exact money arithmetic.
+
+Changing reporting currency is an explicit, resumable operation. The old reporting
+currency and conversion version remain active until the whole operation finishes,
+so reports never mix partially converted versions. Pending currency operations
+temporarily block deal creation, money edits, and rate changes; resume or cancel
+them in currency settings to release that lock. The durable constraints live in
+[the currency migration](migrations/crm/0005_currency_conversion_versions.sql).
+
+Dashboard money totals exclude archived and unconverted deals; missing conversions
+are disclosed by count and currency instead of being presented as zero-valued
+deals. Exact totals cross the API as decimal strings representing integer minor
+units, avoiding JavaScript number precision loss. Query ownership is in
+[DashboardRepository](src/dashboard/dashboard-repository.ts), with the response
+contract in [dashboard-contracts](src/dashboard/dashboard-contracts.ts).
