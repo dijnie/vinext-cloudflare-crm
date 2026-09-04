@@ -28,9 +28,10 @@ built.
 - Validation: [Zod](https://github.com/colinhacks/zod)
 
 > [!IMPORTANT]
-> Production publication remains blocked until the intended first owner can be
-> bootstrapped safely. Open registration means the first verified account
-> currently becomes owner.
+> Phase 1 is deployed to production with Cloudflare Email Service, and the
+> intended first account is verified as the sole active owner. Open registration
+> remains enabled; only an empty workspace assigns the first verified account as
+> owner.
 
 <!-- dash-content-end -->
 
@@ -53,7 +54,8 @@ Set `BETTER_AUTH_SECRET` to at least 32 random characters and keep
 `AUTH_BASE_URL` on a canonical HTTPS origin. The sender address is a non-secret
 Wrangler variable in `wrangler.jsonc`; its domain must already be onboarded in
 Cloudflare Email Service. Change the variable and binding sender restriction
-together when changing domains.
+together when changing domains. Email delivery uses the native Worker binding;
+no Resend account or API key is required.
 
 3. Verify the D1 target already declared in `wrangler.jsonc` before applying
    migrations:
@@ -76,9 +78,11 @@ npm run dev
 npm run build
 ```
 
-6. Before any remote migration or upload, choose and verify a controlled
-   first-owner bootstrap procedure. Do not expose an empty database through a
-   secret-configured preview or production version while this decision is open.
+6. Before any remote migration or upload for a fresh or reset database, define
+   a controlled first-owner bootstrap procedure that verifies exactly the
+   intended account holds the sole active owner membership. Production is
+   already bootstrapped; do not repeat this procedure unless the database is
+   intentionally reset.
 
 7. After that gate and explicit target/rollback verification, apply remote
    migrations separately from deployment:
