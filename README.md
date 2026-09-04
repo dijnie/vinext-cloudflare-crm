@@ -5,7 +5,7 @@
 A CRM rebuild on Vinext, Shadcn UI, Cloudflare Workers, and D1. The current
 foundation provides verified email/password auth, race-safe singleton membership,
 the CRM database baseline, a Vietnamese/English application shell, owner-only
-member settings, and guarded server service boundaries.
+member settings, and guarded company, contact, and deal APIs.
 
 ## Features
 
@@ -18,6 +18,7 @@ member settings, and guarded server service boundaries.
 - 🧭 Protected localized application shell with canonical cosmetic workspace URLs
 - 👤 Owner-only localized member management
 - 🏢 Protected localized company route
+- 🔗 Guarded company, contact, and deal APIs with archive/restore workflows
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
 - ✨ Clean, responsive interface
@@ -131,3 +132,8 @@ enter the CRM at `/{locale}/{workspaceSlug}/companies`; owners can manage member
 at `/{locale}/{workspaceSlug}/settings/members`. The workspace slug is canonical
 for navigation but does not select or authorize data. Legacy sample admin and
 REST routes remain quarantined with `404` responses.
+
+Authenticated active members can access the core CRM API under
+`/api/crm/companies`, `/api/crm/contacts`, and `/api/crm/deals`. The route files
+under `app/api/crm` are the HTTP entry points; request validation and list
+contracts are owned by `src/crm/contracts`.
