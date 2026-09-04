@@ -104,6 +104,16 @@ describe("CRM baseline migration", () => {
     );
   });
 
+  it("does not create obsolete sample tables in the fresh CRM schema", async () => {
+    const tables = await env.DB.prepare(
+      "SELECT name FROM sqlite_schema WHERE type = 'table'",
+    ).all<{ name: string }>();
+    const names = tables.results.map((row) => row.name);
+    for (const table of [
+      "customers", "subscriptions", "features", "subscription_features", "customer_subscriptions",
+    ]) expect(names, table).not.toContain(table);
+  });
+
   it("seeds stable stages and singleton settings only", async () => {
     const stages = await env.DB.prepare(
       "SELECT id, position, closed_state FROM deal_stage ORDER BY position",
