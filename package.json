@@ -1,0 +1,74 @@
+{
+	"name": "saas-admin",
+	"description": "Admin dashboard template built with Vinext, shadcn/ui, and Cloudflare's developer stack",
+	"cloudflare": {
+		"label": "SaaS Admin Template",
+		"products": [
+			"Workers",
+			"D1"
+		],
+		"categories": [],
+		"docs_url": "https://developers.cloudflare.com/workers/",
+		"preview_icon_url": "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/c2a0b13a-8cd1-464a-561b-3a7371c7c700/public",
+		"preview_image_url": "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/661a4884-fb10-4867-7b4e-b72763d12100/preview",
+		"publish": true
+	},
+	"dependencies": {
+		"@hookform/resolvers": "5.2.2",
+		"@radix-ui/react-accordion": "1.2.12",
+		"@radix-ui/react-dialog": "1.1.15",
+		"@radix-ui/react-label": "2.1.8",
+		"@radix-ui/react-navigation-menu": "1.2.14",
+		"@radix-ui/react-slot": "1.2.4",
+		"@tanstack/react-table": "8.21.3",
+		"@types/react": "19.2.7",
+		"@types/react-dom": "19.2.3",
+		"@vinext/cloudflare": "1.0.0-beta.7",
+		"class-variance-authority": "0.7.1",
+		"clsx": "2.1.1",
+		"lucide-react": "0.555.0",
+		"react": "19.2.8",
+		"react-dom": "19.2.8",
+		"react-hook-form": "7.66.1",
+		"react-server-dom-webpack": "19.2.8",
+		"tailwind-merge": "3.4.0",
+		"tailwindcss-animate": "1.0.7",
+		"vinext": "1.0.0-beta.9",
+		"zod": "4.1.13"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "1.54.4",
+		"@types/node": "24.10.1",
+		"@vitejs/plugin-react": "6.1.1",
+		"@vitejs/plugin-rsc": "0.5.34",
+		"autoprefixer": "10.5.4",
+		"postcss": "8.5.28",
+		"tailwindcss": "3.4.19",
+		"typescript": "5.9.3",
+		"vite": "8.2.2",
+		"wrangler": "4.129.0"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"private": true,
+	"type": "module",
+	"allowScripts": {
+		"esbuild@0.28.1": true,
+		"workerd@1.20260903.1": true
+	},
+	"scripts": {
+		"build": "vinext build",
+		"cf-typegen": "wrangler types",
+		"check": "npm run typecheck && npm run build && vinext-cloudflare deploy --dry-run",
+		"db:migrate": "wrangler d1 migrations apply DB --local",
+		"db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+		"deploy": "vinext-cloudflare deploy",
+		"dev": "npm run db:migrate && vinext dev --port 4321",
+		"e2e:dev": "npm run db:migrate && vinext dev",
+		"predeploy": "npm run db:migrate:remote",
+		"preview": "npm run build && npm run start",
+		"start": "wrangler d1 migrations apply DB --local --config dist/server/wrangler.json && wrangler dev --config dist/server/wrangler.json",
+		"typecheck": "tsc --noEmit"
+	}
+}
