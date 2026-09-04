@@ -19,6 +19,7 @@ member settings, and guarded company, contact, and deal APIs.
 - 👤 Owner-only localized member management
 - 🏢 Localized company, contact, and deal lists with stable record sheets
 - 📝 Manual activities, tasks, deal stage history, and record ownership
+- 🧩 Custom fields and private/shared saved list views
 - 🔗 Guarded company, contact, and deal APIs with archive/restore workflows
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
@@ -105,6 +106,10 @@ email delivery. For list and record-sheet scenarios, pass the suite selector:
 npm run test:e2e:local -- lists-and-sheets
 ```
 
+For custom-field and saved-view journeys, use the selector
+`npm run test:e2e:local -- custom-fields-and-saved-views`. The executable scenarios
+live in [tests/e2e](tests/e2e).
+
 6. Before any remote migration or upload for a fresh or reset database, define
    a controlled first-owner bootstrap procedure that verifies exactly the
    intended account holds the sole active owner membership. Production is
@@ -155,3 +160,24 @@ for the UI and [the activity contract](src/crm/contracts/activity-contract.ts)
 for API validation. Record assignment uses [OwnerPicker](src/components/crm/owner-picker.tsx)
 and the [ownership API entry point](app/api/crm/ownership/route.ts); assignment
 rules belong to [OwnershipService](src/crm/ownership/ownership-service.ts).
+
+All active members can manage custom fields from each list's field settings and
+edit values in record sheets. Start with [FieldsSheet](src/components/crm/fields/fields-sheet.tsx)
+and [RecordFields](src/components/crm/fields/record-fields.tsx); supported types
+belong to [the field contract](src/fields/field-contracts.ts), and SELECT/USER
+list filters to [the field query owner](src/fields/field-list-query.ts).
+
+The field deletion dialog shows value coverage and requires the current password
+and typed stable field key. Deletion retains the normalized definition, options,
+values, and reserved key as a recoverable tombstone; there is no automatic purge.
+Keep the displayed recovery ID for explicit recovery in field settings. Lifecycle
+rules belong to [FieldService](src/fields/field-service.ts), and password checking
+to [verifyCurrentPassword](src/auth/verify-current-password.ts).
+
+Use [SavedViewsMenu](src/components/crm/saved-views-menu.tsx) to save and apply
+private or shared list state. Every active member may create views; private views
+remain creator-only, while shared views are readable by all members. Only the
+original creator may edit, change sharing, or delete a view; membership removal
+or record reassignment does not transfer that authority. See
+[SavedViewService](src/views/saved-view-service.ts) and
+[the saved-state contract](src/views/saved-view-contracts.ts).
