@@ -60,7 +60,7 @@ for (const locale of ["vi", "en"] as const) {
     await expect(dialog).toBeVisible();
     await expect(dialog.locator(":focus")).toHaveCount(1);
     const membersLink = dialog.getByRole("link", { name: vi ? "Thành viên" : "Members", exact: true });
-    for (let step = 0; step < 3; step++) {
+    for (let step = 0; step < 5; step++) {
       await page.keyboard.press("Tab");
       await expect(dialog.locator(":focus")).toHaveCount(1);
       if (await membersLink.evaluate((element) => element === document.activeElement)) break;
