@@ -7,7 +7,6 @@ export interface RuntimeEnv extends Cloudflare.Env {
   BETTER_AUTH_SECRET: string;
   AUTH_ALLOWED_EMAILS: string;
   AUTH_BASE_URL: string;
-  AUTH_TRUSTED_ORIGINS: string;
   AUTH_EMAIL_FROM: string;
   RESEND_API_KEY: string;
 }
@@ -26,7 +25,6 @@ export function createCompositionRoot(
       secret: runtimeBindings["BETTER_AUTH_SECRET"],
       allowedEmails: runtimeBindings["AUTH_ALLOWED_EMAILS"],
       baseUrl: runtimeBindings["AUTH_BASE_URL"],
-      trustedOrigins: runtimeBindings["AUTH_TRUSTED_ORIGINS"],
     },
     emailAdapter,
   );

@@ -19,7 +19,6 @@ import {
 export interface AuthConfiguration {
   secret: string;
   baseUrl: string;
-  trustedOrigins: string;
   allowedEmails: string;
 }
 
@@ -36,27 +35,6 @@ function parseCanonicalOrigin(value: string): URL {
     throw new Error("AUTH_BASE_URL must be a canonical HTTPS origin");
   }
   return url;
-}
-
-function parseTrustedOrigins(value: string, baseUrl: URL): string[] {
-  const origins = value
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean)
-    .map((origin) => new URL(origin));
-  if (
-    origins.length === 0 ||
-    origins.some(
-      (origin) =>
-        origin.protocol !== "https:" ||
-        origin.origin !== origin.href.replace(/\/$/, ""),
-    )
-  ) {
-    throw new Error("AUTH_TRUSTED_ORIGINS must contain exact HTTPS origins");
-  }
-  const normalized = origins.map((origin) => origin.origin);
-  if (!normalized.includes(baseUrl.origin)) normalized.push(baseUrl.origin);
-  return normalized;
 }
 
 function assertCanonicalEmailUrl(value: string, baseUrl: URL): string {
@@ -76,14 +54,12 @@ export function createAuth(
     throw new Error("BETTER_AUTH_SECRET must be at least 32 characters");
   }
   const baseUrl = parseCanonicalOrigin(config.baseUrl);
-  const trustedOrigins = parseTrustedOrigins(config.trustedOrigins, baseUrl);
   const allowlist = parseEmailAllowlist(config.allowedEmails);
 
   return betterAuth({
     appName: "CRM",
     baseURL: baseUrl.origin,
     secret: config.secret,
-    trustedOrigins,
     database: drizzleAdapter(db, {
       provider: "sqlite",
       schema,

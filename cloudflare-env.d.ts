@@ -4,7 +4,6 @@ declare namespace Cloudflare {
     BETTER_AUTH_SECRET: string;
     AUTH_ALLOWED_EMAILS: string;
     AUTH_BASE_URL: string;
-    AUTH_TRUSTED_ORIGINS: string;
     AUTH_EMAIL_FROM: string;
     RESEND_API_KEY: string;
   }
@@ -15,7 +14,6 @@ interface Env {
   BETTER_AUTH_SECRET: string;
   AUTH_ALLOWED_EMAILS: string;
   AUTH_BASE_URL: string;
-  AUTH_TRUSTED_ORIGINS: string;
   AUTH_EMAIL_FROM: string;
   RESEND_API_KEY: string;
 }
