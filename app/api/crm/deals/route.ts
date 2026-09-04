@@ -47,7 +47,7 @@ export function createDealsPatchHandler(root: CompositionRoot) {
     output: dealBulkOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.deals.bulkArchive(context, input.ids);
+      return root.deals.bulkArchive(context, input.ids, input.action === "bulk-restore");
     },
   });
 }

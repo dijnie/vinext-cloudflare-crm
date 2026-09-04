@@ -47,7 +47,7 @@ export function createContactsPatchHandler(root: CompositionRoot) {
     output: contactBulkOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.contacts.bulkArchive(context, input.ids);
+      return root.contacts.bulkArchive(context, input.ids, input.action === "bulk-restore");
     },
   });
 }

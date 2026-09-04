@@ -35,6 +35,7 @@ import {
   createDealContactPostHandler,
 } from "../../app/api/crm/deals/[dealId]/contacts/route";
 import { handleAuthRequest } from "@/auth/auth";
+import { createOwnersGetHandler } from "../../app/api/crm/owners/route";
 import type { AuthEmailAdapter, AuthEmailMessage } from "@/auth/email-adapter";
 import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
 import { singletonMembership } from "@/db/schema";
@@ -165,6 +166,152 @@ async function json(response: Response) {
 
 describe.sequential("core CRM API", () => {
   beforeEach(clearState);
+
+  it("prevents caching authenticated list responses and authorization or validation errors", async () => {
+    const root = createCompositionRoot(bindings, new RecordingEmailAdapter());
+    const actor = await verifiedSession("cache-policy@example.com");
+    const lists = [
+      ["/api/crm/companies", createCompaniesGetHandler(root)],
+      ["/api/crm/contacts", createContactsGetHandler(root)],
+      ["/api/crm/deals", createDealsGetHandler(root)],
+      ["/api/crm/owners", createOwnersGetHandler(root)],
+    ] as const;
+    for (const [path, handler] of lists) {
+      const anonymous = await handler(request(path));
+      expect(anonymous.status).toBe(401);
+      expect(anonymous.headers.get("cache-control")).toBe("private, no-store");
+      const authenticated = await handler(request(path, actor.cookie));
+      expect(authenticated.status).toBe(200);
+      expect(authenticated.headers.get("cache-control")).toBe("private, no-store");
+    }
+    const invalid = await createCompaniesGetHandler(root)(request("/api/crm/companies?page=0", actor.cookie));
+    expect(invalid.status).toBe(400);
+    expect(invalid.headers.get("cache-control")).toBe("private, no-store");
+    await root.db.update(singletonMembership).set({ status: "revoked" }).where(eq(singletonMembership.userId, actor.userId));
+    for (const [path, handler] of lists) {
+      const forbidden = await handler(request(path, actor.cookie));
+      expect(forbidden.status).toBe(403);
+      expect(forbidden.headers.get("cache-control")).toBe("private, no-store");
+    }
+  });
+
+  it("lists active owners only and rejects anonymous or revoked callers", async () => {
+    const root = createCompositionRoot(bindings, new RecordingEmailAdapter());
+    const handler = createOwnersGetHandler(root);
+    expect((await handler(request("/api/crm/owners"))).status).toBe(401);
+    const actor = await verifiedSession("owners@example.com");
+    const revoked = await verifiedSession("revoked@example.com");
+    await root.db.update(singletonMembership).set({ status: "revoked" }).where(eq(singletonMembership.userId, revoked.userId));
+    const response = await handler(request("/api/crm/owners", actor.cookie));
+    expect(response.status).toBe(200);
+    const owners = await json(response);
+    expect(owners.rows.map((row: any) => row.membershipId).sort()).toEqual(["sentinel-owner", actor.userId].sort());
+    expect((await handler(request("/api/crm/owners", revoked.cookie))).status).toBe(403);
+  });
+
+  it("filters punctuation-bearing titles and industries and omits unsupported blank facets", async () => {
+    const actor = await verifiedSession("facets@example.com");
+    const root = createCompositionRoot(bindings, new RecordingEmailAdapter());
+    for (const industry of ["Media, Publishing", "Technology", null]) {
+      const response = await createCompaniesPostHandler(root)(request("/api/crm/companies", actor.cookie, "POST", { name: industry ?? "Unclassified" }));
+      expect(response.status).toBe(200);
+      const company = await json(response);
+      expect((await createCompanyPatchHandler(root, Promise.resolve({ companyId: company.id }))(request(`/api/crm/companies/${company.id}`, actor.cookie, "PATCH", { action: "update", data: { industry } }))).status).toBe(200);
+    }
+    const companies = await json(await createCompaniesGetHandler(root)(request("/api/crm/companies?industry=Media%2C+Publishing&industry=Technology", actor.cookie)));
+    expect(companies.total).toBe(2);
+    expect(companies.rows.map((row: any) => row.industry).sort()).toEqual(["Media, Publishing", "Technology"]);
+    const allCompanies = await json(await createCompaniesGetHandler(root)(request("/api/crm/companies", actor.cookie)));
+    expect(allCompanies.facets.industry.map((option: any) => option.value)).toEqual(["Media, Publishing", "Technology"]);
+    for (const title of ["VP, Sales", "CEO", null]) {
+      expect((await createContactsPostHandler(root)(request("/api/crm/contacts", actor.cookie, "POST", { firstName: title ?? "Untitled", title: title ?? undefined }))).status).toBe(200);
+    }
+    const contacts = await json(await createContactsGetHandler(root)(request("/api/crm/contacts?title=VP%2C+Sales&title=CEO", actor.cookie)));
+    expect(contacts.total).toBe(2);
+    expect(contacts.rows.map((row: any) => row.title).sort()).toEqual(["CEO", "VP, Sales"]);
+    const allContacts = await json(await createContactsGetHandler(root)(request("/api/crm/contacts", actor.cookie)));
+    expect(allContacts.facets.title.map((option: any) => option.value)).toEqual(["CEO", "VP, Sales"]);
+    expect(allContacts.facets.company).toEqual([]);
+    expect(allContacts.facets.owner).toEqual([{ value: "unassigned", label: "", count: 3 }]);
+  });
+
+  it("keeps facet choices independent of selected filters while respecting search and archive scope", async () => {
+    const actor = await verifiedSession("facet-scope@example.com");
+    const root = createCompositionRoot(bindings, new RecordingEmailAdapter());
+    const create = async (name: string, industry: string, ownerMembershipId: string | null) => {
+      const response = await createCompaniesPostHandler(root)(request("/api/crm/companies", actor.cookie, "POST", { name, ownerMembershipId }));
+      expect(response.status).toBe(200);
+      const company = await json(response);
+      expect((await createCompanyPatchHandler(root, Promise.resolve({ companyId: company.id }))(request(`/api/crm/companies/${company.id}`, actor.cookie, "PATCH", { action: "update", data: { industry } }))).status).toBe(200);
+      return company;
+    };
+    const first = await create("Alpha", "Industry A", actor.userId);
+    const second = await create("Beta", "Industry B", null);
+    const archived = await create("Archived", "Industry C", actor.userId);
+    expect((await createCompaniesPatchHandler(root)(request("/api/crm/companies", actor.cookie, "PATCH", { action: "bulk-archive", ids: [archived.id] }))).status).toBe(200);
+    const list = async (query: string) => {
+      const response = await createCompaniesGetHandler(root)(request(`/api/crm/companies?${query}`, actor.cookie));
+      expect(response.status).toBe(200);
+      return json(response);
+    };
+    const activeChoices = [
+      { value: "Industry A", label: "Industry A", count: 1 },
+      { value: "Industry B", label: "Industry B", count: 1 },
+    ];
+    const single = await list("industry=Industry+A");
+    expect(single.rows.map((row: any) => row.id)).toEqual([first.id]);
+    expect(single.facets.industry).toEqual(activeChoices);
+    const multiple = await list("industry=Industry+A&industry=Industry+B");
+    expect(multiple.rows.map((row: any) => row.id).sort()).toEqual([first.id, second.id].sort());
+    expect(multiple.facets.industry).toEqual(activeChoices);
+    const owned = await list(`owner=${actor.userId}&industry=Industry+A`);
+    expect(owned.rows.map((row: any) => row.id)).toEqual([first.id]);
+    expect(owned.facets.industry).toEqual(activeChoices);
+    expect(owned.facets.owner.map((option: any) => option.value).sort()).toEqual([actor.userId, "unassigned"].sort());
+    const searched = await list(`q=Beta&owner=${actor.userId}&industry=Industry+A`);
+    expect(searched.rows).toEqual([]);
+    expect(searched.facets.industry).toEqual([activeChoices[1]]);
+    expect(searched.facets.owner).toEqual([{ value: "unassigned", label: "", count: 1 }]);
+    const archiveScope = await list("archived=true&industry=Industry+A");
+    expect(archiveScope.rows).toEqual([]);
+    expect(archiveScope.facets.industry).toEqual([{ value: "Industry C", label: "Industry C", count: 1 }]);
+    const archiveSearch = await list("archived=true&q=Alpha");
+    expect(archiveSearch.facets.industry).toEqual([]);
+  });
+
+  it("keeps contact bulk restore atomic on email conflicts and restores deduplicated selections", async () => {
+    const actor = await verifiedSession("contact-restore@example.com");
+    const root = createCompositionRoot(bindings, new RecordingEmailAdapter());
+    const create = async (email: string) => json(await createContactsPostHandler(root)(request("/api/crm/contacts", actor.cookie, "POST", { firstName: email, email })));
+    const first = await create("first@example.com");
+    const second = await create("second@example.com");
+    const mutate = (action: string, ids: string[]) => createContactsPatchHandler(root)(request("/api/crm/contacts", actor.cookie, "PATCH", { action, ids }));
+    expect((await mutate("bulk-archive", [first.id, second.id])).status).toBe(200);
+    const replacement = await create("second@example.com");
+    expect((await mutate("bulk-restore", [first.id, second.id])).status).toBe(409);
+    const archived = await json(await createContactsGetHandler(root)(request("/api/crm/contacts?archived=true", actor.cookie)));
+    expect(archived.rows.map((row: any) => row.id).sort()).toEqual([first.id, second.id].sort());
+    expect((await mutate("bulk-archive", [replacement.id])).status).toBe(200);
+    expect(await json(await mutate("bulk-restore", [first.id, second.id, first.id]))).toEqual({ requested: 2, succeeded: 2, failed: 0 });
+    const active = await json(await createContactsGetHandler(root)(request("/api/crm/contacts", actor.cookie)));
+    expect(active.rows.map((row: any) => row.id).sort()).toEqual([first.id, second.id].sort());
+  });
+
+  it("restores selected deals and reports missing IDs without touching other archived deals", async () => {
+    const actor = await verifiedSession("deal-restore@example.com");
+    const root = createCompositionRoot(bindings, new RecordingEmailAdapter());
+    const company = await json(await createCompaniesPostHandler(root)(request("/api/crm/companies", actor.cookie, "POST", { name: "Acme" })));
+    const create = async (name: string) => json(await createDealsPostHandler(root)(request("/api/crm/deals", actor.cookie, "POST", { name, companyId: company.id, ownerMembershipId: actor.userId })));
+    const selected = await create("Selected");
+    const untouched = await create("Untouched");
+    const mutate = (action: string, ids: string[]) => createDealsPatchHandler(root)(request("/api/crm/deals", actor.cookie, "PATCH", { action, ids }));
+    expect((await mutate("bulk-archive", [selected.id, untouched.id])).status).toBe(200);
+    expect(await json(await mutate("bulk-restore", [selected.id, selected.id, crypto.randomUUID()]))).toEqual({ requested: 2, succeeded: 1, failed: 1 });
+    const active = await json(await createDealsGetHandler(root)(request("/api/crm/deals", actor.cookie)));
+    expect(active.rows.map((row: any) => row.id)).toEqual([selected.id]);
+    const archived = await json(await createDealsGetHandler(root)(request("/api/crm/deals?archived=true", actor.cookie)));
+    expect(archived.rows.map((row: any) => row.id)).toEqual([untouched.id]);
+  });
 
   it("guards every service with active singleton membership", async () => {
     const root = createCompositionRoot(bindings, new RecordingEmailAdapter());
@@ -639,8 +786,27 @@ describe.sequential("core CRM API", () => {
       request("/api/crm/companies", actor.cookie),
     );
     expect(response.status).toBe(500);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await json(response)).toEqual({
       error: { code: "internal_error", requestId: "core-crm-request" },
     });
+  });
+
+  it("restores selected records atomically and returns SQL facet counts", async () => {
+    const actor = await verifiedSession("restore@example.com");
+    const root = createCompositionRoot(bindings, new RecordingEmailAdapter());
+    const create = (name: string, domain: string) => createCompaniesPostHandler(root)(request("/api/crm/companies", actor.cookie, "POST", { name, domain })).then(json);
+    const first = await create("First", "first.test");
+    const second = await create("Second", "second.test");
+    const mutation = (action: string, ids: string[]) => createCompaniesPatchHandler(root)(request("/api/crm/companies", actor.cookie, "PATCH", { action, ids }));
+    expect((await mutation("bulk-archive", [first.id, second.id])).status).toBe(200);
+    const replacement = await create("Replacement", "second.test");
+    expect((await mutation("bulk-restore", [first.id, second.id])).status).toBe(409);
+    const archived = await json(await createCompaniesGetHandler(root)(request("/api/crm/companies?archived=true", actor.cookie)));
+    expect(archived.total).toBe(2);
+    expect(archived.facets.owner).toEqual([{ value: "unassigned", label: "", count: 2 }]);
+    expect((await mutation("bulk-archive", [replacement.id])).status).toBe(200);
+    const restored = await json(await mutation("bulk-restore", [first.id, second.id, first.id]));
+    expect(restored).toEqual({ requested: 2, succeeded: 2, failed: 0 });
   });
 });

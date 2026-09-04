@@ -3,6 +3,7 @@ import { z } from "zod";
 import { HttpError } from "@/server/http-errors";
 
 export const DEFAULT_PAGE_SIZE = 25;
+export const facetOutputSchema = z.record(z.string(), z.array(z.object({ value: z.string(), label: z.string(), count: z.number().int().nonnegative() })));
 export const MAX_PAGE_SIZE = 100;
 export const MAX_BULK_IDS = 100;
 
@@ -48,7 +49,7 @@ export const bulkIdsSchema = z
 
 export const bulkArchiveInputSchema = z
   .object({
-    action: z.literal("bulk-archive"),
+    action: z.enum(["bulk-archive", "bulk-restore"]),
     ids: bulkIdsSchema,
   })
   .strict();
@@ -70,7 +71,7 @@ export function parseSearchParams<T>(
     input[key] = arrayKeys.includes(key)
       ? url.searchParams
           .getAll(key)
-          .flatMap((value) => value.split(","))
+          .flatMap((value) => ["industry", "title"].includes(key) ? [value] : value.split(","))
           .filter(Boolean)
       : (url.searchParams.get(key) ?? "");
   }

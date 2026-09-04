@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   bulkArchiveInputSchema,
   bulkResultSchema,
+  facetOutputSchema,
   isoDateTimeSchema,
   listContract,
   membershipIdSchema,
@@ -120,6 +121,7 @@ const dealListRowOutputSchema = z.object({
   updatedAt: isoDateTimeSchema,
 });
 export const dealListOutputSchema = z.object({
+  facets: facetOutputSchema,
   total: z.number().int().nonnegative(),
   rows: z.array(dealListRowOutputSchema),
 });
@@ -151,8 +153,8 @@ export const dealArchiveOutputSchema = z.object({
   archivedAt: nullableIsoDateTimeSchema,
 });
 export const dealMutationOutputSchema = z.union([
-  dealUpdateOutputSchema,
   dealArchiveOutputSchema,
+  dealUpdateOutputSchema,
 ]);
 export const dealContactOutputSchema = z.object({
   dealId: stableIdSchema,

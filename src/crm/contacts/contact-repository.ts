@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm";
 
 import type { AppDatabase } from "@/db/client";
+import { listFacets } from "@/crm/facet-repository";
 import {
   company,
   contact,
@@ -58,7 +59,8 @@ export class ContactRepository {
       .select({ total: sql<number>`count(*)` })
       .from(contact)
       .where(where);
-    return { rows, total };
+    const facets = await listFacets(this.db, "contact", this.where({ ...input, owner: [], company: [], title: [] }));
+    return { rows, total, facets };
   }
 
   async byId(id: string) {
@@ -123,10 +125,10 @@ export class ContactRepository {
       .returning()
       .get();
   }
-  async bulkArchive(ids: string[], archivedAt: Date) {
+  async bulkArchive(ids: string[], archivedAt: Date | null) {
     const result = await this.db
       .update(contact)
-      .set({ archivedAt, updatedAt: archivedAt })
+      .set({ archivedAt, updatedAt: new Date() })
       .where(inArray(contact.id, ids));
     return result.meta.changes;
   }

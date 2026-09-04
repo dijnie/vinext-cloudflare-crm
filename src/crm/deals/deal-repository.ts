@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm";
 
 import type { AppDatabase } from "@/db/client";
+import { listFacets } from "@/crm/facet-repository";
 import {
   company,
   contact,
@@ -65,7 +66,8 @@ export class DealRepository {
       .select({ total: sql<number>`count(*)` })
       .from(deal)
       .where(where);
-    return { rows, total };
+    const facets = await listFacets(this.db, "deal", this.where({ ...input, owner: [], company: [], stage: [] }));
+    return { rows, total, facets };
   }
 
   async byId(id: string) {
@@ -136,10 +138,10 @@ export class DealRepository {
       .returning()
       .get();
   }
-  async bulkArchive(ids: string[], archivedAt: Date) {
+  async bulkArchive(ids: string[], archivedAt: Date | null) {
     const result = await this.db
       .update(deal)
-      .set({ archivedAt, updatedAt: archivedAt })
+      .set({ archivedAt, updatedAt: new Date() })
       .where(inArray(deal.id, ids));
     return result.meta.changes;
   }

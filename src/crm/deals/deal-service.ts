@@ -22,6 +22,7 @@ export class DealService {
     const result = await this.repository.list(input);
     return {
       total: result.total,
+      facets: result.facets,
       rows: result.rows.map((row) => this.serialize(row)),
     };
   }
@@ -172,10 +173,12 @@ export class DealService {
     if (!row) throw new HttpError(404, "not_found", "Deal was not found");
     return { id: row.id, name: row.name, archivedAt: toIso(row.archivedAt) };
   }
-  async bulkArchive(context: RequestContext, ids: string[]) {
+  async bulkArchive(context: RequestContext, ids: string[], restore = false) {
     this.guard(context);
-    const succeeded = await this.repository.bulkArchive(ids, new Date());
-    return { requested: ids.length, succeeded, failed: ids.length - succeeded };
+    try {
+      const succeeded = await this.repository.bulkArchive(ids, restore ? null : new Date());
+      return { requested: ids.length, succeeded, failed: ids.length - succeeded };
+    } catch (error) { relationError(error, "Restored records conflict with active records"); }
   }
 
   async attachContact(

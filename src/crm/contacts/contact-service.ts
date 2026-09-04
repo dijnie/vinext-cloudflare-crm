@@ -26,6 +26,7 @@ export class ContactService {
     const result = await this.repository.list(input);
     return {
       total: result.total,
+      facets: result.facets,
       rows: result.rows.map((row) => this.serialize(row)),
     };
   }
@@ -142,10 +143,12 @@ export class ContactService {
     }
   }
 
-  async bulkArchive(context: RequestContext, ids: string[]) {
+  async bulkArchive(context: RequestContext, ids: string[], restore = false) {
     this.guard(context);
-    const succeeded = await this.repository.bulkArchive(ids, new Date());
-    return { requested: ids.length, succeeded, failed: ids.length - succeeded };
+    try {
+      const succeeded = await this.repository.bulkArchive(ids, restore ? null : new Date());
+      return { requested: ids.length, succeeded, failed: ids.length - succeeded };
+    } catch (error) { relationError(error, "Restored records conflict with active records"); }
   }
 
   private serialize<

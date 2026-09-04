@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   bulkArchiveInputSchema,
   bulkResultSchema,
+  facetOutputSchema,
   isoDateTimeSchema,
   listContract,
   membershipIdSchema,
@@ -100,6 +101,7 @@ const companyListRowOutputSchema = z.object({
   openDealCount: z.number().int().nonnegative(),
 });
 export const companyListOutputSchema = z.object({
+  facets: facetOutputSchema,
   total: z.number().int().nonnegative(),
   rows: z.array(companyListRowOutputSchema),
 });

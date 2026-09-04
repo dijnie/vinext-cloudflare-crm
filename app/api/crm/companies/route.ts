@@ -46,7 +46,7 @@ export function createCompaniesPatchHandler(root: CompositionRoot) {
     output: companyBulkOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.companies.bulkArchive(context, input.ids);
+      return root.companies.bulkArchive(context, input.ids, input.action === "bulk-restore");
     },
   });
 }

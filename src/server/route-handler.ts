@@ -21,6 +21,7 @@ export interface RouteHandlerOptions<TInput, TResult> {
 
 function withSecurityHeaders(response: Response): Response {
   const headers = new Headers(response.headers);
+  headers.set("cache-control", "private, no-store");
   applySecurityHeaders(headers);
   return new Response(response.body, {
     status: response.status,
