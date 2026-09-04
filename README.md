@@ -36,10 +36,9 @@ member settings, and guarded company, contact, and deal APIs.
 - Validation: [Zod](https://github.com/colinhacks/zod)
 
 > [!IMPORTANT]
-> Phase 1 is deployed to production with Cloudflare Email Service, and the
-> intended first account is verified as the sole active owner. Open registration
-> remains enabled; only an empty workspace assigns the first verified account as
-> owner.
+> Version preview and production share the remote D1 selected in
+> [wrangler.jsonc](wrangler.jsonc). Preview writes therefore affect production
+> data. Local checks do not establish remote migration or deployment readiness.
 
 <!-- dash-content-end -->
 
@@ -48,7 +47,7 @@ member settings, and guarded company, contact, and deal APIs.
 1. Install dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 2. Set up your environment variables:
@@ -65,14 +64,7 @@ Cloudflare Email Service. Change the variable and binding sender restriction
 together when changing domains. Email delivery uses the native Worker binding;
 no Resend account or API key is required.
 
-3. Verify the D1 target already declared in `wrangler.jsonc` before applying
-   migrations:
-
-```bash
-npx wrangler d1 info saas-admin
-```
-
-4. Run the authoritative CRM migrations locally:
+3. Run the authoritative CRM migrations locally:
 
 The development command applies local migrations before starting Vinext:
 
@@ -83,7 +75,7 @@ npm run dev
 The source migration directory is `migrations/crm`. Apply it without starting
 the development server with `npm run db:migrate:local`.
 
-5. Build the application:
+4. Build the application:
 
 ```bash
 npm run build
@@ -96,8 +88,9 @@ account credentials:
 npm run test:e2e:local
 ```
 
-The [local browser runner](scripts/e2e-local.mjs) owns fixture provisioning,
-server startup, suite selection, and cleanup. It uses real Better Auth sign-up
+The [local browser runner](scripts/e2e-local.mjs) owns the complete default
+browser matrix in fresh database groups, fixture provisioning, server startup,
+and cleanup. It uses real Better Auth sign-up
 and sign-in, seeding verified status only for its disposable fixture accounts
 because the local email binding cannot deliver mail. These checks do not prove
 email delivery. For list and record-sheet scenarios, pass the suite selector:
@@ -110,27 +103,54 @@ For custom-field and saved-view journeys, use the selector
 `npm run test:e2e:local -- custom-fields-and-saved-views`. The executable scenarios
 live in [tests/e2e](tests/e2e).
 
-6. Before any remote migration or upload for a fresh or reset database, define
-   a controlled first-owner bootstrap procedure that verifies exactly the
-   intended account holds the sole active owner membership. Production is
-   already bootstrapped; do not repeat this procedure unless the database is
-   intentionally reset.
+### Verification and remote operations
 
-7. After that gate and explicit target/rollback verification, apply preview
-   migrations separately from deployment:
+The [package scripts](package.json) own the local checks, binding generation,
+and deployment commands. `npm run check` covers the non-browser release gates;
+browser checks use the disposable local runner above. Local mail fixtures do
+not prove Cloudflare Email Service delivery or remote auth cookies.
+
+The selected remote database already contains bootstrapped accounts and older
+migration history. The fresh baseline in [migrations/crm](migrations/crm) cannot
+be applied over that schema. Before any remote change, explicitly choose an
+audited account-preserving transition or an approved reset with controlled
+owner rebootstrap. Historical SQL files remain quarantined at the root of
+[migrations](migrations); the configured migration discovery reads only
+`migrations/crm`. Retain that older SQL until the cutover decision and operational
+rollback checks are resolved. A retained Git revision alone does not verify
+database recovery, and source cleanup does not alter the remote ledger.
+
+The [migration runner](scripts/d1-migrations.mjs) prints the resolved target and
+ledger. Inspect without applying changes:
 
 ```bash
-npm run db:migrate:preview
+node scripts/d1-migrations.mjs --target preview
 ```
 
-Because `preview_database_id` currently equals `database_id` in `wrangler.jsonc`,
-this command targets the same selected remote D1 database as production. Do not
-run it before its reset, backup, bookmark, and migration-ledger checks receive
-explicit approval. `npm run deploy` does not apply remote migrations.
+Use `--target production` to inspect the production selection. Remote apply
+requires the exact database ID acknowledgement as well as operational approval;
+it still rejects incompatible migration history. See the runbook for the
+conditional apply commands. `npm run start` uses the built Worker's local
+migration configuration to keep preview data and schema in the same local store.
 
-Do not use `wrangler secret put` during bootstrap because it deploys
-immediately. Upload and verify a non-production version first, then deploy the
-exact reviewed version only after the intended owner exists.
+The stateful [cutover runbook](../plans/260904-0849-vinext-crm-rebuild/reports/crm-cutover-runbook.md)
+records the selected targets, ledger collision, retained revision, backup and
+write-freeze gates, preview smoke ownership, production approval, and rollback
+decisions. It lives in the parent workspace's plans directory; a standalone
+application checkout needs that release record from the operator.
+
+Remote migrations are separate from deployment. Version upload, preview writes,
+and production promotion require their respective operational approval. Use
+version-scoped secrets for reviewed uploads; `wrangler secret put` immediately
+deploys and is unsuitable for staging an unreviewed auth configuration.
+Set `AUTH_BASE_URL` to the exact HTTPS origin being tested and verify its cookies
+and email links before promotion. Preserve the existing auth secret when
+preserving accounts and sessions.
+
+Worker rollback changes code and bindings, not D1 contents. Because preview and
+production share D1, a database Time Travel restore affects both and discards
+writes after the chosen recovery point. Record that accepted loss boundary
+before a restore; there is no automatic reset or zero-loss database rollback.
 
 ## Usage
 
@@ -141,7 +161,8 @@ enter the CRM at `/{locale}/{workspaceSlug}/companies`, with contact and deal
 lists at the corresponding `/contacts` and `/deals` paths; owners can manage
 members at `/{locale}/{workspaceSlug}/settings/members`. The workspace slug is canonical
 for navigation but does not select or authorize data. Legacy sample admin and
-REST routes remain quarantined with `404` responses.
+REST implementations are removed; their old URLs remain unavailable with `404`
+responses.
 
 Authenticated active members can access the core CRM API under
 `/api/crm/companies`, `/api/crm/contacts`, and `/api/crm/deals`. The route files
