@@ -33,7 +33,16 @@ export async function assertSafeMutationRequest(
   request: Request,
   canonicalOrigin: string,
 ): Promise<void> {
-  const origin = request.headers.get("origin");
+  let origin = request.headers.get("origin");
+  const incoming = new URL(request.url);
+  const canonical = new URL(canonicalOrigin);
+  // The local HTTPS proxy forwards same-origin requests to its HTTP Worker.
+  // Never relax canonical-origin checks for a non-loopback deployment.
+  if (
+    ["localhost", "127.0.0.1", "[::1]"].includes(incoming.hostname) &&
+    incoming.protocol === "http:" && canonical.protocol === "https:" &&
+    incoming.host === canonical.host && origin === incoming.origin
+  ) origin = canonicalOrigin;
   const fetchSite = request.headers.get("sec-fetch-site");
   const acceptedSites = ["same-origin", "same-site", "none"];
   if (origin !== canonicalOrigin || (fetchSite && !acceptedSites.includes(fetchSite))) {

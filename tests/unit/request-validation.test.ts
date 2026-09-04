@@ -16,6 +16,19 @@ function request(body: string, headers: HeadersInit = {}) {
 }
 
 describe("request validation", () => {
+  it("accepts the same-host loopback HTTPS proxy without relaxing remote origins", async () => {
+    const proxied = (url: string, origin: string, site = "same-origin") => new Request(url, {
+      method: "POST", body: "{}", headers: { origin, "sec-fetch-site": site, "content-type": "application/json" },
+    });
+    await expect(assertSafeMutationRequest(proxied("http://localhost:8787/api/crm", "http://localhost:8787"), "https://localhost:8787")).resolves.toBeUndefined();
+    for (const [url, origin, canonical, site] of [
+      ["http://crm.test/api/crm", "http://crm.test", "https://crm.test", "same-origin"],
+      ["http://localhost:8787/api/crm", "http://localhost:8788", "https://localhost:8787", "same-origin"],
+      ["http://localhost:8787/api/crm", "http://localhost:8787", "https://localhost:8788", "same-origin"],
+      ["http://localhost:8787/api/crm", "https://evil.test", "https://localhost:8787", "same-origin"],
+      ["http://localhost:8787/api/crm", "http://localhost:8787", "https://localhost:8787", "cross-site"],
+    ]) await expect(assertSafeMutationRequest(proxied(url!, origin!, site!), canonical!)).rejects.toMatchObject({ code: "invalid_origin" });
+  });
   it("rejects cross-origin and cross-site mutations", async () => {
     await expect(
       assertSafeMutationRequest(

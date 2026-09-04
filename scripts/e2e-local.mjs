@@ -54,7 +54,7 @@ async function run(command, args) {
 }
 try {
   await run("npx", ["wrangler", "d1", "migrations", "apply", "DB", "--local", "--config", config, "--persist-to", persist]);
-  server = spawn("node", ["node_modules/wrangler/bin/wrangler.js", "dev", "--config", config, "--persist-to", persist, "--port", String(port), "--local-protocol", "https"], { stdio: "inherit", env: environment, detached: true });
+  server = spawn("node", ["node_modules/wrangler/bin/wrangler.js", "dev", "--config", config, "--persist-to", persist, "--port", String(port), "--local-protocol", "https", "--var", `AUTH_BASE_URL:${baseURL}`], { stdio: "inherit", env: environment, detached: true });
   console.log(`Local E2E server PID=${server.pid} port=${port} cwd=${process.cwd()} state=${persist}`);
   const api = await request.newContext({ baseURL, ignoreHTTPSErrors: true, extraHTTPHeaders: { origin: baseURL } });
   try {
