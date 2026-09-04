@@ -6,6 +6,8 @@ import {
   singletonWorkspace,
   user,
 } from "@/db/schema";
+import { MemberService } from "@/members/member-service";
+import type { RequestContext } from "@/server/request-context";
 
 export const SINGLETON_WORKSPACE_ID = "00000000-0000-4000-8000-000000000001";
 export const SINGLETON_WORKSPACE_SLUG = "crm";
@@ -76,25 +78,22 @@ export async function changeSingletonRole(
   targetUserId: string,
   role: SingletonRole,
 ): Promise<boolean> {
-  const result = await db.run(sql`
-    UPDATE singleton_membership
-       SET role = ${role}, updated_at = ${Date.now()}
-     WHERE user_id = ${targetUserId}
-       AND status = 'active'
-       AND EXISTS (
-         SELECT 1 FROM singleton_membership AS actor
-          WHERE actor.user_id = ${actorUserId}
-            AND actor.role = 'owner'
-            AND actor.status = 'active'
-       )
-       AND (
-         role != 'owner'
-         OR ${role} = 'owner'
-         OR (SELECT COUNT(*) FROM singleton_membership
-              WHERE role = 'owner' AND status = 'active') > 1
-       )
-  `);
-  return result.meta.changes === 1;
+  const service = new MemberService(db);
+  try {
+    await service.changeRole(
+      {
+        userId: actorUserId,
+        membershipId: actorUserId,
+        role: "owner",
+        requestId: crypto.randomUUID(),
+      } as RequestContext,
+      targetUserId,
+      role,
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function revokeSingletonMembership(
@@ -102,24 +101,21 @@ export async function revokeSingletonMembership(
   actorUserId: string,
   targetUserId: string,
 ): Promise<boolean> {
-  const result = await db.run(sql`
-    UPDATE singleton_membership
-       SET status = 'revoked', updated_at = ${Date.now()}
-     WHERE user_id = ${targetUserId}
-       AND status = 'active'
-       AND EXISTS (
-         SELECT 1 FROM singleton_membership AS actor
-          WHERE actor.user_id = ${actorUserId}
-            AND actor.role = 'owner'
-            AND actor.status = 'active'
-       )
-       AND (
-         role != 'owner'
-         OR (SELECT COUNT(*) FROM singleton_membership
-              WHERE role = 'owner' AND status = 'active') > 1
-       )
-  `);
-  return result.meta.changes === 1;
+  const service = new MemberService(db);
+  try {
+    await service.remove(
+      {
+        userId: actorUserId,
+        membershipId: actorUserId,
+        role: "owner",
+        requestId: crypto.randomUUID(),
+      } as RequestContext,
+      targetUserId,
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function findUserByNormalizedEmail(

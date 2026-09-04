@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+import { applySecurityHeaders } from "./src/server/security-headers";
+
 const QUARANTINED_PREFIXES = [
   "/admin",
   "/api/customers",
@@ -9,6 +11,7 @@ const QUARANTINED_PREFIXES = [
 ];
 
 export function proxy(request: NextRequest) {
+  let response: NextResponse;
   if (
     QUARANTINED_PREFIXES.some(
       (prefix) =>
@@ -16,16 +19,14 @@ export function proxy(request: NextRequest) {
         request.nextUrl.pathname.startsWith(`${prefix}/`),
     )
   ) {
-    return new NextResponse(null, { status: 404 });
+    response = new NextResponse(null, { status: 404 });
+  } else {
+    response = NextResponse.next();
   }
-  return NextResponse.next();
+  applySecurityHeaders(response.headers);
+  return response;
 }
 
 export const config = {
-  matcher: [
-    "/admin/:path*",
-    "/api/customers/:path*",
-    "/api/subscriptions/:path*",
-    "/api/customer_subscriptions/:path*",
-  ],
+  matcher: ["/:path*"],
 };

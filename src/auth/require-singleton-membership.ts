@@ -1,9 +1,6 @@
-import { and, eq } from "drizzle-orm";
-
-import { singletonMembership } from "@/db/schema";
 import type { CompositionRoot } from "@/server/composition-root";
-
-import { reconcileSingletonMembership } from "./singleton-workspace";
+import { isHttpError } from "@/server/http-errors";
+import { requireRequestContext } from "@/server/request-context";
 
 export interface SingletonAuthContext {
   userId: string;
@@ -14,29 +11,11 @@ export async function requireSingletonMembership(
   requestHeaders: Headers,
   root: CompositionRoot,
 ): Promise<SingletonAuthContext | null> {
-  const session = await root.auth.api.getSession({ headers: requestHeaders });
-  if (!session?.user.emailVerified) return null;
-
-  let membership = await root.db.query.singletonMembership.findFirst({
-    where: and(
-      eq(singletonMembership.userId, session.user.id),
-      eq(singletonMembership.status, "active"),
-    ),
-  });
-  if (!membership) {
-    try {
-      await reconcileSingletonMembership(root.db, session.user.id);
-    } catch {
-      return null;
-    }
-    membership = await root.db.query.singletonMembership.findFirst({
-      where: and(
-        eq(singletonMembership.userId, session.user.id),
-        eq(singletonMembership.status, "active"),
-      ),
-    });
+  try {
+    const context = await requireRequestContext(requestHeaders, root);
+    return { userId: context.userId, role: context.role };
+  } catch (error) {
+    if (isHttpError(error) && [401, 403].includes(error.status)) return null;
+    throw error;
   }
-  return membership
-    ? { userId: session.user.id, role: membership.role }
-    : null;
 }
