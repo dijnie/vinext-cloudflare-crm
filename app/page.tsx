@@ -1,25 +1,10 @@
-import { buttonVariants } from "@/components/ui/button";
-import { Github, LayoutDashboard } from "lucide-react";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-const repoLink =
-  "https://github.com/cloudflare/templates/tree/main/saas-admin-template";
+import { SINGLETON_WORKSPACE_SLUG } from "@/auth/singleton-workspace";
+import { canonicalWorkspacePath, LOCALE_COOKIE, savedLocale } from "@/i18n/config";
 
-export default function HomePage() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-20 px-8">
-      <h1 className="text-5xl font-bold">SaaS Admin Template</h1>
-      <p className="text-xl text-muted-foreground">
-        Manage a SaaS application - customers, subscriptions - using Cloudflare
-        Workers and D1.
-      </p>
-      <div className="flex flex gap-4 mt-4">
-        <a className={buttonVariants()} href="/admin">
-          <LayoutDashboard /> Go to admin
-        </a>
-        <a className={buttonVariants({ variant: "outline" })} href={repoLink}>
-          <Github /> View on GitHub
-        </a>
-      </div>
-    </div>
-  );
+export default async function HomePage() {
+  const saved = (await cookies()).get(LOCALE_COOKIE)?.value;
+  redirect(canonicalWorkspacePath(savedLocale(saved), SINGLETON_WORKSPACE_SLUG));
 }

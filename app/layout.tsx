@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { headers } from "next/headers";
 
 import "@/styles/globals.css";
 
@@ -24,17 +25,18 @@ const themeScript = `
 
 export const metadata: Metadata = {
   title: {
-    default: "SaaS Admin Template",
-    template: "%s - SaaS Admin Template",
+    default: "CRM",
+    template: "%s - CRM",
   },
   icons: { icon: "/favicon.svg" },
 };
 
 export const viewport: Viewport = { width: "device-width" };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const locale = (await headers()).get("x-app-locale") === "en" ? "en" : "vi";
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

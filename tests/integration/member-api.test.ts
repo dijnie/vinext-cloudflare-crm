@@ -13,7 +13,7 @@ import type {
   AuthEmailMessage,
 } from "@/auth/email-adapter";
 import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
-import { singletonMembership } from "@/db/schema";
+import { company, singletonMembership } from "@/db/schema";
 import {
   createCompositionRoot,
   type RuntimeEnv,
@@ -177,6 +177,14 @@ describe.sequential("member API", () => {
     expect(changeRole.status).toBe(200);
     expect(await changeRole.json()).toEqual({ success: true });
 
+    await root.db.insert(company).values({
+      id: "owned-company",
+      name: "Owned company",
+      ownerMembershipId: member.userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
     const remove = await createMemberDeleteHandler(
       root,
       Promise.resolve({ memberId: member.userId }),
@@ -188,6 +196,9 @@ describe.sequential("member API", () => {
     );
     expect(remove.status).toBe(200);
     expect(await remove.json()).toEqual({ success: true });
+    expect(await root.db.query.company.findFirst({ where: (fields, { eq }) => eq(fields.id, "owned-company") })).toMatchObject({ ownerMembershipId: owner.userId });
+    const revokedSession = await createMembersGetHandler(root)(apiRequest("/api/crm/members", member.cookie));
+    expect(revokedSession.status).toBe(401);
 
     const restore = await createMemberPatchHandler(
       root,
@@ -200,6 +211,40 @@ describe.sequential("member API", () => {
     );
     expect(restore.status).toBe(200);
     expect(await restore.json()).toEqual({ success: true });
+  });
+
+  it("rejects last-owner self-removal and keeps the session active", async () => {
+    const owner = await createVerifiedSession("owner@example.com", true);
+    const member = await createVerifiedSession("member@example.com");
+    const root = createCompositionRoot(runtimeBindings, new RecordingEmailAdapter());
+    const remove = await createMemberDeleteHandler(root, Promise.resolve({ memberId: owner.userId }))(
+      apiRequest(`/api/crm/members/${owner.userId}`, owner.cookie, {
+        method: "DELETE",
+        body: JSON.stringify({ replacementMembershipId: member.userId }),
+      }),
+    );
+    expect(remove.status).toBe(409);
+    expect(await remove.json()).toEqual({ error: { code: "conflict", requestId: "member-api-request" } });
+    expect((await createMembersGetHandler(root)(apiRequest("/api/crm/members", owner.cookie))).status).toBe(200);
+  });
+
+  it("keeps workspace ownership with an owner when records go to a member", async () => {
+    const actor = await createVerifiedSession("actor@example.com", true);
+    const replacement = await createVerifiedSession("replacement@example.com");
+    const root = createCompositionRoot(runtimeBindings, new RecordingEmailAdapter());
+    const promoteCanonicalOwner = await createMemberPatchHandler(root, Promise.resolve({ memberId: "sentinel-owner" }))(
+      apiRequest("/api/crm/members/sentinel-owner", actor.cookie, { method: "PATCH", body: JSON.stringify({ action: "change-role", role: "owner" }) }),
+    );
+    expect(promoteCanonicalOwner.status).toBe(200);
+    await root.db.insert(company).values({ id: "canonical-owner-company", name: "Canonical owner company", ownerMembershipId: "sentinel-owner", createdAt: new Date(), updatedAt: new Date() });
+
+    const remove = await createMemberDeleteHandler(root, Promise.resolve({ memberId: "sentinel-owner" }))(
+      apiRequest("/api/crm/members/sentinel-owner", actor.cookie, { method: "DELETE", body: JSON.stringify({ replacementMembershipId: replacement.userId }) }),
+    );
+    expect(remove.status).toBe(200);
+    expect(await root.db.query.singletonWorkspace.findFirst({ where: (fields, { eq }) => eq(fields.id, SINGLETON_WORKSPACE_ID) })).toMatchObject({ ownerUserId: actor.userId });
+    expect(await root.db.query.singletonMembership.findFirst({ where: (fields, { eq }) => eq(fields.userId, actor.userId) })).toMatchObject({ role: "owner", status: "active" });
+    expect(await root.db.query.company.findFirst({ where: (fields, { eq }) => eq(fields.id, "canonical-owner-company") })).toMatchObject({ ownerMembershipId: replacement.userId });
   });
 
   it("returns the guarded error shape for member access and strict input failures", async () => {

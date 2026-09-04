@@ -126,15 +126,23 @@ export class MemberRepository {
         .set({ ownerMembershipId: replacement, updatedAt: new Date(now) })
         .where(eq(savedView.ownerMembershipId, targetMembershipId)),
       this.db.delete(session).where(eq(session.userId, targetMembershipId)),
-      replacement
-        ? this.db
-            .update(singletonWorkspace)
-            .set({ ownerUserId: replacement, updatedAt: new Date(now) })
-            .where(eq(singletonWorkspace.ownerUserId, targetMembershipId))
-        : this.db
-            .update(singletonWorkspace)
-            .set({ ownerUserId: actorMembershipId, updatedAt: new Date(now) })
-            .where(eq(singletonWorkspace.ownerUserId, targetMembershipId)),
+      this.db
+        .update(singletonWorkspace)
+        .set({
+          ownerUserId: sql<string>`(
+            SELECT candidate.user_id
+              FROM singleton_membership AS candidate
+             WHERE candidate.status = 'active'
+               AND candidate.role = 'owner'
+               AND candidate.user_id != ${targetMembershipId}
+             ORDER BY CASE WHEN candidate.user_id = ${actorMembershipId} THEN 0 ELSE 1 END,
+                      candidate.created_at,
+                      candidate.user_id
+             LIMIT 1
+          )`,
+          updatedAt: new Date(now),
+        })
+        .where(eq(singletonWorkspace.ownerUserId, targetMembershipId)),
       this.db
         .update(singletonMembership)
         .set({ status: "revoked", updatedAt: new Date(now) })
