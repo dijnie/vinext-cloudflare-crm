@@ -2,12 +2,12 @@ import { createAuth } from "@/auth/auth";
 import type { AuthEmailAdapter } from "@/auth/email-adapter";
 import { CloudflareEmailAdapter } from "@/auth/cloudflare-email-adapter";
 import { createDatabase } from "@/db/client";
+import { CompanyService } from "@/crm/companies/company-service";
+import { ContactService } from "@/crm/contacts/contact-service";
+import { DealService } from "@/crm/deals/deal-service";
 import { MemberService } from "@/members/member-service";
 
-import {
-  defaultSecurityLogger,
-  type SecurityLogger,
-} from "./security-logging";
+import { defaultSecurityLogger, type SecurityLogger } from "./security-logging";
 
 export interface RuntimeEnv extends Cloudflare.Env {
   BETTER_AUTH_SECRET: string;
@@ -34,7 +34,19 @@ export function createCompositionRoot(
     emailAdapter,
   );
   const members = new MemberService(db, securityLogger);
-  return { auth, db, env: runtimeBindings, members, securityLogger };
+  const companies = new CompanyService(db);
+  const contacts = new ContactService(db);
+  const deals = new DealService(db);
+  return {
+    auth,
+    companies,
+    contacts,
+    db,
+    deals,
+    env: runtimeBindings,
+    members,
+    securityLogger,
+  };
 }
 
 export type CompositionRoot = ReturnType<typeof createCompositionRoot>;

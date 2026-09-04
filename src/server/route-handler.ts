@@ -8,6 +8,7 @@ import { assertSafeMutationRequest, parseJsonInput } from "./validation";
 
 export interface RouteHandlerOptions<TInput, TResult> {
   input?: ZodType<TInput>;
+  output?: ZodType;
   unsafe?: boolean;
   ownerOnly?: boolean;
   handle: (args: {
@@ -46,7 +47,8 @@ export function createRouteHandler<TInput = undefined, TResult = unknown>(
       const input = options.input
         ? await parseJsonInput(request, options.input)
         : (undefined as TInput);
-      const result = await options.handle({ context, input, request, root });
+      const handled = await options.handle({ context, input, request, root });
+      const result = options.output ? options.output.parse(handled) : handled;
       return withSecurityHeaders(Response.json(result));
     } catch (error) {
       const status = isHttpError(error) ? error.status : 500;
