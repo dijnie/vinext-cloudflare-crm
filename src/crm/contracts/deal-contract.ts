@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { currencyCodeSchema, dealConversionOutputSchema } from "@/currency/currency-contracts";
 import { fieldDefinitionSchema, fieldValuesSchema } from "@/fields/field-contracts";
 
 import {
@@ -23,11 +24,7 @@ export const DEAL_STAGE_IDS = [
   "closed-lost",
 ] as const;
 export const dealStageSchema = z.enum(DEAL_STAGE_IDS);
-const currencySchema = z
-  .string()
-  .trim()
-  .regex(/^[A-Za-z]{3}$/)
-  .transform((value) => value.toUpperCase());
+const currencySchema = currencyCodeSchema;
 const amountSchema = z.number().int().min(0).max(99_999_999_999_999).nullable();
 
 export const dealListInputSchema = listContract([
@@ -113,6 +110,7 @@ const dealListRowOutputSchema = z.object({
   stageLabelKey: z.string(),
   closedState: z.enum(["open", "won", "lost"]),
   amountMinor: z.number().int().nullable(),
+  ...dealConversionOutputSchema.shape,
   currency: z.string().length(3),
   expectedCloseAt: nullableIsoDateTimeSchema,
   closedAt: nullableIsoDateTimeSchema,

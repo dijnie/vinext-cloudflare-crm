@@ -121,6 +121,7 @@ export const deal = sqliteTable(
       mode: "timestamp_ms",
     }).notNull(),
     amountMinor: integer("amount_minor"),
+    moneyRevision: integer("money_revision").default(0).notNull(),
     currency: text("currency").default("USD").notNull(),
     expectedCloseAt: integer("expected_close_at", { mode: "timestamp_ms" }),
     closedAt: integer("closed_at", { mode: "timestamp_ms" }),
@@ -389,7 +390,7 @@ export const exchangeRate = sqliteTable(
     id: text("id").primaryKey(),
     baseCurrency: text("base_currency").notNull(),
     quoteCurrency: text("quote_currency").notNull(),
-    rateScaled: integer("rate_scaled").notNull(),
+    rate: text("rate").notNull(),
     asOf: integer("as_of", { mode: "timestamp_ms" }).notNull(),
     source: text("source", { enum: ["fetched", "manual"] }).notNull(),
     provider: text("provider"),
@@ -402,7 +403,7 @@ export const exchangeRate = sqliteTable(
       table.source,
     ),
     index("exchange_rate_pair_idx").on(table.baseCurrency, table.quoteCurrency),
-    check("exchange_rate_value_check", sql`${table.rateScaled} > 0`),
+    check("exchange_rate_value_check", sql`length(${table.rate}) between 1 and 21`),
     check(
       "exchange_rate_source_check",
       sql`${table.source} in ('fetched', 'manual')`,
@@ -419,6 +420,9 @@ export const crmSetting = sqliteTable(
   {
     id: text("id").primaryKey(),
     reportingCurrency: text("reporting_currency").default("USD").notNull(),
+    activeConversionVersion: text("active_conversion_version").default("initial").notNull(),
+    pendingJobId: text("pending_job_id"),
+    ratesRevision: integer("rates_revision").default(0).notNull(),
     ...timestamps,
   },
   (table) => [
@@ -429,3 +433,32 @@ export const crmSetting = sqliteTable(
     ),
   ],
 );
+
+export const currencyJob = sqliteTable("currency_job", {
+  id: text("id").primaryKey(),
+  kind: text("kind", { enum: ["rerate", "fill_missing"] }).notNull(),
+  targetCurrency: text("target_currency").notNull(),
+  expectedVersion: text("expected_version").notNull(),
+  targetVersion: text("target_version").notNull(),
+  ratesJson: text("rates_json").notNull(),
+  cursor: text("cursor"),
+  total: integer("total").notNull(),
+  processed: integer("processed").default(0).notNull(),
+  converted: integer("converted").default(0).notNull(),
+  missing: integer("missing").default(0).notNull(),
+  status: text("status", { enum: ["pending", "running", "completed", "cancelled"] }).notNull(),
+  ...timestamps,
+});
+
+export const dealConversion = sqliteTable("deal_conversion", {
+  version: text("version").notNull(),
+  dealId: text("deal_id").notNull().references(() => deal.id, { onDelete: "cascade" }),
+  moneyRevision: integer("money_revision").notNull(),
+  amountMinor: integer("amount_minor"),
+  currency: text("currency").notNull(),
+  baseAmountMinor: integer("base_amount_minor"),
+  baseCurrency: text("base_currency"),
+  fxRate: text("fx_rate"),
+  fxRateAt: integer("fx_rate_at", { mode: "timestamp_ms" }),
+  rateSource: text("rate_source", { enum: ["identity", "manual", "fetched"] }),
+}, table => [primaryKey({ columns: [table.version, table.dealId] }), index("deal_conversion_amount_idx").on(table.version, table.baseAmountMinor, table.dealId)]);

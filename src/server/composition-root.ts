@@ -10,6 +10,8 @@ import { OwnershipService } from "@/crm/ownership/ownership-service";
 import { MemberService } from "@/members/member-service";
 import { SavedViewService } from "@/views/saved-view-service";
 import { FieldService } from "@/fields/field-service";
+import { DashboardService } from "@/dashboard/dashboard-service";
+import { CurrencyService } from "@/currency/currency-service";
 
 import { defaultSecurityLogger, type SecurityLogger } from "./security-logging";
 
@@ -45,7 +47,11 @@ export function createCompositionRoot(
   const ownership = new OwnershipService(db);
   const views = new SavedViewService(db);
   const fields = new FieldService(db);
+  const dashboard = new DashboardService(db);
+  const currency = new CurrencyService(db);
   return {
+    currency,
+    dashboard,
     fields,
     views,
     activities,

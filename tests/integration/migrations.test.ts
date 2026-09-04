@@ -28,6 +28,7 @@ describe("CRM baseline migration", () => {
       { name: "0002_deal_relationship_invariants.sql" },
       { name: "0003_activity_relationship_history.sql" },
       { name: "0004_custom_field_invariants.sql" },
+      { name: "0005_currency_conversion_versions.sql" },
     ]);
   });
 

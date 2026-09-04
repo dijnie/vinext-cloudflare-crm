@@ -1,4 +1,5 @@
 import { inJsonArray } from "@/crm/sql-filters";
+import { prepareDealConversion } from "@/currency/deal-conversion-write";
 import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/fields/field-list-query";
 import {
   and,
@@ -17,6 +18,8 @@ import type { AppDatabase } from "@/db/client";
 import { listFacets } from "@/crm/facet-repository";
 import {
   company,
+  crmSetting,
+  dealConversion,
   contact,
   deal,
   dealContact,
@@ -48,6 +51,10 @@ export class DealRepository {
         closedState: dealStage.closedState,
         amountMinor: deal.amountMinor,
         currency: deal.currency,
+        baseAmountMinor: dealConversion.baseAmountMinor,
+        baseCurrency: dealConversion.baseCurrency,
+        fxRate: dealConversion.fxRate,
+        fxRateAt: dealConversion.fxRateAt,
         expectedCloseAt: deal.expectedCloseAt,
         closedAt: deal.closedAt,
         closedReason: deal.closedReason,
@@ -57,11 +64,13 @@ export class DealRepository {
         updatedAt: deal.updatedAt,
       })
       .from(deal)
+      .innerJoin(crmSetting, eq(crmSetting.id, "settings"))
+      .leftJoin(dealConversion, and(eq(dealConversion.dealId,deal.id),eq(dealConversion.version,crmSetting.activeConversionVersion),eq(dealConversion.moneyRevision,deal.moneyRevision)))
       .innerJoin(company, eq(company.id, deal.companyId))
       .innerJoin(dealStage, eq(dealStage.id, deal.stageId))
       .innerJoin(user, eq(user.id, deal.ownerMembershipId))
       .where(where)
-      .orderBy(this.order(input.sort, input.dir), asc(deal.id))
+      .orderBy(...(input.sort === "amount" ? [asc(sql`${dealConversion.baseAmountMinor} is null`)] : []), this.order(input.sort, input.dir), asc(deal.id))
       .limit(input.pageSize)
       .offset((input.page - 1) * input.pageSize);
     const [{ total }] = await this.db
@@ -92,6 +101,11 @@ export class DealRepository {
         stageChangedAt: deal.stageChangedAt,
         amountMinor: deal.amountMinor,
         currency: deal.currency,
+        moneyRevision: deal.moneyRevision,
+        baseAmountMinor: dealConversion.baseAmountMinor,
+        baseCurrency: dealConversion.baseCurrency,
+        fxRate: dealConversion.fxRate,
+        fxRateAt: dealConversion.fxRateAt,
         expectedCloseAt: deal.expectedCloseAt,
         closedAt: deal.closedAt,
         closedReason: deal.closedReason,
@@ -101,6 +115,8 @@ export class DealRepository {
         updatedAt: deal.updatedAt,
       })
       .from(deal)
+      .innerJoin(crmSetting, eq(crmSetting.id, "settings"))
+      .leftJoin(dealConversion, and(eq(dealConversion.dealId,deal.id),eq(dealConversion.version,crmSetting.activeConversionVersion),eq(dealConversion.moneyRevision,deal.moneyRevision)))
       .innerJoin(company, eq(company.id, deal.companyId))
       .innerJoin(dealStage, eq(dealStage.id, deal.stageId))
       .innerJoin(user, eq(user.id, deal.ownerMembershipId))
@@ -123,10 +139,12 @@ export class DealRepository {
     return { ...record, contacts };
   }
 
-  create(values: typeof deal.$inferInsert) {
-    return this.db.insert(deal).values(values).returning().get();
+  async create(values: typeof deal.$inferInsert) {
+    const fx = await prepareDealConversion(this.db,{id:values.id,amountMinor:values.amountMinor ?? null,currency:values.currency ?? "USD",moneyRevision:0});
+    const results = await this.db.batch([fx.guard,this.db.insert(deal).values(values).returning(),fx.conversion,fx.finish]);
+    return results[1][0]!;
   }
-  async updateWithHistory(id: string, values: Partial<typeof deal.$inferInsert>, expectedStage: string, authorId: string) {
+  async updateWithHistory(id: string, values: Partial<typeof deal.$inferInsert>, expectedStage: string, authorId: string, expectedMoney?: {revision:number;amountMinor:number|null;currency:string}) {
     const changedStage = values.stageId !== undefined && values.stageId !== expectedStage;
     const now = values.updatedAt ?? new Date();
     const query = this.db.update(deal).set({
@@ -134,7 +152,9 @@ export class DealRepository {
       ...(changedStage ? { lastActivityAt: sql`max(coalesce(${deal.lastActivityAt}, 0), ${now.getTime()})` } : {}),
     }).where(and(eq(deal.id, id), eq(deal.stageId, expectedStage))).returning({ id: deal.id, name: deal.name }).toSQL();
     const update = this.db.$client.prepare(query.sql).bind(...query.params);
-    if (!changedStage) {
+    const fx = expectedMoney ? await prepareDealConversion(this.db,{id,amountMinor:values.amountMinor === undefined ? expectedMoney.amountMinor : values.amountMinor,currency:values.currency ?? expectedMoney.currency,moneyRevision:expectedMoney.revision+1},sql`exists(select 1 from deal where id=${id} and stage_id=${expectedStage} and money_revision=${expectedMoney.revision})`) : undefined;
+    const prepared = (statement: {toSQL():{sql:string;params:unknown[]}}) => { const query=statement.toSQL(); return this.db.$client.prepare(query.sql).bind(...query.params); };
+    if (!changedStage && !fx) {
       const result = await update.all<{ id: string; name: string }>();
       return result.results[0];
     }
@@ -142,7 +162,9 @@ export class DealRepository {
     // changes() refers to the preceding guarded UPDATE on the same batch connection.
     // A stale stage therefore produces neither history nor related-record stamps.
     const result = await this.db.$client.batch([
+      ...(fx ? [prepared(fx.guard)] : []),
       update,
+      ...(changedStage ? [
       this.db.$client.prepare(`INSERT INTO activity
         (id, type, company_id, deal_id, author_user_id, metadata_json, occurred_at, created_at, updated_at)
         SELECT ?, 'stage_change', company_id, id, ?, json_object('fromStageId', ?, 'toStageId', ?), ?, ?, ?
@@ -151,8 +173,10 @@ export class DealRepository {
       this.db.$client.prepare(`UPDATE company SET last_activity_at = max(coalesce(last_activity_at, 0), ?), updated_at = ?
         WHERE id = (SELECT company_id FROM activity WHERE id = ?)`)
         .bind(now.getTime(), now.getTime(), auditId),
+      ] : []),
+      ...(fx ? [prepared(fx.conversion),prepared(fx.finish)] : []),
     ]);
-    return result[0]!.results[0] as { id: string; name: string } | undefined;
+    return result[fx ? 1 : 0]!.results[0] as { id: string; name: string } | undefined;
   }
   archive(id: string, archivedAt: Date | null) {
     return this.db
@@ -263,7 +287,7 @@ export class DealRepository {
         : sort === "stage"
           ? deal.stageId
           : sort === "amount"
-            ? deal.amountMinor
+            ? dealConversion.baseAmountMinor
             : sort === "expectedCloseAt"
               ? deal.expectedCloseAt
               : sort === "lastActivityAt"

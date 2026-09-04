@@ -41,6 +41,7 @@ it("upgrades existing activity history without losing rows or visibility", async
     { name: "0002_deal_relationship_invariants.sql" },
     { name: "0003_activity_relationship_history.sql" },
     { name: "0004_custom_field_invariants.sql" },
+    { name: "0005_currency_conversion_versions.sql" },
   ]);
   expect((await db.prepare("PRAGMA foreign_key_check").all()).results).toEqual([]);
   expect((await db.prepare("PRAGMA foreign_key_list(activity_visibility)").all()).results).toContainEqual(expect.objectContaining({ table: "activity", from: "activity_id", on_delete: "CASCADE" }));

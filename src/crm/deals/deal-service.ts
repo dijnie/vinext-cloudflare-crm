@@ -1,4 +1,5 @@
 import type { AppDatabase } from "@/db/client";
+import { currencyError } from "@/currency/currency-service";
 import type {
   DealCreateInput,
   DealListInput,
@@ -59,6 +60,7 @@ export class DealService {
       companyName: undefined,
       companyDomain: undefined,
       expectedCloseAt: toIso(record.expectedCloseAt),
+      fxRateAt: toIso(record.fxRateAt),
       closedAt: toIso(record.closedAt),
       lastActivityAt: toIso(record.lastActivityAt),
       archivedAt: toIso(record.archivedAt),
@@ -106,7 +108,7 @@ export class DealService {
       });
       return { id: row.id, name: row.name, companyId: row.companyId };
     } catch (error) {
-      relationError(error, "Deal relationships are invalid");
+      try { currencyError(error); } catch (classified) { relationError(classified, "Deal relationships are invalid"); }
     }
   }
 
@@ -148,6 +150,8 @@ export class DealService {
       values.ownerMembershipId = input.ownerMembershipId;
     if (input.amountMinor !== undefined) values.amountMinor = input.amountMinor;
     if (input.currency !== undefined) values.currency = input.currency;
+    const moneyChanged = (input.amountMinor !== undefined && input.amountMinor !== current.amountMinor) || (input.currency !== undefined && input.currency !== current.currency);
+    if (moneyChanged) values.moneyRevision = current.moneyRevision + 1;
     if (input.expectedCloseAt !== undefined)
       values.expectedCloseAt = input.expectedCloseAt
         ? new Date(input.expectedCloseAt)
@@ -163,11 +167,11 @@ export class DealService {
     } else if (input.closedReason !== undefined)
       values.closedReason = input.closedReason;
     try {
-      const row = await this.repository.updateWithHistory(id, values, current.stageId, context.userId);
+      const row = await this.repository.updateWithHistory(id, values, current.stageId, context.userId, moneyChanged ? { revision:current.moneyRevision,amountMinor:current.amountMinor,currency:current.currency } : undefined);
       if (!row) throw new HttpError(409, "conflict", "Deal stage changed before this update");
       return { id: row.id, name: row.name };
     } catch (error) {
-      relationError(error, "Deal relationships are invalid");
+      try { currencyError(error); } catch (classified) { relationError(classified, "Deal relationships are invalid"); }
     }
   }
 
@@ -260,6 +264,7 @@ export class DealService {
       archivedAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
+      fxRateAt: Date | null;
     },
   >(row: T) {
     if (!row.companyId || !row.ownerMembershipId) {
@@ -286,6 +291,7 @@ export class DealService {
       companyName: undefined,
       companyDomain: undefined,
       expectedCloseAt: toIso(row.expectedCloseAt),
+      fxRateAt: toIso(row.fxRateAt),
       closedAt: toIso(row.closedAt),
       lastActivityAt: toIso(row.lastActivityAt),
       archivedAt: toIso(row.archivedAt),
