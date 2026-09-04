@@ -198,7 +198,7 @@ for (const locale of ["vi", "en"] as const) {
     await expect(sheet.getByRole("alert")).toContainText(labels.missing);
     await page.goto(`/${locale}/crm/companies?sort=unknown`);
     await expect(page.getByRole("heading", { name: labels.invalidQuery, exact: true })).toBeVisible();
-    await page.goto(`/${locale}/crm/companies?recordType=company&recordId=${company.id}&tab=fields`);
+    await page.goto(`/${locale}/crm/companies?recordType=company&recordId=${company.id}&tab=unknown`);
     await expect(page.getByRole("heading", { name: labels.invalidQuery, exact: true })).toBeVisible();
     await expect(sheet).toHaveCount(0);
   });

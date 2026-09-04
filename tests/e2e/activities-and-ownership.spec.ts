@@ -184,7 +184,9 @@ test("revoked owner races show localized errors and fresh pickers exclude inacti
       cases.push({ page, labels, locale, company });
       await page.goto(`/${locale}/crm/companies?q=${name}`);
       await expect(page.locator("section[aria-busy]")).toHaveAttribute("aria-busy", "false");
-      await page.getByRole("checkbox", { name: `${labels.select} ${name}`, exact: true }).check();
+      const recordSelection = page.getByRole("checkbox", { name: `${labels.select} ${name}`, exact: true });
+      await recordSelection.click();
+      await expect(recordSelection).toBeChecked();
       await page.getByRole("button", { name: labels.activity.reassign, exact: true }).click();
       await expect(page.locator("#bulk-owner")).toHaveAttribute("aria-busy", "false");
       await page.locator("#bulk-owner").selectOption(disposableId);
@@ -193,7 +195,7 @@ test("revoked owner races show localized errors and fresh pickers exclude inacti
     expect(revoke.ok(), await revoke.text()).toBe(true);
     for (const { page, labels, locale, company } of cases) {
       await page.getByRole("button", { name: labels.confirm, exact: true }).click();
-      await expect(page.getByRole("alert")).toContainText(labels.error);
+      await expect(page.getByRole("alert")).toContainText(labels.invalid);
       await page.getByRole("button", { name: labels.cancel, exact: true }).click();
       await open(page, locale, "company", company.id, "details");
       await page.getByRole("button", { name: labels.edit, exact: true }).click();
