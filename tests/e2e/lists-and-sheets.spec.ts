@@ -11,7 +11,9 @@ test.beforeAll(async ({ baseURL }) => {
   expect(signedIn.ok()).toBe(true);
   const owners = await api.get("/api/crm/owners");
   expect(owners.ok()).toBe(true);
-  ownerId = (await owners.json()).rows[0].membershipId;
+  const owner = (await owners.json()).rows.find((row: { email: string }) => row.email === process.env["E2E_OWNER_EMAIL"]);
+  expect(owner, "The named owner fixture must remain active").toBeDefined();
+  ownerId = owner.membershipId;
 });
 test.beforeEach(async ({ context }) => { await context.addCookies((await api.storageState()).cookies); });
 test.afterAll(async () => { await api?.dispose(); });
