@@ -19,6 +19,13 @@ const config = "dist/server/wrangler.json";
 const ownerPassword = randomBytes(24).toString("hex");
 const memberPassword = randomBytes(24).toString("hex");
 const environment = { ...process.env, AUTH_BASE_URL: baseURL, BETTER_AUTH_SECRET: randomBytes(32).toString("hex"), E2E_BASE_URL: baseURL, E2E_OWNER_EMAIL: "owner@e2e.invalid", E2E_OWNER_PASSWORD: ownerPassword, E2E_MEMBER_EMAIL: "member@e2e.invalid", E2E_MEMBER_PASSWORD: memberPassword };
+environment.E2E_DISPOSABLE_MEMBER_EMAIL = "disposable@e2e.invalid";
+environment.E2E_DISPOSABLE_MEMBER_PASSWORD = randomBytes(24).toString("hex");
+const accounts = [
+  [environment.E2E_OWNER_EMAIL, ownerPassword],
+  [environment.E2E_MEMBER_EMAIL, memberPassword],
+  [environment.E2E_DISPOSABLE_MEMBER_EMAIL, environment.E2E_DISPOSABLE_MEMBER_PASSWORD],
+];
 let server;
 let commandProcess;
 let interrupted = false;
@@ -66,16 +73,16 @@ try {
       await new Promise((accept) => setTimeout(accept, 500));
     }
     if (!ready) throw new Error("E2E server failed readiness");
-    for (const [email, password] of [[environment.E2E_OWNER_EMAIL, ownerPassword], [environment.E2E_MEMBER_EMAIL, memberPassword]]) {
+    for (const [email, password] of accounts) {
       const response = await api.post("/api/auth/sign-up/email", { data: { name: email.split("@")[0], email, password } });
       if (!response.ok()) throw new Error(`Fixture sign-up failed: ${response.status()} ${await response.text()}`);
     }
     // The local email binding cannot deliver verification mail. Mark only the
-    // two fresh fixture addresses verified; real sign-in claims membership.
+    // fresh fixture addresses verified; real sign-in claims membership.
     const seed = resolve(directory, "verify-accounts.sql");
-    await writeFile(seed, "UPDATE user SET email_verified=1 WHERE email IN ('owner@e2e.invalid','member@e2e.invalid');", { mode: 0o600 });
+    await writeFile(seed, "UPDATE user SET email_verified=1 WHERE email IN ('owner@e2e.invalid','member@e2e.invalid','disposable@e2e.invalid');", { mode: 0o600 });
     await run("npx", ["wrangler", "d1", "execute", "DB", "--local", "--config", config, "--persist-to", persist, "--file", seed]);
-    for (const [email, password] of [[environment.E2E_OWNER_EMAIL, ownerPassword], [environment.E2E_MEMBER_EMAIL, memberPassword]]) {
+    for (const [email, password] of accounts) {
       const response = await api.post("/api/auth/sign-in/email", { data: { email, password } });
       if (!response.ok()) throw new Error(`Fixture sign-in failed: ${response.status()} ${await response.text()}`);
     }

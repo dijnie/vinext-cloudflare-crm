@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { changeListState, listApiSearch, parseListState } from "@/crm/list-state";
 describe("canonical list navigation", () => {
   it("rejects unknown, malformed and duplicate parameters", () => {
-    for (const query of ["secret=x", "page=0", "pageSize=101", "recordType=deal", "recordId=bad", "columns=password", "sort=nope", "q=a&q=b", "tab=activities", "tab=fields"]) expect(() => parseListState("company", new URLSearchParams(query))).toThrow();
+    for (const query of ["secret=x", "page=0", "pageSize=101", "recordType=deal", "recordId=bad", "columns=password", "sort=nope", "q=a&q=b", "tab=fields"]) expect(() => parseListState("company", new URLSearchParams(query))).toThrow();
   });
   it("resets pages while retaining sheet and list context", () => {
     const before = new URLSearchParams("page=4&owner=alice&recordType=company&recordId=11111111-1111-4111-8111-111111111111");

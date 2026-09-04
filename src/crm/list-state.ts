@@ -15,7 +15,7 @@ export const entityColumns = {
 } as const;
 const navigationSchema = z.object({
   recordType: entityTypeSchema.optional(), recordId: stableIdSchema.optional(),
-  tab: z.literal("details").default("details"),
+  tab: z.enum(["details", "activities"]).default("details"),
   columns: z.array(z.string()).optional(), view: stableIdSchema.optional(),
 }).superRefine((value, ctx) => {
   if (Boolean(value.recordType) !== Boolean(value.recordId)) ctx.addIssue({ code: "custom", message: "Record type and ID must be paired" });
