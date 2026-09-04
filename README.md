@@ -1,19 +1,18 @@
-# SaaS Admin Template
-
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/dijnie/vinext-saas-admin-template.git)
-
-![SaaS Admin Template](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/52b88668-0144-489c-dd02-fe620270ba00/public)
+# Vinext CRM
 
 <!-- dash-content-start -->
 
-A complete admin dashboard template built with Vinext, Shadcn UI, and Cloudflare's developer stack. Quickly deploy a fully functional admin interface with customer and subscription management capabilities.
+A CRM rebuild on Vinext, Shadcn UI, Cloudflare Workers, and D1. The current
+compatibility slice proves verified email/password auth, singleton membership,
+and a protected localized company route before the remaining CRM modules are
+built.
 
 ## Features
 
 - 🎨 Modern UI built with Vinext and Shadcn UI
-- 🔐 Built-in API with token authentication
-- 👥 Customer management
-- 💳 Subscription tracking
+- 🔐 Better Auth with mandatory email verification
+- 👥 Singleton owner/member workspace
+- 🏢 Protected localized company route
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
 - ✨ Clean, responsive interface
@@ -28,7 +27,9 @@ A complete admin dashboard template built with Vinext, Shadcn UI, and Cloudflare
 - Validation: [Zod](https://github.com/colinhacks/zod)
 
 > [!IMPORTANT]
-> When using C3 to create this project, select "no" when it asks if you want to deploy. You need to follow this project's [setup steps](https://github.com/cloudflare/templates/tree/main/d1-template#setup-steps) before deploying.
+> Production publication remains blocked until the intended first owner can be
+> bootstrapped safely. Open registration means the first verified account
+> currently becomes owner.
 
 <!-- dash-content-end -->
 
@@ -47,21 +48,15 @@ npm install
 cp .dev.vars.example .dev.vars
 ```
 
-Add your API token:
+Fill in the four auth and email values listed in `.dev.vars.example`. Keep the
+canonical auth URL on HTTPS, including for local Workerd development.
 
-```
-API_TOKEN=your_token_here
-```
-
-_An API token is required to authenticate requests to the API. You should generate this before trying to run the project locally or deploying it._
-
-3. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) with the name "admin-db":
+3. Verify the D1 target already declared in `wrangler.jsonc` before applying
+   migrations:
 
 ```bash
-npx wrangler d1 create admin-db
+npx wrangler d1 info saas-admin
 ```
-
-...and update the `database_id` field in `wrangler.jsonc` with the new database ID.
 
 4. Run the database migrations locally:
 
@@ -77,21 +72,23 @@ npm run dev
 npm run build
 ```
 
-6. Deploy to Cloudflare Workers. The `predeploy` hook applies remote D1
-   migrations before publishing the Worker:
+6. Before any remote migration or upload, choose and verify a controlled
+   first-owner bootstrap procedure. Do not expose an empty database through a
+   secret-configured preview or production version while this decision is open.
+
+7. After that gate and explicit target/rollback verification, apply remote
+   migrations separately from deployment:
 
 ```bash
-npm run deploy
+npm run db:migrate:remote
 ```
 
-7. Set your production API token:
-
-```bash
-npx wrangler secret put API_TOKEN
-```
+Do not use `wrangler secret put` during bootstrap because it deploys
+immediately. Upload and verify a non-production version first, then deploy the
+exact reviewed version only after the intended owner exists.
 
 ## Usage
 
-This project includes a fully functional admin dashboard with customer and subscription management capabilities. It also includes an API with token authentication to access resources via REST, returning JSON data.
-
-It also includes a "Customer Workflow", built with [Cloudflare Workflows](https://developers.cloudflare.com/workflows). This workflow can be triggered in the UI or via the REST API to do arbitrary actions in the background for any given user. See [`src/workflows/customer_workflow.ts`](./src/workflows/customer_workflow.ts) to learn more about what you can do in this workflow.
+The current compatibility slice provides verified email/password auth and the
+localized protected company route. Legacy sample admin and REST routes are
+quarantined with `404` responses while their replacement is built.

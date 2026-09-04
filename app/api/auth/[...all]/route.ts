@@ -13,7 +13,6 @@ async function handler(request: Request) {
     request,
     root.auth,
     root.db,
-    runtimeBindings["AUTH_ALLOWED_EMAILS"],
     runtimeBindings["AUTH_BASE_URL"],
   );
 }

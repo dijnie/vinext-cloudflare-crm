@@ -67,7 +67,6 @@ function createHarness(overrides: Partial<RuntimeEnv> = {}) {
       new Request(url, { ...init, headers }),
       root.auth,
       root.db,
-      bindings["AUTH_ALLOWED_EMAILS"],
       bindings["AUTH_BASE_URL"],
     );
   };
@@ -125,12 +124,12 @@ async function signUpAndVerify(
 describe.sequential("Better Auth compatibility under workerd", () => {
   beforeEach(clearState);
 
-  it("enforces the exact allowlist before account creation", async () => {
-    const { request, root } = createHarness();
-    const denied = await request("/sign-up/email", {
+  it("accepts any well-formed email but rejects malformed sign-up input", async () => {
+    const { email, request, root } = createHarness();
+    const accepted = await request("/sign-up/email", {
       method: "POST",
       body: jsonBody({
-        name: "Denied",
+        name: "Open registration",
         email: "owner+other@example.com",
         password: "correct horse battery staple",
       }),
@@ -140,9 +139,12 @@ describe.sequential("Better Auth compatibility under workerd", () => {
       body: jsonBody({ name: "Malformed", password: "unused-password" }),
     });
 
-    expect(denied.status).toBe(400);
-    expect(await denied.json()).toEqual(await malformed.json());
-    expect(await root.db.select().from(user)).toHaveLength(0);
+    expect(accepted.status).toBe(200);
+    expect(malformed.status).toBe(400);
+    expect(email.verificationMessages).toHaveLength(1);
+    expect(await root.db.select().from(user)).toHaveLength(1);
+    expect(await root.db.select().from(session)).toHaveLength(0);
+    expect(await root.db.select().from(singletonMembership)).toHaveLength(0);
   });
 
   it("normalizes sign-up, verifies email, admits a guarded session, and signs out", async () => {
@@ -246,7 +248,7 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     expect(await harness.root.db.select().from(rateLimit)).not.toHaveLength(0);
   });
 
-  it("keeps a revoked allowlisted account out on later sign-in", async () => {
+  it("keeps a revoked account out on later sign-in", async () => {
     const harness = createHarness();
     await signUpAndVerify(
       harness,
@@ -387,7 +389,7 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     const emails = Array.from({ length: 8 }, (_, index) =>
       `race-${index}@example.com`,
     );
-    const harness = createHarness({ AUTH_ALLOWED_EMAILS: emails.join(",") });
+    const harness = createHarness();
     const password = "correct horse battery staple";
     const signUps = await Promise.all(
       emails.map((email, index) =>

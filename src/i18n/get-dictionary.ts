@@ -5,7 +5,7 @@ const dictionaries = {
     open: "Mở chi tiết",
     close: "Đóng",
     signInTitle: "Đăng nhập",
-    signInDescription: "Đăng nhập bằng tài khoản email đủ điều kiện và đã xác minh.",
+    signInDescription: "Đăng nhập bằng tài khoản email đã xác minh.",
   },
   en: {
     title: "Companies",
@@ -13,7 +13,7 @@ const dictionaries = {
     open: "Open details",
     close: "Close",
     signInTitle: "Sign in",
-    signInDescription: "Sign in with an eligible, verified email account.",
+    signInDescription: "Sign in with a verified email account.",
   },
 } as const;
 

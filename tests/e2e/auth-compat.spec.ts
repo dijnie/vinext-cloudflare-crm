@@ -20,14 +20,14 @@ test("preview guards legacy routes and preserves company sheet history", async (
     extraHTTPHeaders: { origin: baseURL },
   });
 
-  const denied = await api.post("/api/auth/sign-up/email", {
+  const malformed = await api.post("/api/auth/sign-up/email", {
     data: {
-      name: "Denied",
-      email: "definitely-not-allowed@example.invalid",
+      name: "Malformed",
+      email: "not-an-email",
       password: "not-a-real-user-password",
     },
   });
-  expect(denied.status()).toBe(400);
+  expect(malformed.status()).toBe(400);
 
   const signIn = await api.post("/api/auth/sign-in/email", {
     data: { email, password },

@@ -3,7 +3,6 @@ import { and, eq } from "drizzle-orm";
 import { singletonMembership } from "@/db/schema";
 import type { CompositionRoot } from "@/server/composition-root";
 
-import { isEmailEligible, parseEmailAllowlist } from "./signup-eligibility";
 import { reconcileSingletonMembership } from "./singleton-workspace";
 
 export interface SingletonAuthContext {
@@ -17,10 +16,6 @@ export async function requireSingletonMembership(
 ): Promise<SingletonAuthContext | null> {
   const session = await root.auth.api.getSession({ headers: requestHeaders });
   if (!session?.user.emailVerified) return null;
-
-  const runtimeBindings = root["env"];
-  const allowlist = parseEmailAllowlist(runtimeBindings["AUTH_ALLOWED_EMAILS"]);
-  if (!isEmailEligible(session.user.email, allowlist)) return null;
 
   let membership = await root.db.query.singletonMembership.findFirst({
     where: and(

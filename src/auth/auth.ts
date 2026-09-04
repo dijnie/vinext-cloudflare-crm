@@ -6,11 +6,7 @@ import type { AppDatabase } from "@/db/client";
 import * as schema from "@/db/schema";
 
 import type { AuthEmailAdapter } from "./email-adapter";
-import {
-  isEmailEligible,
-  normalizeEmail,
-  parseEmailAllowlist,
-} from "./signup-eligibility";
+import { normalizeEmail } from "./normalize-email";
 import {
   findUserByNormalizedEmail,
   reconcileSingletonMembership,
@@ -19,7 +15,6 @@ import {
 export interface AuthConfiguration {
   secret: string;
   baseUrl: string;
-  allowedEmails: string;
 }
 
 const GENERIC_AUTH_ERROR = "Unable to continue";
@@ -54,8 +49,6 @@ export function createAuth(
     throw new Error("BETTER_AUTH_SECRET must be at least 32 characters");
   }
   const baseUrl = parseCanonicalOrigin(config.baseUrl);
-  const allowlist = parseEmailAllowlist(config.allowedEmails);
-
   return betterAuth({
     appName: "CRM",
     baseURL: baseUrl.origin,
@@ -92,9 +85,6 @@ export function createAuth(
         });
       },
       afterEmailVerification: async (verifiedUser) => {
-        if (!isEmailEligible(verifiedUser.email, allowlist)) {
-          throw new APIError("FORBIDDEN", { message: GENERIC_AUTH_ERROR });
-        }
         await reconcileSingletonMembership(db, verifiedUser.id);
       },
     },
@@ -105,10 +95,7 @@ export function createAuth(
             const currentUser = await db.query.user.findFirst({
               where: (table, { eq }) => eq(table.id, sessionData.userId),
             });
-            if (
-              !currentUser?.emailVerified ||
-              !isEmailEligible(currentUser.email, allowlist)
-            ) {
+            if (!currentUser?.emailVerified) {
               throw new APIError("FORBIDDEN", { message: GENERIC_AUTH_ERROR });
             }
             await reconcileSingletonMembership(db, currentUser.id);
@@ -139,7 +126,6 @@ export async function handleAuthRequest(
   request: Request,
   auth: ReturnType<typeof createAuth>,
   db: AppDatabase,
-  allowedEmails: string,
   authBaseUrl: string,
 ): Promise<Response> {
   const incomingUrl = new URL(request.url);
@@ -183,11 +169,6 @@ export async function handleAuthRequest(
   }
 
   const normalizedEmail = normalizeEmail(body.email);
-  const allowlist = parseEmailAllowlist(allowedEmails);
-  if (!isEmailEligible(normalizedEmail, allowlist)) {
-    return Response.json({ message: GENERIC_AUTH_ERROR }, { status: 400 });
-  }
-
   if (path === "/sign-in/email") {
     const currentUser = await findUserByNormalizedEmail(db, normalizedEmail);
     if (currentUser?.emailVerified) {

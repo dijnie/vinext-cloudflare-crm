@@ -22,7 +22,6 @@ export default defineConfig({
             path.join(rootDirectory, "migrations"),
           ),
           BETTER_AUTH_SECRET: "test-secret-with-at-least-32-characters",
-          AUTH_ALLOWED_EMAILS: "owner@example.com,member@example.com",
           AUTH_BASE_URL: "https://auth.test",
           AUTH_EMAIL_FROM: "CRM <auth@example.com>",
           RESEND_API_KEY: "test-key-not-used",

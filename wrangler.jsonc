@@ -13,8 +13,13 @@
     "enabled": true
   },
   "upload_source_maps": true,
-  "vars": {
-    "EXAMPLE_VALUE": "example_value"
+  "secrets": {
+    "required": [
+      "BETTER_AUTH_SECRET",
+      "AUTH_BASE_URL",
+      "AUTH_EMAIL_FROM",
+      "RESEND_API_KEY"
+    ]
   },
   "d1_databases": [
     {
