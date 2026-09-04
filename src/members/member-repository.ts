@@ -31,7 +31,10 @@ export class MemberRepository {
       })
       .from(singletonMembership)
       .innerJoin(user, eq(user.id, singletonMembership.userId))
-      .orderBy(asc(singletonMembership.createdAt), asc(singletonMembership.userId));
+      .orderBy(
+        asc(singletonMembership.createdAt),
+        asc(singletonMembership.userId),
+      );
   }
 
   findActive(membershipId: string) {
@@ -41,6 +44,15 @@ export class MemberRepository {
         eq(singletonMembership.status, "active"),
       ),
     });
+  }
+
+  async hasOwnedDeals(membershipId: string): Promise<boolean> {
+    const row = await this.db
+      .select({ id: deal.id })
+      .from(deal)
+      .where(eq(deal.ownerMembershipId, membershipId))
+      .limit(1);
+    return row.length > 0;
   }
 
   async changeRole(
@@ -90,6 +102,15 @@ export class MemberRepository {
     const replacement = replacementMembershipId;
     const now = Date.now();
     const operationId = crypto.randomUUID();
+    const dealOwnershipUpdate = replacement
+      ? this.db
+          .update(deal)
+          .set({ ownerMembershipId: replacement, updatedAt: new Date(now) })
+          .where(eq(deal.ownerMembershipId, targetMembershipId))
+      : this.db
+          .update(deal)
+          .set({ updatedAt: new Date(now) })
+          .where(sql`0 = 1`);
     const results = await this.db.batch([
       this.db.insert(memberOperationGuard).values({
         id: operationId,
@@ -110,10 +131,7 @@ export class MemberRepository {
         .update(contact)
         .set({ ownerMembershipId: replacement, updatedAt: new Date(now) })
         .where(eq(contact.ownerMembershipId, targetMembershipId)),
-      this.db
-        .update(deal)
-        .set({ ownerMembershipId: replacement, updatedAt: new Date(now) })
-        .where(eq(deal.ownerMembershipId, targetMembershipId)),
+      dealOwnershipUpdate,
       this.db
         .update(customFieldValue)
         .set({ userMembershipId: replacement, updatedAt: new Date(now) })

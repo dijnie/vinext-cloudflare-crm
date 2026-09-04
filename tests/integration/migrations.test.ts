@@ -23,7 +23,10 @@ describe("CRM baseline migration", () => {
     const ledger = await env.DB.prepare(
       "SELECT name FROM d1_migrations ORDER BY id",
     ).all<{ name: string }>();
-    expect(ledger.results).toEqual([{ name: "0001_crm_baseline.sql" }]);
+    expect(ledger.results).toEqual([
+      { name: "0001_crm_baseline.sql" },
+      { name: "0002_deal_relationship_invariants.sql" },
+    ]);
   });
 
   it("creates required tables without CRM tenant columns", async () => {
@@ -37,8 +40,12 @@ describe("CRM baseline migration", () => {
       const columns = await env.DB.prepare(`PRAGMA table_info(${table})`).all<{
         name: string;
       }>();
-      expect(columns.results.map((row) => row.name)).not.toContain("workspace_id");
-      expect(columns.results.map((row) => row.name)).not.toContain("organization_id");
+      expect(columns.results.map((row) => row.name)).not.toContain(
+        "workspace_id",
+      );
+      expect(columns.results.map((row) => row.name)).not.toContain(
+        "organization_id",
+      );
     }
   });
 
@@ -83,6 +90,10 @@ describe("CRM baseline migration", () => {
         "company_active_owner_insert",
         "contact_active_owner_insert",
         "deal_active_owner_insert",
+        "deal_required_relationships_insert",
+        "deal_contact_company_insert",
+        "contact_company_preserves_deals",
+        "deal_company_preserves_contacts",
         "saved_view_active_owner_insert",
         "custom_field_active_user_insert",
         "activity_visibility_active_member_insert",
@@ -95,17 +106,79 @@ describe("CRM baseline migration", () => {
       "SELECT id, position, closed_state FROM deal_stage ORDER BY position",
     ).all();
     expect(stages.results).toHaveLength(7);
-    expect(stages.results.at(0)).toMatchObject({ id: "demo-booked", position: 10 });
-    expect(stages.results.at(-1)).toMatchObject({ id: "closed-lost", closed_state: "lost" });
+    expect(stages.results.at(0)).toMatchObject({
+      id: "demo-booked",
+      position: 10,
+    });
+    expect(stages.results.at(-1)).toMatchObject({
+      id: "closed-lost",
+      closed_state: "lost",
+    });
 
     const settings = await env.DB.prepare("SELECT * FROM crm_setting").all();
     expect(settings.results).toHaveLength(1);
-    expect(settings.results[0]).toMatchObject({ id: "settings", reporting_currency: "USD" });
+    expect(settings.results[0]).toMatchObject({
+      id: "settings",
+      reporting_currency: "USD",
+    });
     for (const table of ["company", "contact", "deal", "activity"]) {
-      const count = await env.DB.prepare(`SELECT count(*) AS count FROM ${table}`).first<{
+      const count = await env.DB.prepare(
+        `SELECT count(*) AS count FROM ${table}`,
+      ).first<{
         count: number;
       }>();
       expect(count?.count).toBe(0);
     }
+  });
+
+  it("enforces mandatory and company-compatible deal relationships", async () => {
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO user (id, name, email, email_verified, created_at, updated_at) VALUES ('relationship-owner', 'Relationship Owner', 'relationship-owner@example.com', 1, 0, 0)",
+      ),
+      env.DB.prepare(
+        "INSERT INTO singleton_membership (user_id, role, status, created_at, updated_at) VALUES ('relationship-owner', 'owner', 'active', 0, 0)",
+      ),
+      env.DB.prepare(
+        "INSERT INTO company (id, name, created_at, updated_at) VALUES ('relationship-company', 'Relationship Company', 0, 0)",
+      ),
+      env.DB.prepare(
+        "INSERT INTO company (id, name, created_at, updated_at) VALUES ('other-company', 'Other Company', 0, 0)",
+      ),
+      env.DB.prepare(
+        "INSERT INTO contact (id, first_name, company_id, created_at, updated_at) VALUES ('other-contact', 'Other', 'other-company', 0, 0)",
+      ),
+      env.DB.prepare(
+        "INSERT INTO contact (id, first_name, company_id, created_at, updated_at) VALUES ('compatible-contact', 'Compatible', 'relationship-company', 0, 0)",
+      ),
+    ]);
+
+    await expect(
+      env.DB.prepare(
+        "INSERT INTO deal (id, name, stage_id, stage_changed_at, currency, created_at, updated_at) VALUES ('invalid-deal', 'Invalid', 'demo-booked', 0, 'USD', 0, 0)",
+      ).run(),
+    ).rejects.toThrow("deal company and owner are required");
+
+    await env.DB.prepare(
+      "INSERT INTO deal (id, name, company_id, owner_membership_id, stage_id, stage_changed_at, currency, created_at, updated_at) VALUES ('valid-deal', 'Valid', 'relationship-company', 'relationship-owner', 'demo-booked', 0, 'USD', 0, 0)",
+    ).run();
+    await expect(
+      env.DB.prepare(
+        "INSERT INTO deal_contact (deal_id, contact_id) VALUES ('valid-deal', 'other-contact')",
+      ).run(),
+    ).rejects.toThrow("deal contact company mismatch");
+    await env.DB.prepare(
+      "INSERT INTO deal_contact (deal_id, contact_id) VALUES ('valid-deal', 'compatible-contact')",
+    ).run();
+    await expect(
+      env.DB.prepare(
+        "UPDATE contact SET company_id = 'other-company' WHERE id = 'compatible-contact'",
+      ).run(),
+    ).rejects.toThrow("contact company conflicts with a deal");
+    await expect(
+      env.DB.prepare(
+        "UPDATE deal SET company_id = 'other-company' WHERE id = 'valid-deal'",
+      ).run(),
+    ).rejects.toThrow("deal company conflicts with a contact");
   });
 });
