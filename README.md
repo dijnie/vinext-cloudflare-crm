@@ -17,7 +17,7 @@ member settings, and guarded company, contact, and deal APIs.
 - 🌐 Vietnamese and English sign-up, sign-in, verification, and password-reset routes
 - 🧭 Protected localized application shell with canonical cosmetic workspace URLs
 - 👤 Owner-only localized member management
-- 🏢 Protected localized company route
+- 🏢 Localized company, contact, and deal lists with stable record sheets
 - 🔗 Guarded company, contact, and deal APIs with archive/restore workflows
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
@@ -87,18 +87,21 @@ the development server with `npm run db:migrate:local`.
 npm run build
 ```
 
-The public localized-auth browser scenario can run without account credentials:
+Run browser checks against a fresh disposable local D1 database without supplying
+account credentials:
 
 ```bash
-E2E_BASE_URL=https://localhost:8787 npm run test:e2e -- auth-and-members.spec.ts -g "localized auth routes preserve locale state"
+npm run test:e2e:local
 ```
 
-The authenticated owner/member scenarios require deterministic accounts in the
-isolated E2E D1 database. Set `E2E_BASE_URL`, `E2E_OWNER_EMAIL`,
-`E2E_OWNER_PASSWORD`, `E2E_MEMBER_EMAIL`, and `E2E_MEMBER_PASSWORD`, then run:
+The [local browser runner](scripts/e2e-local.mjs) owns fixture provisioning,
+server startup, suite selection, and cleanup. It uses real Better Auth sign-up
+and sign-in, seeding verified status only for its disposable fixture accounts
+because the local email binding cannot deliver mail. These checks do not prove
+email delivery. For list and record-sheet scenarios, pass the suite selector:
 
 ```bash
-npm run test:e2e -- auth-and-members.spec.ts
+npm run test:e2e:local -- lists-and-sheets
 ```
 
 6. Before any remote migration or upload for a fresh or reset database, define
@@ -128,12 +131,19 @@ exact reviewed version only after the intended owner exists.
 Public auth is available under `/{locale}/sign-up`, `/{locale}/sign-in`,
 `/{locale}/verify-email`, `/{locale}/forgot-password`, and
 `/{locale}/reset-password`, where `locale` is `vi` or `en`. Authenticated users
-enter the CRM at `/{locale}/{workspaceSlug}/companies`; owners can manage members
-at `/{locale}/{workspaceSlug}/settings/members`. The workspace slug is canonical
+enter the CRM at `/{locale}/{workspaceSlug}/companies`, with contact and deal
+lists at the corresponding `/contacts` and `/deals` paths; owners can manage
+members at `/{locale}/{workspaceSlug}/settings/members`. The workspace slug is canonical
 for navigation but does not select or authorize data. Legacy sample admin and
 REST routes remain quarantined with `404` responses.
 
 Authenticated active members can access the core CRM API under
 `/api/crm/companies`, `/api/crm/contacts`, and `/api/crm/deals`. The route files
-under `app/api/crm` are the HTTP entry points; request validation and list
-contracts are owned by `src/crm/contracts`.
+under [app/api/crm](app/api/crm) are the HTTP entry points; request validation
+and list contracts are owned by [src/crm/contracts](src/crm/contracts).
+
+For shareable list state and stable record-sheet links, start with
+[parseListState](src/crm/list-state.ts) and the
+[list contract](src/crm/contracts/list-contract.ts). Direct record entry points
+are owned by [DirectRecordPage](src/components/crm/entity-list-page.tsx), and
+sheet navigation by [the record-sheet components](src/components/crm/record-sheet).
