@@ -2,7 +2,6 @@ import { env } from "cloudflare:workers";
 import { cache } from "react";
 
 import { AdminPage } from "@/components/admin/admin-page";
-import { RunCustomerWorkflowButton } from "@/components/admin/run-customer-workflow";
 import {
   Table,
   TableBody,
@@ -31,12 +30,6 @@ export default async function CustomerPage({ params }: CustomerPageProps) {
 
   return (
     <AdminPage
-      actions={
-        <RunCustomerWorkflowButton
-          apiToken={env.API_TOKEN}
-          customerId={id}
-        />
-      }
       currentPath={`/admin/customers/${id}`}
       title={customer.name}
     >

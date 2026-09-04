@@ -345,26 +345,6 @@ const apiEndpoints: APIEndpoint[] = [
       },
     ],
   },
-  {
-    method: "POST",
-    path: "/api/customer/[:id]/workflow",
-    description: "Start a workflow for a customer",
-    parameters: [
-      {
-        name: "customer_id",
-        type: "string",
-        required: true,
-        description: "ID of the customer",
-      },
-    ],
-    responses: [
-      {
-        name: "Success Response",
-        description: "Empty body with status code 202",
-        example: null,
-      },
-    ],
-  },
 ];
 
 export { apiEndpoints };

@@ -238,27 +238,3 @@ export const getCustomerSubscriptions = async (
     };
   }
 };
-
-export const runCustomerWorkflow = async (
-  id: string | number,
-  baseUrl: string,
-  apiToken: string,
-) => {
-  const response = await fetch(baseUrl + `/api/customers/${id}/workflow`, {
-    headers: {
-      Authorization: `Bearer ${apiToken}`,
-    },
-    method: "POST",
-  });
-  if (response.ok) {
-    const data = await response.json();
-    return {
-      success: true,
-    };
-  } else {
-    console.error("Failed to fetch customer subscriptions");
-    return {
-      success: false,
-    };
-  }
-};
