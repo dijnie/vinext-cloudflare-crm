@@ -1,4 +1,5 @@
 import { inJsonArray } from "@/crm/sql-filters";
+import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/fields/field-list-query";
 import {
   and,
   asc,
@@ -24,6 +25,7 @@ export class CompanyRepository {
   constructor(private readonly db: AppDatabase) {}
 
   async list(input: CompanyListInput) {
+    await validateFieldFilters(this.db, "company", input.fields);
     const where = this.where(input);
     const order = this.order(input.sort, input.dir);
     const rows = await this.db
@@ -53,8 +55,10 @@ export class CompanyRepository {
       .select({ total: sql<number>`count(*)` })
       .from(company)
       .where(where);
-    const facets = await listFacets(this.db, "company", this.where({ ...input, owner: [], industry: [] }));
-    return { rows, total, facets };
+    const facetWhere = this.where({ ...input, owner: [], industry: [], fields: {} });
+    const facets = await listFacets(this.db, "company", facetWhere);
+    const fields = await fieldListData(this.db, "company", rows.map(row => row.id), facetWhere);
+    return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldUserLabels: fields.fieldUserLabels };
   }
 
   async byId(id: string) {
@@ -147,6 +151,7 @@ export class CompanyRepository {
 
   private where(input: CompanyListInput): SQL<unknown> {
     const conditions: SQL<unknown>[] = [
+      ...fieldFilterConditions("company", input.fields),
       input.archived
         ? isNotNull(company.archivedAt)
         : isNull(company.archivedAt),

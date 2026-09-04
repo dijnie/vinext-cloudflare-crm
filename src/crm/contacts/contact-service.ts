@@ -27,6 +27,9 @@ export class ContactService {
     return {
       total: result.total,
       facets: result.facets,
+      customFields: result.customFields,
+      fieldFacets: result.fieldFacets,
+      fieldUserLabels: result.fieldUserLabels,
       rows: result.rows.map((row) => this.serialize(row)),
     };
   }

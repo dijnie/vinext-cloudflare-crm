@@ -15,7 +15,7 @@ export const entityColumns = {
 } as const;
 const navigationSchema = z.object({
   recordType: entityTypeSchema.optional(), recordId: stableIdSchema.optional(),
-  tab: z.enum(["details", "activities"]).default("details"),
+  tab: z.enum(["details", "activities", "fields"]).default("details"),
   columns: z.array(z.string()).optional(), view: stableIdSchema.optional(),
 }).superRefine((value, ctx) => {
   if (Boolean(value.recordType) !== Boolean(value.recordId)) ctx.addIssue({ code: "custom", message: "Record type and ID must be paired" });
@@ -33,7 +33,7 @@ export function parseListState(entity: EntityType, search: URLSearchParams) {
   }
   const list = listSchemas[entity].parse(query);
   const sheet = navigationSchema.parse(navigation);
-  if (sheet.columns?.some(key => !(entityColumns[entity] as readonly string[]).includes(key))) throw new Error("Invalid column");
+  if (sheet.columns?.some(key => !(entityColumns[entity] as readonly string[]).includes(key) && !/^field:[a-z][a-z0-9_]{0,59}$/.test(key))) throw new Error("Invalid column");
   return { list, ...sheet };
 }
 export function listApiSearch(search: URLSearchParams): string {
@@ -47,6 +47,6 @@ export function changeListState(search: URLSearchParams, changes: Record<string,
     if (Array.isArray(value)) { next.delete(key); value.forEach(item => next.append(key, item)); }
     else if (value === null || value === "") next.delete(key); else next.set(key, value);
   }
-  if (Object.keys(changes).some(key => ["q", "sort", "dir", "archived", "owner", "industry", "company", "title", "stage", "view", "pageSize"].includes(key))) next.delete("page");
+  if (Object.keys(changes).some(key => ["q", "sort", "dir", "archived", "owner", "industry", "company", "title", "stage", "fields", "view", "pageSize"].includes(key))) next.delete("page");
   return next.toString();
 }

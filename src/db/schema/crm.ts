@@ -263,6 +263,7 @@ export const customFieldDefinition = sqliteTable(
       ],
     }).notNull(),
     configJson: text("config_json"),
+    deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
     required: integer("required", { mode: "boolean" }).default(false).notNull(),
     showOnSheet: integer("show_on_sheet", { mode: "boolean" })
       .default(true)
@@ -359,6 +360,7 @@ export const savedView = sqliteTable(
     name: text("name").notNull(),
     shared: integer("shared", { mode: "boolean" }).default(false).notNull(),
     stateJson: text("state_json").notNull(),
+    creatorUserId: text("creator_user_id").references(() => user.id, { onDelete: "set null" }),
     ownerMembershipId: text("owner_membership_id").references(
       () => singletonMembership.userId,
       { onDelete: "set null" },
@@ -366,6 +368,7 @@ export const savedView = sqliteTable(
     ...timestamps,
   },
   (table) => [
+    uniqueIndex("saved_view_creator_name_unique").on(table.entity, table.creatorUserId, table.name),
     uniqueIndex("saved_view_owner_name_unique").on(
       table.entity,
       table.ownerMembershipId,

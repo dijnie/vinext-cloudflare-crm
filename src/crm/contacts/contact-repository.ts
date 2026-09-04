@@ -1,4 +1,5 @@
 import { inJsonArray } from "@/crm/sql-filters";
+import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/fields/field-list-query";
 import {
   and,
   asc,
@@ -28,6 +29,7 @@ export class ContactRepository {
   constructor(private readonly db: AppDatabase) {}
 
   async list(input: ContactListInput) {
+    await validateFieldFilters(this.db, "contact", input.fields);
     const where = this.where(input);
     const rows = await this.db
       .select({
@@ -59,8 +61,10 @@ export class ContactRepository {
       .select({ total: sql<number>`count(*)` })
       .from(contact)
       .where(where);
-    const facets = await listFacets(this.db, "contact", this.where({ ...input, owner: [], company: [], title: [] }));
-    return { rows, total, facets };
+    const facetWhere = this.where({ ...input, owner: [], company: [], title: [], fields: {} });
+    const facets = await listFacets(this.db, "contact", facetWhere);
+    const fields = await fieldListData(this.db, "contact", rows.map(row => row.id), facetWhere);
+    return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldUserLabels: fields.fieldUserLabels };
   }
 
   async byId(id: string) {
@@ -160,6 +164,7 @@ export class ContactRepository {
 
   private where(input: ContactListInput): SQL<unknown> {
     const conditions: SQL<unknown>[] = [
+      ...fieldFilterConditions("contact", input.fields),
       input.archived
         ? isNotNull(contact.archivedAt)
         : isNull(contact.archivedAt),

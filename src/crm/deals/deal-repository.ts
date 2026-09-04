@@ -1,4 +1,5 @@
 import { inJsonArray } from "@/crm/sql-filters";
+import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/fields/field-list-query";
 import {
   and,
   asc,
@@ -29,6 +30,7 @@ export class DealRepository {
   constructor(private readonly db: AppDatabase) {}
 
   async list(input: DealListInput) {
+    await validateFieldFilters(this.db, "deal", input.fields);
     const where = this.where(input);
     const rows = await this.db
       .select({
@@ -66,8 +68,10 @@ export class DealRepository {
       .select({ total: sql<number>`count(*)` })
       .from(deal)
       .where(where);
-    const facets = await listFacets(this.db, "deal", this.where({ ...input, owner: [], company: [], stage: [] }));
-    return { rows, total, facets };
+    const facetWhere = this.where({ ...input, owner: [], company: [], stage: [], fields: {} });
+    const facets = await listFacets(this.db, "deal", facetWhere);
+    const fields = await fieldListData(this.db, "deal", rows.map(row => row.id), facetWhere);
+    return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldUserLabels: fields.fieldUserLabels };
   }
 
   async byId(id: string) {
@@ -234,6 +238,7 @@ export class DealRepository {
 
   private where(input: DealListInput): SQL<unknown> {
     const conditions: SQL<unknown>[] = [
+      ...fieldFilterConditions("deal", input.fields),
       input.archived ? isNotNull(deal.archivedAt) : isNull(deal.archivedAt),
     ];
     if (input.q)

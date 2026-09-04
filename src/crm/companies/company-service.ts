@@ -28,6 +28,9 @@ export class CompanyService {
     return {
       total: result.total,
       facets: result.facets,
+      customFields: result.customFields,
+      fieldFacets: result.fieldFacets,
+      fieldUserLabels: result.fieldUserLabels,
       rows: result.rows.map((row) => ({
         ...row,
         owner: row.ownerMembershipId

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fieldDefinitionSchema, fieldValuesSchema } from "@/fields/field-contracts";
 
 import {
   bulkArchiveInputSchema,
@@ -86,6 +87,7 @@ export const companyMutationOutputSchema = z.union([
   companyArchiveOutputSchema,
 ]);
 const companyListRowOutputSchema = z.object({
+  fields: fieldValuesSchema.default({}),
   id: stableIdSchema,
   name: z.string(),
   domain: z.string().nullable(),
@@ -101,6 +103,9 @@ const companyListRowOutputSchema = z.object({
   openDealCount: z.number().int().nonnegative(),
 });
 export const companyListOutputSchema = z.object({
+  customFields: z.array(fieldDefinitionSchema),
+  fieldFacets: facetOutputSchema,
+  fieldUserLabels: z.record(z.string(), z.string()),
   facets: facetOutputSchema,
   total: z.number().int().nonnegative(),
   rows: z.array(companyListRowOutputSchema),

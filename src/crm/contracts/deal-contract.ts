@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fieldDefinitionSchema, fieldValuesSchema } from "@/fields/field-contracts";
 
 import {
   bulkArchiveInputSchema,
@@ -100,6 +101,7 @@ const dealCompanyReferenceSchema = z.object({
   domain: z.string().nullable(),
 });
 const dealListRowOutputSchema = z.object({
+  fields: fieldValuesSchema.default({}),
   id: stableIdSchema,
   name: z.string(),
   description: z.string().nullable(),
@@ -121,6 +123,9 @@ const dealListRowOutputSchema = z.object({
   updatedAt: isoDateTimeSchema,
 });
 export const dealListOutputSchema = z.object({
+  customFields: z.array(fieldDefinitionSchema),
+  fieldFacets: facetOutputSchema,
+  fieldUserLabels: z.record(z.string(), z.string()),
   facets: facetOutputSchema,
   total: z.number().int().nonnegative(),
   rows: z.array(dealListRowOutputSchema),

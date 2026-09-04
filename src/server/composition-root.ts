@@ -8,6 +8,8 @@ import { DealService } from "@/crm/deals/deal-service";
 import { ActivityService } from "@/crm/activities/activity-service";
 import { OwnershipService } from "@/crm/ownership/ownership-service";
 import { MemberService } from "@/members/member-service";
+import { SavedViewService } from "@/views/saved-view-service";
+import { FieldService } from "@/fields/field-service";
 
 import { defaultSecurityLogger, type SecurityLogger } from "./security-logging";
 
@@ -41,7 +43,11 @@ export function createCompositionRoot(
   const deals = new DealService(db);
   const activities = new ActivityService(db);
   const ownership = new OwnershipService(db);
+  const views = new SavedViewService(db);
+  const fields = new FieldService(db);
   return {
+    fields,
+    views,
     activities,
     auth,
     companies,

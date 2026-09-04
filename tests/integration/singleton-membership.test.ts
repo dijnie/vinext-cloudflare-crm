@@ -205,6 +205,7 @@ describe.sequential("singleton membership foundation", () => {
       name: "My companies",
       stateJson: "{}",
       ownerMembershipId: "member-a",
+      creatorUserId: "member-a",
       createdAt: now,
       updatedAt: now,
     });
@@ -225,7 +226,7 @@ describe.sequential("singleton membership foundation", () => {
     expect(await db.query.customFieldValue.findFirst()).toMatchObject({
       userMembershipId: "sentinel-owner",
     });
-    expect(await db.query.savedView.findFirst()).toMatchObject({ ownerMembershipId: "sentinel-owner" });
+    expect(await db.query.savedView.findFirst()).toMatchObject({ ownerMembershipId: null, creatorUserId: "member-a" });
     expect(await db.select().from(activityVisibility)).toHaveLength(0);
     expect(await db.select().from(session)).toHaveLength(0);
     expect(await db.query.activity.findFirst()).toMatchObject({ authorUserId: "member-a" });
@@ -274,7 +275,7 @@ describe.sequential("singleton membership foundation", () => {
       fieldError = error;
     }
     expect((fieldError as { cause?: Error }).cause?.message).toContain(
-      "field user membership is inactive",
+      "field_member_inactive",
     );
 
     await db.insert(activity).values({

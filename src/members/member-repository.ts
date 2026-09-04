@@ -141,7 +141,7 @@ export class MemberRepository {
         .where(eq(activityVisibility.membershipId, targetMembershipId)),
       this.db
         .update(savedView)
-        .set({ ownerMembershipId: replacement, updatedAt: new Date(now) })
+        .set({ ownerMembershipId: null, updatedAt: new Date(now) })
         .where(eq(savedView.ownerMembershipId, targetMembershipId)),
       this.db.delete(session).where(eq(session.userId, targetMembershipId)),
       this.db

@@ -40,6 +40,9 @@ export function relationError(error: unknown, fallback: string): never {
     current = "cause" in current ? current.cause : null;
   }
   const message = messages.join(" ").toLowerCase();
+  if (message.includes("saved_view_owner_inactive")) {
+    throw new HttpError(403, "membership_required", "Active membership is required");
+  }
   if (
     message.includes("activity anchor mismatch") ||
     message.includes("deal contact company mismatch") ||
