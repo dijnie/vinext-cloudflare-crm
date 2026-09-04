@@ -201,3 +201,7 @@ dist
 
 ### Astro ###
 .astro/
+
+### Browser test artifacts ###
+test-results/
+playwright-report/

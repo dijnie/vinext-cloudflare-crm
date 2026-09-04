@@ -77,6 +77,7 @@
 		"start": "npm run db:migrate:local && wrangler dev --config dist/server/wrangler.json --persist-to .wrangler/state --port 8787 --local-protocol https",
 		"test": "npm run test:unit && npm run test:integration",
 		"test:e2e": "playwright test",
+		"test:e2e:local": "npm run build && node scripts/e2e-local.mjs",
 		"test:integration": "vitest run --dir tests/integration",
 		"test:unit": "vitest run --dir tests/unit",
 		"typecheck": "tsc --noEmit"
