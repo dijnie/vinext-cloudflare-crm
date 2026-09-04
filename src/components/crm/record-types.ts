@@ -1,5 +1,6 @@
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
 import type { FieldDefinition, FieldValue } from "@/fields/field-contracts";
+import { formatMinor } from "@/currency/currency-catalog";
 
 export interface CrmRecord {
   id: string;
@@ -22,8 +23,7 @@ export function displayValue(row: CrmRecord, key: string, locale: string, labels
   const value = row[key === "amount" ? "amountMinor" : key];
   if (value == null || value === "") return "—";
   if (key === "amount" && typeof value === "number" && typeof row.currency === "string") {
-    const money = new Intl.NumberFormat(locale, { style: "currency", currency: row.currency });
-    return money.format(value / 10 ** (money.resolvedOptions().maximumFractionDigits ?? 2));
+    return formatMinor(value, row.currency, locale);
   }
   if (key.endsWith("At") && typeof value === "string") return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(value));
   if (typeof value === "number") return new Intl.NumberFormat(locale).format(value);
