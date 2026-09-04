@@ -19,7 +19,7 @@ export default defineConfig({
         d1Databases: ["DB"],
         bindings: {
           TEST_MIGRATIONS: await readD1Migrations(
-            path.join(rootDirectory, "migrations"),
+            path.join(rootDirectory, "migrations/crm"),
           ),
           BETTER_AUTH_SECRET: "test-secret-with-at-least-32-characters",
           AUTH_BASE_URL: "https://auth.test",
