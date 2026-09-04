@@ -13,14 +13,21 @@
     "enabled": true
   },
   "upload_source_maps": true,
+  "vars": {
+    "AUTH_EMAIL_FROM": "noreply@dijnie.dev"
+  },
   "secrets": {
     "required": [
       "BETTER_AUTH_SECRET",
-      "AUTH_BASE_URL",
-      "AUTH_EMAIL_FROM",
-      "RESEND_API_KEY"
+      "AUTH_BASE_URL"
     ]
   },
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_sender_addresses": ["noreply@dijnie.dev"]
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

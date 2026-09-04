@@ -23,6 +23,7 @@ built.
 - Frontend: [Vinext](https://github.com/cloudflare/vinext)
 - UI Components: [Shadcn UI](https://ui.shadcn.com)
 - Database: [Cloudflare D1](https://developers.cloudflare.com/d1)
+- Transactional email: [Cloudflare Email Service](https://developers.cloudflare.com/email-service/)
 - Deployment: [Cloudflare Workers](https://workers.cloudflare.com)
 - Validation: [Zod](https://github.com/colinhacks/zod)
 
@@ -48,8 +49,11 @@ npm install
 cp .dev.vars.example .dev.vars
 ```
 
-Fill in the four auth and email values listed in `.dev.vars.example`. Keep the
-canonical auth URL on HTTPS, including for local Workerd development.
+Set `BETTER_AUTH_SECRET` to at least 32 random characters and keep
+`AUTH_BASE_URL` on a canonical HTTPS origin. The sender address is a non-secret
+Wrangler variable in `wrangler.jsonc`; its domain must already be onboarded in
+Cloudflare Email Service. Change the variable and binding sender restriction
+together when changing domains.
 
 3. Verify the D1 target already declared in `wrangler.jsonc` before applying
    migrations:

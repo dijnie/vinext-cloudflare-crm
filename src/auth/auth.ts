@@ -27,7 +27,7 @@ function parseCanonicalOrigin(value: string): URL {
     url.search ||
     url.hash
   ) {
-    throw new Error("AUTH_BASE_URL must be a canonical HTTPS origin");
+    throw new Error("Auth base URL must be a canonical HTTPS origin");
   }
   return url;
 }
