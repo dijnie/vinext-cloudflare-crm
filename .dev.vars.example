@@ -1,1 +1,6 @@
-API_TOKEN=your_token_here
+BETTER_AUTH_SECRET=replace_with_at_least_32_random_characters
+AUTH_ALLOWED_EMAILS=owner@example.com
+AUTH_BASE_URL=https://localhost:8787
+AUTH_TRUSTED_ORIGINS=https://localhost:8787
+AUTH_EMAIL_FROM=CRM <auth@example.com>
+RESEND_API_KEY=replace_with_resend_api_key

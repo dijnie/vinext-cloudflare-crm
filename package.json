@@ -24,8 +24,10 @@
 		"@types/react": "19.2.7",
 		"@types/react-dom": "19.2.3",
 		"@vinext/cloudflare": "1.0.0-beta.7",
+		"better-auth": "1.7.2",
 		"class-variance-authority": "0.7.1",
 		"clsx": "2.1.1",
+		"drizzle-orm": "0.45.2",
 		"lucide-react": "0.555.0",
 		"react": "19.2.8",
 		"react-dom": "19.2.8",
@@ -38,14 +40,19 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "1.54.4",
+		"@cloudflare/vitest-plugin": "1.1.4",
+		"@playwright/test": "1.62.1",
 		"@types/node": "24.10.1",
 		"@vitejs/plugin-react": "6.1.1",
 		"@vitejs/plugin-rsc": "0.5.34",
+		"auth": "1.7.2",
 		"autoprefixer": "10.5.4",
+		"drizzle-kit": "0.31.10",
 		"postcss": "8.5.28",
 		"tailwindcss": "3.4.19",
 		"typescript": "5.9.3",
 		"vite": "8.2.2",
+		"vitest": "4.1.11",
 		"wrangler": "4.129.0"
 	},
 	"engines": {
@@ -60,15 +67,18 @@
 	"scripts": {
 		"build": "vinext build",
 		"cf-typegen": "wrangler types",
-		"check": "npm run typecheck && npm run build && vinext-cloudflare deploy --dry-run",
+		"check": "npm run typecheck && npm run test:unit && npm run test:integration && npm run build && vinext-cloudflare deploy --dry-run",
 		"db:migrate": "wrangler d1 migrations apply DB --local",
 		"db:migrate:remote": "wrangler d1 migrations apply DB --remote",
 		"deploy": "vinext-cloudflare deploy",
 		"dev": "npm run db:migrate && vinext dev --port 4321",
 		"e2e:dev": "npm run db:migrate && vinext dev",
-		"predeploy": "npm run db:migrate:remote",
 		"preview": "npm run build && npm run start",
-		"start": "wrangler d1 migrations apply DB --local --config dist/server/wrangler.json && wrangler dev --config dist/server/wrangler.json",
+		"start": "wrangler d1 migrations apply DB --local --persist-to .wrangler/state --config dist/server/wrangler.json && wrangler dev --config dist/server/wrangler.json --persist-to .wrangler/state --port 8787 --local-protocol https",
+		"test": "npm run test:unit && npm run test:integration",
+		"test:e2e": "playwright test",
+		"test:integration": "vitest run --dir tests/integration",
+		"test:unit": "vitest run --dir tests/unit",
 		"typecheck": "tsc --noEmit"
 	}
 }
