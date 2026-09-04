@@ -3,15 +3,16 @@
 <!-- dash-content-start -->
 
 A CRM rebuild on Vinext, Shadcn UI, Cloudflare Workers, and D1. The current
-compatibility slice proves verified email/password auth, singleton membership,
-and a protected localized company route before the remaining CRM modules are
-built.
+foundation provides verified email/password auth, race-safe singleton membership,
+the CRM database baseline, and guarded server service boundaries.
 
 ## Features
 
 - 🎨 Modern UI built with Vinext and Shadcn UI
 - 🔐 Better Auth with mandatory email verification
 - 👥 Singleton owner/member workspace
+- 🗃️ CRM schema with no tenant key on CRM records
+- 🛡️ Guarded request and member service boundaries
 - 🏢 Protected localized company route
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
@@ -64,13 +65,16 @@ no Resend account or API key is required.
 npx wrangler d1 info saas-admin
 ```
 
-4. Run the database migrations locally:
+4. Run the authoritative CRM migrations locally:
 
 The development command applies local migrations before starting Vinext:
 
 ```bash
 npm run dev
 ```
+
+The source migration directory is `migrations/crm`. Apply it without starting
+the development server with `npm run db:migrate:local`.
 
 5. Build the application:
 
@@ -84,12 +88,17 @@ npm run build
    already bootstrapped; do not repeat this procedure unless the database is
    intentionally reset.
 
-7. After that gate and explicit target/rollback verification, apply remote
+7. After that gate and explicit target/rollback verification, apply preview
    migrations separately from deployment:
 
 ```bash
-npm run db:migrate:remote
+npm run db:migrate:preview
 ```
+
+Because `preview_database_id` currently equals `database_id` in `wrangler.jsonc`,
+this command targets the same selected remote D1 database as production. Do not
+run it before its reset, backup, bookmark, and migration-ledger checks receive
+explicit approval. `npm run deploy` does not apply remote migrations.
 
 Do not use `wrangler secret put` during bootstrap because it deploys
 immediately. Upload and verify a non-production version first, then deploy the
@@ -97,6 +106,6 @@ exact reviewed version only after the intended owner exists.
 
 ## Usage
 
-The current compatibility slice provides verified email/password auth and the
-localized protected company route. Legacy sample admin and REST routes are
-quarantined with `404` responses while their replacement is built.
+The current foundation provides verified auth, singleton membership management,
+the CRM schema, and the localized protected company route. Legacy sample admin
+and REST routes remain quarantined with `404` responses.
