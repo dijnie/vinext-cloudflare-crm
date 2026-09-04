@@ -18,6 +18,7 @@ member settings, and guarded company, contact, and deal APIs.
 - 🧭 Protected localized application shell with canonical cosmetic workspace URLs
 - 👤 Owner-only localized member management
 - 🏢 Localized company, contact, and deal lists with stable record sheets
+- 📝 Manual activities, tasks, deal stage history, and record ownership
 - 🔗 Guarded company, contact, and deal APIs with archive/restore workflows
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
@@ -147,3 +148,10 @@ For shareable list state and stable record-sheet links, start with
 [list contract](src/crm/contracts/list-contract.ts). Direct record entry points
 are owned by [DirectRecordPage](src/components/crm/entity-list-page.tsx), and
 sheet navigation by [the record-sheet components](src/components/crm/record-sheet).
+
+Open a record sheet's Activities tab for manual activity logging, tasks, and
+deal stage history. Start with [ActivityTimeline](src/components/crm/activity-timeline.tsx)
+for the UI and [the activity contract](src/crm/contracts/activity-contract.ts)
+for API validation. Record assignment uses [OwnerPicker](src/components/crm/owner-picker.tsx)
+and the [ownership API entry point](app/api/crm/ownership/route.ts); assignment
+rules belong to [OwnershipService](src/crm/ownership/ownership-service.ts).
