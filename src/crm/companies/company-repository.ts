@@ -1,9 +1,9 @@
+import { inJsonArray } from "@/crm/sql-filters";
 import {
   and,
   asc,
   desc,
   eq,
-  inArray,
   isNotNull,
   isNull,
   like,
@@ -133,7 +133,7 @@ export class CompanyRepository {
     const result = await this.db
       .update(company)
       .set({ archivedAt, updatedAt: new Date() })
-      .where(inArray(company.id, ids));
+      .where(inJsonArray(company.id, ids));
     return result.meta.changes;
   }
   activeMember(id: string) {
@@ -160,18 +160,18 @@ export class CompanyRepository {
         )!,
       );
     if (input.industry.length)
-      conditions.push(inArray(company.industry, input.industry));
+      conditions.push(inJsonArray(company.industry, input.industry));
     if (input.owner.length) {
       const assigned = input.owner.filter((id) => id !== "unassigned");
       conditions.push(
         input.owner.includes("unassigned")
           ? assigned.length
             ? or(
-                inArray(company.ownerMembershipId, assigned),
+                inJsonArray(company.ownerMembershipId, assigned),
                 isNull(company.ownerMembershipId),
               )!
             : isNull(company.ownerMembershipId)
-          : inArray(company.ownerMembershipId, assigned),
+          : inJsonArray(company.ownerMembershipId, assigned),
       );
     }
     return and(...conditions)!;

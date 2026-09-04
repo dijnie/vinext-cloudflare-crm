@@ -194,9 +194,9 @@ export const activity = sqliteTable(
     ...timestamps,
   },
   (table) => [
-    index("activity_company_created_idx").on(table.companyId, table.createdAt),
-    index("activity_contact_created_idx").on(table.contactId, table.createdAt),
-    index("activity_deal_created_idx").on(table.dealId, table.createdAt),
+    index("activity_company_created_idx").on(table.companyId, table.createdAt, table.id),
+    index("activity_contact_created_idx").on(table.contactId, table.createdAt, table.id),
+    index("activity_deal_created_idx").on(table.dealId, table.createdAt, table.id),
     index("activity_due_idx").on(table.dueAt),
     index("activity_author_idx").on(table.authorUserId),
     check(
@@ -204,8 +204,8 @@ export const activity = sqliteTable(
       sql`${table.type} in ('note', 'call', 'meeting', 'task', 'stage_change')`,
     ),
     check(
-      "activity_one_anchor_check",
-      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null)) = 1`,
+      "activity_anchor_check",
+      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null)) >= 1`,
     ),
     check(
       "activity_metadata_json_check",

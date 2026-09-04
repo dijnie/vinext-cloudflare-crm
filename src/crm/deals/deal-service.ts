@@ -135,7 +135,7 @@ export class DealService {
         "Deal contacts belong to another company",
       );
     const now = new Date();
-    const values: Partial<Parameters<DealRepository["update"]>[1]> = {
+    const values: Parameters<DealRepository["updateWithHistory"]>[1] = {
       updatedAt: now,
     };
     if (input.name !== undefined) values.name = input.name;
@@ -160,7 +160,8 @@ export class DealService {
     } else if (input.closedReason !== undefined)
       values.closedReason = input.closedReason;
     try {
-      const row = await this.repository.update(id, values);
+      const row = await this.repository.updateWithHistory(id, values, current.stageId, context.userId);
+      if (!row) throw new HttpError(409, "conflict", "Deal stage changed before this update");
       return { id: row.id, name: row.name };
     } catch (error) {
       relationError(error, "Deal relationships are invalid");

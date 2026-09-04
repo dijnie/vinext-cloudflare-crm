@@ -1,9 +1,9 @@
+import { inJsonArray } from "@/crm/sql-filters";
 import {
   and,
   asc,
   desc,
   eq,
-  inArray,
   isNotNull,
   isNull,
   like,
@@ -122,13 +122,33 @@ export class DealRepository {
   create(values: typeof deal.$inferInsert) {
     return this.db.insert(deal).values(values).returning().get();
   }
-  update(id: string, values: Partial<typeof deal.$inferInsert>) {
-    return this.db
-      .update(deal)
-      .set(values)
-      .where(eq(deal.id, id))
-      .returning()
-      .get();
+  async updateWithHistory(id: string, values: Partial<typeof deal.$inferInsert>, expectedStage: string, authorId: string) {
+    const changedStage = values.stageId !== undefined && values.stageId !== expectedStage;
+    const now = values.updatedAt ?? new Date();
+    const query = this.db.update(deal).set({
+      ...values,
+      ...(changedStage ? { lastActivityAt: sql`max(coalesce(${deal.lastActivityAt}, 0), ${now.getTime()})` } : {}),
+    }).where(and(eq(deal.id, id), eq(deal.stageId, expectedStage))).returning({ id: deal.id, name: deal.name }).toSQL();
+    const update = this.db.$client.prepare(query.sql).bind(...query.params);
+    if (!changedStage) {
+      const result = await update.all<{ id: string; name: string }>();
+      return result.results[0];
+    }
+    const auditId = crypto.randomUUID();
+    // changes() refers to the preceding guarded UPDATE on the same batch connection.
+    // A stale stage therefore produces neither history nor related-record stamps.
+    const result = await this.db.$client.batch([
+      update,
+      this.db.$client.prepare(`INSERT INTO activity
+        (id, type, company_id, deal_id, author_user_id, metadata_json, occurred_at, created_at, updated_at)
+        SELECT ?, 'stage_change', company_id, id, ?, json_object('fromStageId', ?, 'toStageId', ?), ?, ?, ?
+        FROM deal WHERE id = ? AND changes() = 1`)
+        .bind(auditId, authorId, expectedStage, values.stageId, now.getTime(), now.getTime(), now.getTime(), id),
+      this.db.$client.prepare(`UPDATE company SET last_activity_at = max(coalesce(last_activity_at, 0), ?), updated_at = ?
+        WHERE id = (SELECT company_id FROM activity WHERE id = ?)`)
+        .bind(now.getTime(), now.getTime(), auditId),
+    ]);
+    return result[0]!.results[0] as { id: string; name: string } | undefined;
   }
   archive(id: string, archivedAt: Date | null) {
     return this.db
@@ -142,7 +162,7 @@ export class DealRepository {
     const result = await this.db
       .update(deal)
       .set({ archivedAt, updatedAt: new Date() })
-      .where(inArray(deal.id, ids));
+      .where(inJsonArray(deal.id, ids));
     return result.meta.changes;
   }
   activeMember(id: string) {
@@ -223,11 +243,11 @@ export class DealRepository {
           like(deal.description, `%${input.q}%`),
         )!,
       );
-    if (input.stage.length) conditions.push(inArray(deal.stageId, input.stage));
+    if (input.stage.length) conditions.push(inJsonArray(deal.stageId, input.stage));
     if (input.company.length)
-      conditions.push(inArray(deal.companyId, input.company));
+      conditions.push(inJsonArray(deal.companyId, input.company));
     if (input.owner.length)
-      conditions.push(inArray(deal.ownerMembershipId, input.owner));
+      conditions.push(inJsonArray(deal.ownerMembershipId, input.owner));
     return and(...conditions)!;
   }
 

@@ -5,6 +5,8 @@ import { createDatabase } from "@/db/client";
 import { CompanyService } from "@/crm/companies/company-service";
 import { ContactService } from "@/crm/contacts/contact-service";
 import { DealService } from "@/crm/deals/deal-service";
+import { ActivityService } from "@/crm/activities/activity-service";
+import { OwnershipService } from "@/crm/ownership/ownership-service";
 import { MemberService } from "@/members/member-service";
 
 import { defaultSecurityLogger, type SecurityLogger } from "./security-logging";
@@ -37,7 +39,10 @@ export function createCompositionRoot(
   const companies = new CompanyService(db);
   const contacts = new ContactService(db);
   const deals = new DealService(db);
+  const activities = new ActivityService(db);
+  const ownership = new OwnershipService(db);
   return {
+    activities,
     auth,
     companies,
     contacts,
@@ -45,6 +50,7 @@ export function createCompositionRoot(
     deals,
     env: runtimeBindings,
     members,
+    ownership,
     securityLogger,
   };
 }

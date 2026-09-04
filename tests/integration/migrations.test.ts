@@ -26,6 +26,7 @@ describe("CRM baseline migration", () => {
     expect(ledger.results).toEqual([
       { name: "0001_crm_baseline.sql" },
       { name: "0002_deal_relationship_invariants.sql" },
+      { name: "0003_activity_relationship_history.sql" },
     ]);
   });
 

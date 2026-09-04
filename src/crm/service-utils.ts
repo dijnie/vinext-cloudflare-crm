@@ -41,6 +41,7 @@ export function relationError(error: unknown, fallback: string): never {
   }
   const message = messages.join(" ").toLowerCase();
   if (
+    message.includes("activity anchor mismatch") ||
     message.includes("deal contact company mismatch") ||
     message.includes("contact company conflicts with a deal") ||
     message.includes("deal company conflicts with a contact")
