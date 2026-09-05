@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "saas-admin",
+  "name": "vinext-cloudflare-crm",
   "main": "worker/index.ts",
   "assets": {
     "directory": "dist/client",

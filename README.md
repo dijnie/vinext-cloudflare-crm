@@ -122,6 +122,12 @@ owner rebootstrap. Historical SQL files remain quarantined at the root of
 rollback checks are resolved. A retained Git revision alone does not verify
 database recovery, and source cleanup does not alter the remote ledger.
 
+Inside migration triggers, write `SELECT (CASE ... END);`: remote D1 can
+misinterpret the unparenthesized `CASE` terminator as the trigger terminator and
+return `incomplete input`. Parentheses preserve SQLite behavior. The script tests
+compile all CRM migrations and guard this syntax; existing applied migration
+names remain unchanged and must not be reset or replayed for this correction.
+
 The [migration runner](scripts/d1-migrations.mjs) prints the resolved target and
 ledger. Inspect without applying changes:
 

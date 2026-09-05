@@ -294,8 +294,8 @@ BEFORE UPDATE OF `role` ON `singleton_membership`
 WHEN OLD.`role` = 'owner' AND OLD.`status` = 'active' AND NEW.`role` != 'owner'
   AND EXISTS (SELECT 1 FROM `singleton_workspace`)
 BEGIN
-  SELECT CASE WHEN (SELECT count(*) FROM `singleton_membership` WHERE `role` = 'owner' AND `status` = 'active') <= 1
-    THEN RAISE(ABORT, 'last owner protected') END;
+  SELECT (CASE WHEN (SELECT count(*) FROM `singleton_membership` WHERE `role` = 'owner' AND `status` = 'active') <= 1
+    THEN RAISE(ABORT, 'last owner protected') END);
 END;
 
 CREATE TRIGGER `membership_keep_last_owner_on_status_change`
@@ -303,8 +303,8 @@ BEFORE UPDATE OF `status` ON `singleton_membership`
 WHEN OLD.`role` = 'owner' AND OLD.`status` = 'active' AND NEW.`status` != 'active'
   AND EXISTS (SELECT 1 FROM `singleton_workspace`)
 BEGIN
-  SELECT CASE WHEN (SELECT count(*) FROM `singleton_membership` WHERE `role` = 'owner' AND `status` = 'active') <= 1
-    THEN RAISE(ABORT, 'last owner protected') END;
+  SELECT (CASE WHEN (SELECT count(*) FROM `singleton_membership` WHERE `role` = 'owner' AND `status` = 'active') <= 1
+    THEN RAISE(ABORT, 'last owner protected') END);
 END;
 
 CREATE TRIGGER `membership_keep_last_owner_on_delete`
@@ -312,109 +312,109 @@ BEFORE DELETE ON `singleton_membership`
 WHEN OLD.`role` = 'owner' AND OLD.`status` = 'active'
   AND EXISTS (SELECT 1 FROM `singleton_workspace`)
 BEGIN
-  SELECT CASE WHEN (SELECT count(*) FROM `singleton_membership` WHERE `role` = 'owner' AND `status` = 'active') <= 1
-    THEN RAISE(ABORT, 'last owner protected') END;
+  SELECT (CASE WHEN (SELECT count(*) FROM `singleton_membership` WHERE `role` = 'owner' AND `status` = 'active') <= 1
+    THEN RAISE(ABORT, 'last owner protected') END);
 END;
 
 CREATE TRIGGER `company_active_owner_insert`
 BEFORE INSERT ON `company`
 WHEN NEW.`owner_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'owner membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'owner membership is inactive') END);
 END;
 CREATE TRIGGER `company_active_owner_update`
 BEFORE UPDATE OF `owner_membership_id` ON `company`
 WHEN NEW.`owner_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'owner membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'owner membership is inactive') END);
 END;
 
 CREATE TRIGGER `contact_active_owner_insert`
 BEFORE INSERT ON `contact`
 WHEN NEW.`owner_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'owner membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'owner membership is inactive') END);
 END;
 CREATE TRIGGER `contact_active_owner_update`
 BEFORE UPDATE OF `owner_membership_id` ON `contact`
 WHEN NEW.`owner_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'owner membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'owner membership is inactive') END);
 END;
 
 CREATE TRIGGER `deal_active_owner_insert`
 BEFORE INSERT ON `deal`
 WHEN NEW.`owner_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'owner membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'owner membership is inactive') END);
 END;
 CREATE TRIGGER `deal_active_owner_update`
 BEFORE UPDATE OF `owner_membership_id` ON `deal`
 WHEN NEW.`owner_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'owner membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'owner membership is inactive') END);
 END;
 
 CREATE TRIGGER `saved_view_active_owner_insert`
 BEFORE INSERT ON `saved_view`
 WHEN NEW.`owner_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'view owner membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'view owner membership is inactive') END);
 END;
 CREATE TRIGGER `saved_view_active_owner_update`
 BEFORE UPDATE OF `owner_membership_id` ON `saved_view`
 WHEN NEW.`owner_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'view owner membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`owner_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'view owner membership is inactive') END);
 END;
 
 CREATE TRIGGER `custom_field_active_user_insert`
 BEFORE INSERT ON `custom_field_value`
 WHEN NEW.`user_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`user_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'field user membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`user_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'field user membership is inactive') END);
 END;
 CREATE TRIGGER `custom_field_active_user_update`
 BEFORE UPDATE OF `user_membership_id` ON `custom_field_value`
 WHEN NEW.`user_membership_id` IS NOT NULL
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`user_membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'field user membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`user_membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'field user membership is inactive') END);
 END;
 
 CREATE TRIGGER `activity_visibility_active_member_insert`
 BEFORE INSERT ON `activity_visibility`
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'activity membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'activity membership is inactive') END);
 END;
 CREATE TRIGGER `activity_visibility_active_member_update`
 BEFORE UPDATE OF `membership_id` ON `activity_visibility`
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`membership_id` AND `status` = 'active')
-    THEN RAISE(ABORT, 'activity membership is inactive') END;
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM `singleton_membership` WHERE `user_id` = NEW.`membership_id` AND `status` = 'active')
+    THEN RAISE(ABORT, 'activity membership is inactive') END);
 END;
 
 CREATE TRIGGER `membership_requires_reference_cleanup`
 BEFORE UPDATE OF `status` ON `singleton_membership`
 WHEN OLD.`status` = 'active' AND NEW.`status` = 'revoked'
 BEGIN
-  SELECT CASE WHEN EXISTS (SELECT 1 FROM `company` WHERE `owner_membership_id` = OLD.`user_id`)
+  SELECT (CASE WHEN EXISTS (SELECT 1 FROM `company` WHERE `owner_membership_id` = OLD.`user_id`)
     OR EXISTS (SELECT 1 FROM `contact` WHERE `owner_membership_id` = OLD.`user_id`)
     OR EXISTS (SELECT 1 FROM `deal` WHERE `owner_membership_id` = OLD.`user_id`)
     OR EXISTS (SELECT 1 FROM `custom_field_value` WHERE `user_membership_id` = OLD.`user_id`)
     OR EXISTS (SELECT 1 FROM `activity_visibility` WHERE `membership_id` = OLD.`user_id`)
     OR EXISTS (SELECT 1 FROM `saved_view` WHERE `owner_membership_id` = OLD.`user_id`)
-    THEN RAISE(ABORT, 'membership references require cleanup') END;
+    THEN RAISE(ABORT, 'membership references require cleanup') END);
 END;
 
 INSERT INTO `singleton_workspace` (`id`, `slug`, `created_at`, `updated_at`)

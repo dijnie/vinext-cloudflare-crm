@@ -30,17 +30,17 @@ DROP TABLE activity_visibility_backup;
 CREATE TRIGGER activity_compatible_anchors_insert
 BEFORE INSERT ON activity
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM singleton_membership WHERE user_id = NEW.author_user_id AND status = 'active')
-    THEN RAISE(ABORT, 'author membership is inactive') END;
-  SELECT CASE WHEN NEW.contact_id IS NOT NULL AND NEW.company_id IS NOT NULL
+  SELECT (CASE WHEN NOT EXISTS (SELECT 1 FROM singleton_membership WHERE user_id = NEW.author_user_id AND status = 'active')
+    THEN RAISE(ABORT, 'author membership is inactive') END);
+  SELECT (CASE WHEN NEW.contact_id IS NOT NULL AND NEW.company_id IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM contact WHERE id = NEW.contact_id AND company_id = NEW.company_id)
-    THEN RAISE(ABORT, 'activity anchor mismatch') END;
-  SELECT CASE WHEN NEW.deal_id IS NOT NULL AND NEW.company_id IS NOT NULL
+    THEN RAISE(ABORT, 'activity anchor mismatch') END);
+  SELECT (CASE WHEN NEW.deal_id IS NOT NULL AND NEW.company_id IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM deal WHERE id = NEW.deal_id AND company_id = NEW.company_id)
-    THEN RAISE(ABORT, 'activity anchor mismatch') END;
-  SELECT CASE WHEN NEW.contact_id IS NOT NULL AND NEW.deal_id IS NOT NULL
+    THEN RAISE(ABORT, 'activity anchor mismatch') END);
+  SELECT (CASE WHEN NEW.contact_id IS NOT NULL AND NEW.deal_id IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM contact JOIN deal ON contact.company_id = deal.company_id WHERE contact.id = NEW.contact_id AND deal.id = NEW.deal_id)
-    THEN RAISE(ABORT, 'activity anchor mismatch') END;
+    THEN RAISE(ABORT, 'activity anchor mismatch') END);
 END;
 
 CREATE TRIGGER activity_history_immutable
