@@ -66,6 +66,15 @@ Cloudflare Email Service. Change the variable and binding sender restriction
 together when changing domains. Email delivery uses the native Worker binding;
 no Resend account or API key is required.
 
+Authentication checks read the current session/user together using Better Auth's
+database joins, then read active membership on every protected request. Session
+renewal writes are throttled to five minutes, with a one-hour lifetime from the
+last renewal (idle expiry can be up to five minutes earlier than renewal on
+every request). Cookie caching is not enabled: sign-out, password reset,
+membership revocation and role changes still take effect on the next request.
+The auth integration tests verify SQL counts, renewal and these security paths
+against local D1; production navigation latency needs a post-deploy measurement.
+
 3. Run the authoritative CRM migrations locally:
 
 The development command applies local migrations before starting Vinext:

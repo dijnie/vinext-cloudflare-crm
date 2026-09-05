@@ -60,7 +60,8 @@ export function createAuth(
     }),
     session: {
       expiresIn: 60 * 60,
-      updateAge: 1,
+      // Renew after five minutes, while still validating against DB on every request.
+      updateAge: 5 * 60,
     },
     emailAndPassword: {
       enabled: true,
@@ -116,6 +117,7 @@ export function createAuth(
       },
     },
     advanced: {
+      database: { joins: true },
       ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
       useSecureCookies: true,
     },

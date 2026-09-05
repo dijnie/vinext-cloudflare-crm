@@ -1,8 +1,11 @@
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/d1";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { handleAuthRequest } from "@/modules/auth/auth";
+import { createAuth, handleAuthRequest } from "@/modules/auth/auth";
+import * as schema from "@/db/schema";
+import { requireRequestContext } from "@/server/request-context";
 import type {
   AuthEmailAdapter,
   AuthEmailMessage,
@@ -44,10 +47,20 @@ class RecordingEmailAdapter implements AuthEmailAdapter {
 const runtimeBindings = env as RuntimeEnv;
 let harnessIndex = 0;
 
-function createHarness(overrides: Partial<RuntimeEnv> = {}) {
+function createHarness(overrides: Partial<RuntimeEnv> = {}, queries?: string[]) {
   const email = new RecordingEmailAdapter();
   const bindings = { ...runtimeBindings, ...overrides } as RuntimeEnv;
   const root = createCompositionRoot(bindings, email);
+  if (queries) {
+    root.db = drizzle(bindings.DB, {
+      schema,
+      logger: { logQuery: (query) => queries.push(query) },
+    });
+    root.auth = createAuth(root.db, {
+      secret: bindings.BETTER_AUTH_SECRET,
+      baseUrl: bindings.AUTH_BASE_URL,
+    }, email);
+  }
   harnessIndex += 1;
   const currentHarness = harnessIndex;
   const request = async (
@@ -308,7 +321,13 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     const cookie = requestCookie(signIn);
     const currentSession = await harness.root.db.query.session.findFirst();
     if (!currentSession) throw new Error("Expected an active session");
-    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    // Age the real persisted session instead of sleeping for the renewal window.
+    const previousUpdate = new Date(Date.now() - 301_000);
+    const previousExpiry = new Date(previousUpdate.getTime() + 3_600_000);
+    await harness.root.db.update(session).set({
+      updatedAt: previousUpdate,
+      expiresAt: previousExpiry,
+    }).where(eq(session.id, currentSession.id));
 
     const response = await harness.request("/get-session", {
       headers: { cookie },
@@ -318,11 +337,89 @@ describe.sequential("Better Auth compatibility under workerd", () => {
       where: eq(session.id, currentSession.id),
     });
     expect(renewed!.updatedAt.getTime()).toBeGreaterThan(
-      currentSession.updatedAt.getTime(),
+      previousUpdate.getTime(),
     );
     expect(renewed!.expiresAt.getTime()).toBeGreaterThan(
-      currentSession.expiresAt.getTime(),
+      previousExpiry.getTime(),
     );
+  });
+
+  it("checks session and user with one read and avoids renewal writes during navigation", async () => {
+    const queries: string[] = [];
+    const harness = createHarness({}, queries);
+    const password = "correct horse battery staple";
+    await signUpAndVerify(harness, "owner@example.com", password);
+    const signIn = await harness.request("/sign-in/email", {
+      method: "POST",
+      body: jsonBody({ email: "owner@example.com", password }),
+    });
+    const headers = new Headers({ cookie: requestCookie(signIn) });
+    for (const ageSeconds of [2, 120, 290]) {
+      const previousUpdate = new Date(Date.now() - ageSeconds * 1_000);
+      await harness.root.db.update(session).set({
+        updatedAt: previousUpdate,
+        expiresAt: new Date(previousUpdate.getTime() + 3_600_000),
+      });
+      queries.length = 0;
+      const context = await requireRequestContext(headers, harness.root);
+      expect(context.role).toBe("owner");
+      // One session+user read and one live membership read; no renewal write.
+      expect(queries).toHaveLength(2);
+      expect(queries.every((query) => /^select\b/i.test(query))).toBe(true);
+      const stored = await harness.root.db.query.session.findFirst();
+      expect(stored?.updatedAt).toEqual(previousUpdate);
+    }
+
+    // A previously valid cookie cannot bypass immediate server-side revocation.
+    await harness.root.db.delete(session);
+    await expect(requireRequestContext(headers, harness.root))
+      .rejects.toMatchObject({ status: 401 });
+  });
+
+  it("observes role, verification and membership changes on the next request", async () => {
+    const harness = createHarness();
+    const password = "correct horse battery staple";
+    await signUpAndVerify(harness, "owner@example.com", password);
+    await signUpAndVerify(harness, "member@example.com", password);
+    const signIn = await harness.request("/sign-in/email", {
+      method: "POST",
+      body: jsonBody({ email: "member@example.com", password }),
+    });
+    const headers = new Headers({ cookie: requestCookie(signIn) });
+    const context = await requireRequestContext(headers, harness.root);
+    expect(context.role).toBe("member");
+    await harness.root.db.update(singletonMembership).set({ role: "owner" })
+      .where(eq(singletonMembership.userId, context.userId));
+    expect((await requireRequestContext(headers, harness.root)).role).toBe("owner");
+    await harness.root.db.update(singletonMembership).set({ role: "member" })
+      .where(eq(singletonMembership.userId, context.userId));
+    expect((await requireRequestContext(headers, harness.root)).role).toBe("member");
+
+    await harness.root.db.update(user).set({ emailVerified: false })
+      .where(eq(user.id, context.userId));
+    await expect(requireRequestContext(headers, harness.root))
+      .rejects.toMatchObject({ status: 401 });
+    await harness.root.db.update(user).set({ emailVerified: true })
+      .where(eq(user.id, context.userId));
+    await harness.root.db.update(singletonMembership).set({ status: "revoked" })
+      .where(eq(singletonMembership.userId, context.userId));
+    await expect(requireRequestContext(headers, harness.root))
+      .rejects.toMatchObject({ status: 403 });
+  });
+
+  it("rejects expired sessions instead of renewing them", async () => {
+    const harness = createHarness();
+    const password = "correct horse battery staple";
+    await signUpAndVerify(harness, "owner@example.com", password);
+    const signIn = await harness.request("/sign-in/email", {
+      method: "POST",
+      body: jsonBody({ email: "owner@example.com", password }),
+    });
+    const headers = new Headers({ cookie: requestCookie(signIn) });
+    await harness.root.db.update(session).set({ expiresAt: new Date(Date.now() - 1_000) });
+    await expect(requireRequestContext(headers, harness.root))
+      .rejects.toMatchObject({ status: 401 });
+    expect(await harness.root.db.select().from(session)).toHaveLength(0);
   });
 
   it("uses generic reset responses, rejects host poisoning, consumes a short-lived token record, and invalidates old sessions", async () => {
