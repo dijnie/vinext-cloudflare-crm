@@ -1,6 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vinext-cloudflare-crm",
+  "placement": {
+    "mode": "smart"
+  },
   "main": "worker/index.ts",
   "assets": {
     "directory": "dist/client",

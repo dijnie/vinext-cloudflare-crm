@@ -46,6 +46,12 @@ member settings, and guarded company, contact, and deal APIs.
 
 ## Setup Steps
 
+Smart Placement is enabled in `wrangler.jsonc` to let Cloudflare reduce Worker
+round-trip latency to D1. It needs live traffic to evaluate placement; enabling
+it alone is not proof of faster navigation. Compare authenticated route timings
+after analysis (up to 15 minutes). To roll back, remove the `placement` field
+and redeploy, or disable Placement in the dashboard and update the repo too.
+
 1. Install dependencies:
 
 ```bash
