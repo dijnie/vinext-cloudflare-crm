@@ -57,9 +57,9 @@ async function clearState() {
   ]);
 }
 
-import { createSavedViewsGetHandler, createSavedViewsPostHandler } from "../../app/api/crm/saved-views/route";
-import { createSavedViewPatchHandler, createSavedViewDeleteHandler } from "../../app/api/crm/saved-views/[viewId]/route";
-import { createMemberDeleteHandler, createMemberPatchHandler } from "../../app/api/crm/members/[memberId]/route";
+import { createSavedViewsGetHandler, createSavedViewsPostHandler } from "../../src/app/api/crm/saved-views/route";
+import { createSavedViewPatchHandler, createSavedViewDeleteHandler } from "../../src/app/api/crm/saved-views/[viewId]/route";
+import { createMemberDeleteHandler, createMemberPatchHandler } from "../../src/app/api/crm/members/[memberId]/route";
 const create=(cookie:string,input:unknown)=>createSavedViewsPostHandler(root())(request("/api/crm/saved-views",cookie,"POST",input));
 const list=(cookie:string,entity="company")=>createSavedViewsGetHandler(root())(request("/api/crm/saved-views?entity="+entity,cookie));
 const patch=(cookie:string,id:string,input:unknown)=>createSavedViewPatchHandler(root(),id)(request("/api/crm/saved-views/"+id,cookie,"PATCH",input));

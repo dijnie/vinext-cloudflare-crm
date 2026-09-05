@@ -166,7 +166,7 @@ responses.
 
 Authenticated active members can access the core CRM API under
 `/api/crm/companies`, `/api/crm/contacts`, and `/api/crm/deals`. The route files
-under [app/api/crm](app/api/crm) are the HTTP entry points; request validation
+under [src/app/api/crm](src/app/api/crm) are the HTTP entry points; request validation
 and list contracts are owned by [src/crm/contracts](src/crm/contracts).
 
 For shareable list state and stable record-sheet links, start with
@@ -179,7 +179,7 @@ Open a record sheet's Activities tab for manual activity logging, tasks, and
 deal stage history. Start with [ActivityTimeline](src/components/crm/activity-timeline.tsx)
 for the UI and [the activity contract](src/crm/contracts/activity-contract.ts)
 for API validation. Record assignment uses [OwnerPicker](src/components/crm/owner-picker.tsx)
-and the [ownership API entry point](app/api/crm/ownership/route.ts); assignment
+and the [ownership API entry point](src/app/api/crm/ownership/route.ts); assignment
 rules belong to [OwnershipService](src/crm/ownership/ownership-service.ts).
 
 All active members can manage custom fields from each list's field settings and

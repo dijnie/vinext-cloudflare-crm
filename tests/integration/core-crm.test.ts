@@ -6,36 +6,36 @@ import {
   createCompaniesGetHandler,
   createCompaniesPatchHandler,
   createCompaniesPostHandler,
-} from "../../app/api/crm/companies/route";
+} from "../../src/app/api/crm/companies/route";
 import {
   createCompanyGetHandler,
   createCompanyPatchHandler,
-} from "../../app/api/crm/companies/[companyId]/route";
+} from "../../src/app/api/crm/companies/[companyId]/route";
 import {
   createContactsGetHandler,
   createContactsPatchHandler,
   createContactsPostHandler,
-} from "../../app/api/crm/contacts/route";
+} from "../../src/app/api/crm/contacts/route";
 import {
   createContactGetHandler,
   createContactPatchHandler,
-} from "../../app/api/crm/contacts/[contactId]/route";
+} from "../../src/app/api/crm/contacts/[contactId]/route";
 import {
   createDealsGetHandler,
   createDealsPatchHandler,
   createDealsPostHandler,
-} from "../../app/api/crm/deals/route";
+} from "../../src/app/api/crm/deals/route";
 import {
   createDealGetHandler,
   createDealPatchHandler,
-} from "../../app/api/crm/deals/[dealId]/route";
+} from "../../src/app/api/crm/deals/[dealId]/route";
 import {
   createDealContactDeleteHandler,
   createDealContactPatchHandler,
   createDealContactPostHandler,
-} from "../../app/api/crm/deals/[dealId]/contacts/route";
+} from "../../src/app/api/crm/deals/[dealId]/contacts/route";
 import { handleAuthRequest } from "@/auth/auth";
-import { createOwnersGetHandler } from "../../app/api/crm/owners/route";
+import { createOwnersGetHandler } from "../../src/app/api/crm/owners/route";
 import type { AuthEmailAdapter, AuthEmailMessage } from "@/auth/email-adapter";
 import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
 import { singletonMembership } from "@/db/schema";

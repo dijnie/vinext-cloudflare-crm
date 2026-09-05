@@ -61,7 +61,7 @@ async function clearState() {
 
 import { requireRequestContext } from "@/server/request-context";
 import { DashboardRepository } from "@/dashboard/dashboard-repository";
-import { createDashboardGetHandler } from "../../app/api/crm/dashboard/route";
+import { createDashboardGetHandler } from "../../src/app/api/crm/dashboard/route";
 import { DealRepository } from "@/crm/deals/deal-repository";
 import { dealListInputSchema } from "@/crm/contracts/deal-contract";
 const NOW=new Date("2026-09-04T12:00:00.000Z");

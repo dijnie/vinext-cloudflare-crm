@@ -59,10 +59,10 @@ async function clearState() {
 }
 
 
-import { createCurrencyGetHandler, createCurrencyPatchHandler } from "../../app/api/crm/currency/route";
-import { createCompaniesPostHandler } from "../../app/api/crm/companies/route";
-import { createDealsPostHandler } from "../../app/api/crm/deals/route";
-import { createDealPatchHandler } from "../../app/api/crm/deals/[dealId]/route";
+import { createCurrencyGetHandler, createCurrencyPatchHandler } from "../../src/app/api/crm/currency/route";
+import { createCompaniesPostHandler } from "../../src/app/api/crm/companies/route";
+import { createDealsPostHandler } from "../../src/app/api/crm/deals/route";
+import { createDealPatchHandler } from "../../src/app/api/crm/deals/[dealId]/route";
 import { applyD1Migrations, env as testEnv } from "cloudflare:test";
 const mutate=(cookie:string,input:unknown)=>createCurrencyPatchHandler(root())(request("/api/crm/currency",cookie,"PATCH",input));
 const settings=(cookie:string)=>createCurrencyGetHandler(root())(request("/api/crm/currency",cookie));

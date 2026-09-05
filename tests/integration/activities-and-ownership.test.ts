@@ -7,13 +7,13 @@ import { createCompositionRoot, type RuntimeEnv } from "@/server/composition-roo
 import { DealRepository } from "@/crm/deals/deal-repository";
 import { company as companyTable } from "@/db/schema";
 import { inJsonArray } from "@/crm/sql-filters";
-import { createActivitiesGetHandler, createActivitiesPostHandler } from "../../app/api/crm/activities/route";
-import { createActivityPatchHandler } from "../../app/api/crm/activities/[activityId]/route";
-import { createOwnershipPatchHandler } from "../../app/api/crm/ownership/route";
-import { createCompaniesGetHandler, createCompaniesPatchHandler, createCompaniesPostHandler } from "../../app/api/crm/companies/route";
-import { createContactsPostHandler } from "../../app/api/crm/contacts/route";
-import { createDealsPostHandler } from "../../app/api/crm/deals/route";
-import { createDealPatchHandler } from "../../app/api/crm/deals/[dealId]/route";
+import { createActivitiesGetHandler, createActivitiesPostHandler } from "../../src/app/api/crm/activities/route";
+import { createActivityPatchHandler } from "../../src/app/api/crm/activities/[activityId]/route";
+import { createOwnershipPatchHandler } from "../../src/app/api/crm/ownership/route";
+import { createCompaniesGetHandler, createCompaniesPatchHandler, createCompaniesPostHandler } from "../../src/app/api/crm/companies/route";
+import { createContactsPostHandler } from "../../src/app/api/crm/contacts/route";
+import { createDealsPostHandler } from "../../src/app/api/crm/deals/route";
+import { createDealPatchHandler } from "../../src/app/api/crm/deals/[dealId]/route";
 
 class RecordingEmailAdapter implements AuthEmailAdapter {
   verificationMessages: AuthEmailMessage[] = [];

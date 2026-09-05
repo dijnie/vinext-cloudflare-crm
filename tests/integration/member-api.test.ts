@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   createMemberDeleteHandler,
   createMemberPatchHandler,
-} from "../../app/api/crm/members/[memberId]/route";
-import { createMembersGetHandler } from "../../app/api/crm/members/route";
+} from "../../src/app/api/crm/members/[memberId]/route";
+import { createMembersGetHandler } from "../../src/app/api/crm/members/route";
 import { handleAuthRequest } from "@/auth/auth";
 import type { AuthEmailAdapter, AuthEmailMessage } from "@/auth/email-adapter";
 import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
