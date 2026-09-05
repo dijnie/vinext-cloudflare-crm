@@ -4,15 +4,25 @@ import { currencyCodeSchema, rateSchema } from "@/modules/currency/currency-cont
 import { canonicalRate, conversionFields, convertMinor, rateMantissa } from "@/modules/currency/conversion-service";
 
 describe("exact currency arithmetic",()=>{
-  it("supports precisely eleven currencies and identity minor units",()=>{
-    expect(CURRENCY_CODES).toEqual(["USD","EUR","JPY","GBP","CNY","AUD","CAD","CHF","HKD","SGD","ZAR"]);
-    expect(CURRENCIES).toHaveLength(11);
+  it("supports the currency catalog and identity minor units",()=>{
+    expect(CURRENCY_CODES).toEqual(["USD","EUR","JPY","GBP","CNY","AUD","CAD","CHF","HKD","SGD","ZAR","VND"]);
+    expect(CURRENCIES).toHaveLength(12);
     for(const code of CURRENCY_CODES) {
       expect(currencyCodeSchema.parse(" "+code.toLowerCase()+" ")).toBe(code);
-      expect(minorUnitsOf(code)).toBe(code==="JPY"?0:2);
+      expect(minorUnitsOf(code)).toBe(code==="JPY"||code==="VND"?0:2);
       expect(convertMinor(MAX_AMOUNT_MINOR,code,code,"1")).toBe(MAX_AMOUNT_MINOR);
     }
-    expect(currencyCodeSchema.safeParse("VND").success).toBe(false);
+    expect(CURRENCIES).toContainEqual({code:"VND",minorUnits:0});
+    expect(currencyCodeSchema.safeParse("ZZZ").success).toBe(false);
+  });
+  it("converts and formats Vietnamese dong as whole units",()=>{
+    expect(convertMinor(100,"USD","VND","25000")).toBe(25000);
+    expect(convertMinor(25000,"VND","USD","0.00004")).toBe(100);
+    expect(convertMinor(1,"USD","VND","50")).toBe(1);
+    expect(convertMinor(1,"USD","VND","49")).toBe(0);
+    expect(formatMinor(100000,"VND","vi-VN")).toBe("100.000\u00a0₫");
+    expect(formatMinor(100000,"VND","en-US")).toBe("₫100,000");
+    expect(formatMinor("900719925474099199","VND","vi-VN")).toBe("900.719.925.474.099.199\u00a0₫");
   });
   it("rounds half up at the destination minor unit without floating point loss",()=>{
     expect(convertMinor(1,"USD","USD","0.4999999999")).toBe(0);
@@ -28,7 +38,7 @@ describe("exact currency arithmetic",()=>{
   it("rejects invalid rates, unsupported money and overflow",()=>{
     for(const rate of ["0","0.0000000000","-1","NaN","Infinity","1e2","01","1.12345678901","10000000000"]) expect(rateSchema.safeParse(rate).success,rate).toBe(false);
     for(const amount of [-1,0.1,NaN,Infinity,MAX_AMOUNT_MINOR+1]) expect(()=>convertMinor(amount,"USD","EUR","1")).toThrow();
-    expect(()=>convertMinor(1,"VND","USD","1")).toThrow();
+    expect(()=>convertMinor(1,"ZZZ","USD","1")).toThrow();
     expect(()=>convertMinor(MAX_AMOUNT_MINOR,"JPY","USD","9999999999")).toThrow();
   });
   it("keeps absent conversion fully null and formats integer totals beyond safe-number range",()=>{

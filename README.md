@@ -217,6 +217,10 @@ shareable personal/everyone scope and
 [CurrencySettings](src/components/settings/currency-settings.tsx) for owner-managed
 rates and reporting currency.
 
+VND is supported for deals and reporting currency. Enter VND amounts in whole
+dong (for example, `100000` displays as `100.000 ₫` in Vietnamese), without a
+fractional component. USD remains the default currency.
+
 Rates are maintained manually; there is no external rate fetch. Manual rates take
 precedence over any stored fetched rates. Frozen deal conversions keep reports
 from drifting when rates change: updating a rate can fill missing conversions,
