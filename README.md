@@ -7,6 +7,8 @@ foundation provides verified email/password auth, race-safe singleton membership
 the CRM database baseline, a Vietnamese/English application shell, owner-only
 member settings, and guarded company, contact, and deal APIs.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/dijnie/vinext-cloudflare-crm.git)
+
 ## Features
 
 - 🎨 Modern UI built with Vinext and Shadcn UI
@@ -242,3 +244,4 @@ deals. Exact totals cross the API as decimal strings representing integer minor
 units, avoiding JavaScript number precision loss. Query ownership is in
 [DashboardRepository](src/modules/dashboard/dashboard-repository.ts), with the response
 contract in [dashboard-contracts](src/modules/dashboard/dashboard-contracts.ts).
+s
