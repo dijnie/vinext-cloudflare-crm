@@ -17,6 +17,7 @@ import { getCrmDictionary } from "@/i18n/crm-dictionary";
 import { RecordSheetHost } from "./record-sheet/record-sheet-host";
 import { getCurrencyDictionary } from "@/i18n/currency-dictionary";
 import { useCrmInvalidation } from "./use-crm-invalidation";
+import { NavigationSkeleton } from "./navigation-skeleton";
 
 export function AppShell({ children, dictionary, locale, role, slug }: { children: ReactNode; dictionary: AppDictionary; locale: AppLocale; role: "owner" | "member"; slug: string }) {
   useCrmInvalidation();
@@ -57,10 +58,12 @@ export function AppShell({ children, dictionary, locale, role, slug }: { childre
       <Link className="flex items-center gap-2 font-semibold text-primary" href={base}><span className="grid size-8 place-items-center rounded-md bg-primary text-sm text-primary-foreground">C</span>{dictionary.common.appName}</Link>
       <div className="ml-auto flex items-center gap-2">{signOutError ? <p className="text-sm text-destructive" role="alert">{dictionary.auth.signOutError}</p> : null}<LocaleSwitcher label={dictionary.common.language} locale={locale} /><Button aria-label={dictionary.auth.signOut} className="min-h-11" onClick={signOut} size="sm" type="button" variant="ghost"><LogOut aria-hidden="true" /><span className="hidden sm:inline">{dictionary.auth.signOut}</span></Button></div>
     </header>
-    {navigationPending && <div role="status" data-navigation-pending className="border-b bg-background px-4 py-2 text-sm text-muted-foreground md:px-6">{crmLabels.loading}</div>}
     <div className="flex min-h-0 flex-1">
       <aside className="hidden w-56 shrink-0 border-r bg-background md:block">{navigation}</aside>
-      <main aria-busy={navigationPending} className="min-h-0 min-w-0 flex-1 overflow-auto p-4 md:p-6" id="main-content" tabIndex={-1}>{children}</main>
+      <main aria-busy={navigationPending} className="min-h-0 min-w-0 flex-1 overflow-auto p-4 md:p-6" id="main-content" tabIndex={-1}>
+        {navigationPending && <NavigationSkeleton label={crmLabels.loading} />}
+        <div hidden={navigationPending} inert={navigationPending}>{children}</div>
+      </main>
     </div>
     <RecordSheetHost locale={locale} />
   </div>;

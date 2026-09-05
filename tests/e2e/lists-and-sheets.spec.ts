@@ -73,6 +73,10 @@ test("sidebar navigation announces pending while the destination response is hel
     await settled(page);
     await page.locator("aside").getByRole("link", { name: labels.contact, exact: true }).click();
     await expect(page.locator("[data-navigation-pending]")).toBeVisible();
+    await expect(page.locator("#main-content [data-navigation-pending]")).toBeVisible();
+    await expect(page.locator("header + [data-navigation-pending]")).toHaveCount(0);
+    await expect(page.locator("#main-content > div[hidden][inert]")).toHaveCount(1);
+    await expect(page.locator("aside")).toBeVisible();
     await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "true");
     release();
     await expect(page.locator("[data-list-heading]")).toHaveText(labels.contact);

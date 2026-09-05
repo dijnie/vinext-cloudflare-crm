@@ -46,6 +46,10 @@ member settings, and guarded company, contact, and deal APIs.
 
 ## Setup Steps
 
+Sidebar navigation shows a skeleton inside the main content area instead of a
+top loading banner. The previous page stays mounted but hidden and non-interactive
+until navigation finishes; the header and sidebar remain available.
+
 Smart Placement is enabled in `wrangler.jsonc` to let Cloudflare reduce Worker
 round-trip latency to D1. It needs live traffic to evaluate placement; enabling
 it alone is not proof of faster navigation. Compare authenticated route timings
