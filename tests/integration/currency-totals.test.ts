@@ -74,6 +74,23 @@ async function finish(cookie:string,value:any) {let current=value;for(let attemp
 async function conversion(id:string) {return env.DB.prepare("SELECT c.* FROM deal_conversion c JOIN crm_setting s ON s.active_conversion_version=c.version WHERE c.deal_id=?").bind(id).first<any>();}
 describe.sequential("versioned currency persistence",()=>{
   beforeEach(clearState);
+  it("stores whole dong and converts manual VND rates in both reporting currencies",async()=>{
+    const owner=await actor(),co=await company(owner.cookie);
+    const initial=await successful(await settings(owner.cookie));
+    expect(initial.reportingCurrency).toBe("USD");
+    expect(initial.catalog).toContainEqual({code:"VND",minorUnits:0});
+    await finish(owner.cookie,await successful(await mutate(owner.cookie,{action:"set_manual_rate",baseCurrency:"USD",currency:"VND",rate:"0.00004"})));
+    const dong=await deal(owner.cookie,owner.id,co.id,1_250_000,"VND");
+    expect(await env.DB.prepare("SELECT amount_minor,currency FROM deal WHERE id=?").bind(dong.id).first()).toEqual({amount_minor:1_250_000,currency:"VND"});
+    expect(await conversion(dong.id)).toMatchObject({amount_minor:1_250_000,currency:"VND",base_amount_minor:5_000,base_currency:"USD",rate_source:"manual"});
+    const dollars=await deal(owner.cookie,owner.id,co.id,5_000);
+    expect(await conversion(dollars.id)).toMatchObject({amount_minor:5_000,currency:"USD",base_amount_minor:5_000,base_currency:"USD"});
+    await successful(await mutate(owner.cookie,{action:"set_manual_rate",baseCurrency:"VND",currency:"USD",rate:"25000"}));
+    const completed=await finish(owner.cookie,await successful(await mutate(owner.cookie,{action:"set_reporting_currency",currency:"VND"})));
+    expect(completed.reportingCurrency).toBe("VND");
+    expect(await conversion(dong.id)).toMatchObject({amount_minor:1_250_000,currency:"VND",base_amount_minor:1_250_000,base_currency:"VND",rate_source:"identity"});
+    expect(await conversion(dollars.id)).toMatchObject({amount_minor:5_000,currency:"USD",base_amount_minor:1_250_000,base_currency:"VND",rate_source:"manual"});
+  });
   it("rolls back job creation, conversion chunks and checkpoint failures before retrying",async()=>{
     const owner=await actor(),co=await company(owner.cookie);
     await env.DB.batch(Array.from({length:26},(_,index)=>env.DB.prepare("INSERT INTO deal(id,name,company_id,owner_membership_id,stage_id,stage_changed_at,currency,amount_minor,created_at,updated_at) VALUES(?, 'Boundary',?,?,'demo-booked',0,'USD',100,0,0)").bind("boundary-"+String(index).padStart(3,"0"),co.id,owner.id)));
