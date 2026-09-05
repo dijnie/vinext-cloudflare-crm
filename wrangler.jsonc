@@ -8,9 +8,21 @@
     "binding": "ASSETS"
   },
   "compatibility_date": "2025-10-08",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "observability": {
-    "enabled": true
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true
+    }
   },
   "upload_source_maps": true,
   "vars": {
@@ -25,7 +37,9 @@
   "send_email": [
     {
       "name": "EMAIL",
-      "allowed_sender_addresses": ["noreply@dijnie.dev"]
+      "allowed_sender_addresses": [
+        "noreply@dijnie.dev"
+      ]
     }
   ],
   "d1_databases": [
