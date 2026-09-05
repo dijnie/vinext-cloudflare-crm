@@ -7,9 +7,9 @@ import {
   createMemberPatchHandler,
 } from "../../src/app/api/crm/members/[memberId]/route";
 import { createMembersGetHandler } from "../../src/app/api/crm/members/route";
-import { handleAuthRequest } from "@/auth/auth";
-import type { AuthEmailAdapter, AuthEmailMessage } from "@/auth/email-adapter";
-import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
+import { handleAuthRequest } from "@/modules/auth/auth";
+import type { AuthEmailAdapter, AuthEmailMessage } from "@/modules/auth/email-adapter";
+import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
 import { company, deal, singletonMembership } from "@/db/schema";
 import {
   createCompositionRoot,

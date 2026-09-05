@@ -7,8 +7,8 @@ import {
   dealCreateOutputSchema,
   dealListInputSchema,
   dealListOutputSchema,
-} from "@/crm/contracts/deal-contract";
-import { parseSearchParams } from "@/crm/contracts/list-contract";
+} from "@/modules/crm/contracts/deal-contract";
+import { parseSearchParams } from "@/modules/crm/contracts/list-contract";
 import {
   createCompositionRoot,
   type CompositionRoot,

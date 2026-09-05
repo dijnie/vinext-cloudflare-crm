@@ -1,12 +1,12 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { handleAuthRequest } from "@/auth/auth";
-import type { AuthEmailAdapter, AuthEmailMessage } from "@/auth/email-adapter";
-import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
+import { handleAuthRequest } from "@/modules/auth/auth";
+import type { AuthEmailAdapter, AuthEmailMessage } from "@/modules/auth/email-adapter";
+import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
 import { createCompositionRoot, type RuntimeEnv } from "@/server/composition-root";
-import { DealRepository } from "@/crm/deals/deal-repository";
+import { DealRepository } from "@/modules/crm/deals/deal-repository";
 import { company as companyTable } from "@/db/schema";
-import { inJsonArray } from "@/crm/sql-filters";
+import { inJsonArray } from "@/modules/crm/sql-filters";
 import { createActivitiesGetHandler, createActivitiesPostHandler } from "../../src/app/api/crm/activities/route";
 import { createActivityPatchHandler } from "../../src/app/api/crm/activities/[activityId]/route";
 import { createOwnershipPatchHandler } from "../../src/app/api/crm/ownership/route";

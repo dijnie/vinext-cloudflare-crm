@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { currencyCodeSchema, currencyMutationSchema, currencySettingsSchema } from "@/currency/currency-contracts";
+import { currencyCodeSchema, currencyMutationSchema, currencySettingsSchema } from "@/modules/currency/currency-contracts";
 import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
 import { HttpError } from "@/server/http-errors";
 import { createRouteHandler } from "@/server/route-handler";

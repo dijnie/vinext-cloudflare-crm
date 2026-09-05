@@ -34,10 +34,10 @@ import {
   createDealContactPatchHandler,
   createDealContactPostHandler,
 } from "../../src/app/api/crm/deals/[dealId]/contacts/route";
-import { handleAuthRequest } from "@/auth/auth";
+import { handleAuthRequest } from "@/modules/auth/auth";
 import { createOwnersGetHandler } from "../../src/app/api/crm/owners/route";
-import type { AuthEmailAdapter, AuthEmailMessage } from "@/auth/email-adapter";
-import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
+import type { AuthEmailAdapter, AuthEmailMessage } from "@/modules/auth/email-adapter";
+import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
 import { singletonMembership } from "@/db/schema";
 import {
   createCompositionRoot,

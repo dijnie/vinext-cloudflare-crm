@@ -5,7 +5,7 @@ import {
   dealIdSchema,
   dealMutationInputSchema,
   dealMutationOutputSchema,
-} from "@/crm/contracts/deal-contract";
+} from "@/modules/crm/contracts/deal-contract";
 import {
   createCompositionRoot,
   type CompositionRoot,

@@ -7,8 +7,8 @@ import {
   contactListInputSchema,
   contactListOutputSchema,
   contactWriteOutputSchema,
-} from "@/crm/contracts/contact-contract";
-import { parseSearchParams } from "@/crm/contracts/list-contract";
+} from "@/modules/crm/contracts/contact-contract";
+import { parseSearchParams } from "@/modules/crm/contracts/list-contract";
 import {
   createCompositionRoot,
   type CompositionRoot,

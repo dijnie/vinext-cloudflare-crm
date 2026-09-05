@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { FieldDefinition, FieldValue } from "@/fields/field-contracts";
-import type { EntityType } from "@/crm/list-state";
-import { invalidateCrm } from "@/crm/invalidation";
+import type { FieldDefinition, FieldValue } from "@/modules/fields/field-contracts";
+import type { EntityType } from "@/modules/crm/list-state";
+import { invalidateCrm } from "@/modules/crm/invalidation";
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
 import { crmRequest, requestError } from "../record-types";
 import { FieldEditor } from "./field-editor";

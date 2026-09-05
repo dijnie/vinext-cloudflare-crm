@@ -5,7 +5,7 @@ import {
   companyIdSchema,
   companyMutationInputSchema,
   companyMutationOutputSchema,
-} from "@/crm/contracts/company-contract";
+} from "@/modules/crm/contracts/company-contract";
 import {
   createCompositionRoot,
   type CompositionRoot,

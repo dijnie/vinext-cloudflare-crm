@@ -2,17 +2,17 @@ import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { handleAuthRequest } from "@/auth/auth";
+import { handleAuthRequest } from "@/modules/auth/auth";
 import type {
   AuthEmailAdapter,
   AuthEmailMessage,
-} from "@/auth/email-adapter";
+} from "@/modules/auth/email-adapter";
 import {
   changeSingletonRole,
   reconcileSingletonMembership,
   revokeSingletonMembership,
   SINGLETON_WORKSPACE_ID,
-} from "@/auth/singleton-workspace";
+} from "@/modules/auth/singleton-workspace";
 import {
   account,
   company,

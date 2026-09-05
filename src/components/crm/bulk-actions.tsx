@@ -2,9 +2,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { entityPaths, type EntityType } from "@/crm/list-state";
-import { ownershipInputSchema } from "@/crm/contracts/activity-contract";
-import { invalidateCrm } from "@/crm/invalidation";
+import { entityPaths, type EntityType } from "@/modules/crm/list-state";
+import { ownershipInputSchema } from "@/modules/crm/contracts/activity-contract";
+import { invalidateCrm } from "@/modules/crm/invalidation";
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
 import { crmRequest, requestError } from "./record-types";
 import { OwnerPicker, type OwnerOption } from "./owner-picker";

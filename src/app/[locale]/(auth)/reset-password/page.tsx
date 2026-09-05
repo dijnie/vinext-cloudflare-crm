@@ -1,5 +1,5 @@
 import { AuthPanel } from "@/components/auth/auth-panel";
-import { SINGLETON_WORKSPACE_SLUG } from "@/auth/singleton-workspace";
+import { SINGLETON_WORKSPACE_SLUG } from "@/modules/auth/singleton-workspace";
 import { isAppLocale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/get-dictionary";
 import { notFound } from "next/navigation";

@@ -5,8 +5,8 @@ import { Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { captureSavedViewState, type SavedView } from "@/views/saved-view-contracts";
-import type { EntityType } from "@/crm/list-state";
+import { captureSavedViewState, type SavedView } from "@/modules/views/saved-view-contracts";
+import type { EntityType } from "@/modules/crm/list-state";
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
 import { crmRequest, requestError } from "./record-types";
 

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { SINGLETON_WORKSPACE_SLUG } from "@/auth/singleton-workspace";
+import { SINGLETON_WORKSPACE_SLUG } from "@/modules/auth/singleton-workspace";
 import { canonicalWorkspacePath, LOCALE_COOKIE, savedLocale } from "@/i18n/config";
 
 export default async function HomePage() {

@@ -1,4 +1,4 @@
-import type { FieldDefinition, FieldValue } from "@/fields/field-contracts";
+import type { FieldDefinition, FieldValue } from "@/modules/fields/field-contracts";
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
 
 export function customFieldValue(field: FieldDefinition, value: FieldValue | undefined, locale: string, labels: CrmDictionary, userLabels?: Record<string, string>): string {

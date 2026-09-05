@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
+import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
 import { AppShell } from "@/components/crm/app-shell";
 import { singletonWorkspace } from "@/db/schema";
 import { canonicalWorkspacePath, isAppLocale } from "@/i18n/config";

@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { handleAuthRequest } from "@/auth/auth";
-import type { AuthEmailAdapter, AuthEmailMessage } from "@/auth/email-adapter";
-import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
+import { handleAuthRequest } from "@/modules/auth/auth";
+import type { AuthEmailAdapter, AuthEmailMessage } from "@/modules/auth/email-adapter";
+import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
 import { createCompositionRoot, type RuntimeEnv } from "@/server/composition-root";
 class RecordingEmailAdapter implements AuthEmailAdapter {
   verificationMessages: AuthEmailMessage[] = [];

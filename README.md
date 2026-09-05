@@ -154,6 +154,11 @@ before a restore; there is no automatic reset or zero-loss database rollback.
 
 ## Usage
 
+Pages and API entry points live in `src/app`, reusable UI in `src/components`,
+and business modules in `src/modules` (auth, CRM, currency, dashboard, fields,
+members, and views). Shared database, server, localization, utilities, and styles
+remain in their existing `src` directories.
+
 Public auth is available under `/{locale}/sign-up`, `/{locale}/sign-in`,
 `/{locale}/verify-email`, `/{locale}/forgot-password`, and
 `/{locale}/reset-password`, where `locale` is `vi` or `en`. Authenticated users
@@ -167,41 +172,41 @@ responses.
 Authenticated active members can access the core CRM API under
 `/api/crm/companies`, `/api/crm/contacts`, and `/api/crm/deals`. The route files
 under [src/app/api/crm](src/app/api/crm) are the HTTP entry points; request validation
-and list contracts are owned by [src/crm/contracts](src/crm/contracts).
+and list contracts are owned by [src/modules/crm/contracts](src/modules/crm/contracts).
 
 For shareable list state and stable record-sheet links, start with
-[parseListState](src/crm/list-state.ts) and the
-[list contract](src/crm/contracts/list-contract.ts). Direct record entry points
+[parseListState](src/modules/crm/list-state.ts) and the
+[list contract](src/modules/crm/contracts/list-contract.ts). Direct record entry points
 are owned by [DirectRecordPage](src/components/crm/entity-list-page.tsx), and
 sheet navigation by [the record-sheet components](src/components/crm/record-sheet).
 
 Open a record sheet's Activities tab for manual activity logging, tasks, and
 deal stage history. Start with [ActivityTimeline](src/components/crm/activity-timeline.tsx)
-for the UI and [the activity contract](src/crm/contracts/activity-contract.ts)
+for the UI and [the activity contract](src/modules/crm/contracts/activity-contract.ts)
 for API validation. Record assignment uses [OwnerPicker](src/components/crm/owner-picker.tsx)
 and the [ownership API entry point](src/app/api/crm/ownership/route.ts); assignment
-rules belong to [OwnershipService](src/crm/ownership/ownership-service.ts).
+rules belong to [OwnershipService](src/modules/crm/ownership/ownership-service.ts).
 
 All active members can manage custom fields from each list's field settings and
 edit values in record sheets. Start with [FieldsSheet](src/components/crm/fields/fields-sheet.tsx)
 and [RecordFields](src/components/crm/fields/record-fields.tsx); supported types
-belong to [the field contract](src/fields/field-contracts.ts), and SELECT/USER
-list filters to [the field query owner](src/fields/field-list-query.ts).
+belong to [the field contract](src/modules/fields/field-contracts.ts), and SELECT/USER
+list filters to [the field query owner](src/modules/fields/field-list-query.ts).
 
 The field deletion dialog shows value coverage and requires the current password
 and typed stable field key. Deletion retains the normalized definition, options,
 values, and reserved key as a recoverable tombstone; there is no automatic purge.
 Keep the displayed recovery ID for explicit recovery in field settings. Lifecycle
-rules belong to [FieldService](src/fields/field-service.ts), and password checking
-to [verifyCurrentPassword](src/auth/verify-current-password.ts).
+rules belong to [FieldService](src/modules/fields/field-service.ts), and password checking
+to [verifyCurrentPassword](src/modules/auth/verify-current-password.ts).
 
 Use [SavedViewsMenu](src/components/crm/saved-views-menu.tsx) to save and apply
 private or shared list state. Every active member may create views; private views
 remain creator-only, while shared views are readable by all members. Only the
 original creator may edit, change sharing, or delete a view; membership removal
 or record reassignment does not transfer that authority. See
-[SavedViewService](src/views/saved-view-service.ts) and
-[the saved-state contract](src/views/saved-view-contracts.ts).
+[SavedViewService](src/modules/views/saved-view-service.ts) and
+[the saved-state contract](src/modules/views/saved-view-contracts.ts).
 
 ### Currency and dashboard
 
@@ -217,8 +222,8 @@ precedence over any stored fetched rates. Frozen deal conversions keep reports
 from drifting when rates change: updating a rate can fill missing conversions,
 but does not revalue already converted deals. Original amounts and currencies,
 including legacy unconverted records, are retained. See
-[CurrencyService](src/currency/currency-service.ts) for these rules and
-[the conversion owner](src/currency/conversion-service.ts) for exact money arithmetic.
+[CurrencyService](src/modules/currency/currency-service.ts) for these rules and
+[the conversion owner](src/modules/currency/conversion-service.ts) for exact money arithmetic.
 
 Changing reporting currency is an explicit, resumable operation. The old reporting
 currency and conversion version remain active until the whole operation finishes,
@@ -231,5 +236,5 @@ Dashboard money totals exclude archived and unconverted deals; missing conversio
 are disclosed by count and currency instead of being presented as zero-valued
 deals. Exact totals cross the API as decimal strings representing integer minor
 units, avoiding JavaScript number precision loss. Query ownership is in
-[DashboardRepository](src/dashboard/dashboard-repository.ts), with the response
-contract in [dashboard-contracts](src/dashboard/dashboard-contracts.ts).
+[DashboardRepository](src/modules/dashboard/dashboard-repository.ts), with the response
+contract in [dashboard-contracts](src/modules/dashboard/dashboard-contracts.ts).

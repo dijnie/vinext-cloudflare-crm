@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getCoreRowModel, useReactTable, type ColumnDef, type RowSelectionState } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { changeListState, entityColumns, entityPaths, listApiSearch, parseListState, type EntityType } from "@/crm/list-state";
+import { changeListState, entityColumns, entityPaths, listApiSearch, parseListState, type EntityType } from "@/modules/crm/list-state";
 import { getCrmDictionary } from "@/i18n/crm-dictionary";
 import type { AppLocale } from "@/i18n/config";
 import { DataTable } from "./data-table";

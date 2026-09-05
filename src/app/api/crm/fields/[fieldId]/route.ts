@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
-import { verifyCurrentPassword } from "@/auth/verify-current-password";
-import { fieldDefinitionSchema, fieldDeleteInputSchema, fieldPatchInputSchema } from "@/fields/field-contracts";
+import { verifyCurrentPassword } from "@/modules/auth/verify-current-password";
+import { fieldDefinitionSchema, fieldDeleteInputSchema, fieldPatchInputSchema } from "@/modules/fields/field-contracts";
 import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
 import { HttpError } from "@/server/http-errors";
 import { createRouteHandler } from "@/server/route-handler";

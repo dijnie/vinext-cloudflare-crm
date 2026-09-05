@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 
-import { handleAuthRequest } from "@/auth/auth";
+import { handleAuthRequest } from "@/modules/auth/auth";
 import {
   createCompositionRoot,
   type RuntimeEnv,

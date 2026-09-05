@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
-import { activityCreateInputSchema, activityEntryOutputSchema, timelineInputSchema, timelineOutputSchema } from "@/crm/contracts/activity-contract";
-import { parseSearchParams } from "@/crm/contracts/list-contract";
+import { activityCreateInputSchema, activityEntryOutputSchema, timelineInputSchema, timelineOutputSchema } from "@/modules/crm/contracts/activity-contract";
+import { parseSearchParams } from "@/modules/crm/contracts/list-contract";
 import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
 import { createRouteHandler } from "@/server/route-handler";
 

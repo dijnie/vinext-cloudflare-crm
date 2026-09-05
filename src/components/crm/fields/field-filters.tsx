@@ -1,5 +1,5 @@
 "use client";
-import type { FieldDefinition } from "@/fields/field-contracts";
+import type { FieldDefinition } from "@/modules/fields/field-contracts";
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
 import type { Facet } from "../record-types";
 

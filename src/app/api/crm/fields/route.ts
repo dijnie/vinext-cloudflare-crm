@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
-import { fieldCreateInputSchema, fieldDefinitionSchema, fieldListInputSchema, fieldReorderInputSchema } from "@/fields/field-contracts";
-import { parseSearchParams } from "@/crm/contracts/list-contract";
+import { fieldCreateInputSchema, fieldDefinitionSchema, fieldListInputSchema, fieldReorderInputSchema } from "@/modules/fields/field-contracts";
+import { parseSearchParams } from "@/modules/crm/contracts/list-contract";
 import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
 import { createRouteHandler } from "@/server/route-handler";
 

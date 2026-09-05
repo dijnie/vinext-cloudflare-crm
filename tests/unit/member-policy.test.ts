@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   requireOwnerRole,
   resolveRemovalReplacement,
-} from "@/members/member-policy";
+} from "@/modules/members/member-policy";
 import type { RequestContext } from "@/server/request-context";
 
 function context(role: "owner" | "member", membershipId = "actor") {

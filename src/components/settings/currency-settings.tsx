@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { crmRequest } from "@/components/crm/record-types";
 import { selectClass } from "@/components/crm/list-toolbar";
-import { invalidateCrm } from "@/crm/invalidation";
-import { currencyMutationSchema, type CurrencySettings as Settings, type CurrencyMutation } from "@/currency/currency-contracts";
+import { invalidateCrm } from "@/modules/crm/invalidation";
+import { currencyMutationSchema, type CurrencySettings as Settings, type CurrencyMutation } from "@/modules/currency/currency-contracts";
 import type { AppLocale } from "@/i18n/config";
 import { getCurrencyDictionary } from "@/i18n/currency-dictionary";
 

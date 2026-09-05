@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { ActivityEntry, TimelineInput } from "@/crm/contracts/activity-contract";
-import { invalidateCrm } from "@/crm/invalidation";
-import type { EntityType } from "@/crm/list-state";
+import type { ActivityEntry, TimelineInput } from "@/modules/crm/contracts/activity-contract";
+import { invalidateCrm } from "@/modules/crm/invalidation";
+import type { EntityType } from "@/modules/crm/list-state";
 import type { AppLocale } from "@/i18n/config";
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
 import { ActivityComposer } from "./activity-composer";

@@ -1,7 +1,7 @@
 "use client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { FieldDefinition, FieldValue } from "@/fields/field-contracts";
+import type { FieldDefinition, FieldValue } from "@/modules/fields/field-contracts";
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
 import { OwnerPicker } from "../owner-picker";
 import { selectClass } from "../list-toolbar";

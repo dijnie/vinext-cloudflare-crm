@@ -2,10 +2,10 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { changeListState, entityColumns, type EntityType } from "@/crm/list-state";
+import { changeListState, entityColumns, type EntityType } from "@/modules/crm/list-state";
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
 import { fieldLabel, type Facet } from "./record-types";
-import type { FieldDefinition } from "@/fields/field-contracts";
+import type { FieldDefinition } from "@/modules/fields/field-contracts";
 import { FieldFilters } from "./fields/field-filters";
 
 export const selectClass = "min-h-11 max-w-full rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";

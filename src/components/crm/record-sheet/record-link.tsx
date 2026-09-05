@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { changeListState, type EntityType } from "@/crm/list-state";
+import { changeListState, type EntityType } from "@/modules/crm/list-state";
 
 export function RecordLink({ entity, id, children }: { entity: EntityType; id: string; children: ReactNode }) {
   const pathname = usePathname();

@@ -1,7 +1,7 @@
 import { expect, request, test, type APIRequestContext } from "@playwright/test";
-import { formatMinor } from "../../src/currency/currency-catalog";
-import type { CurrencySettings } from "../../src/currency/currency-contracts";
-import type { DashboardSummaryData } from "../../src/dashboard/dashboard-contracts";
+import { formatMinor } from "../../src/modules/currency/currency-catalog";
+import type { CurrencySettings } from "../../src/modules/currency/currency-contracts";
+import type { DashboardSummaryData } from "../../src/modules/dashboard/dashboard-contracts";
 import { getCurrencyDictionary } from "../../src/i18n/currency-dictionary";
 import { getCrmDictionary } from "../../src/i18n/crm-dictionary";
 

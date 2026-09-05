@@ -1,6 +1,6 @@
 import type { AppLocale } from "@/i18n/config";
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
-import type { EntityType } from "@/crm/list-state";
+import type { EntityType } from "@/modules/crm/list-state";
 import { displayValue, fieldLabel, recordName, type CrmRecord } from "../record-types";
 import { RecordLink } from "./record-link";
 

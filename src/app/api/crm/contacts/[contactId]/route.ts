@@ -5,7 +5,7 @@ import {
   contactIdSchema,
   contactMutationInputSchema,
   contactMutationOutputSchema,
-} from "@/crm/contracts/contact-contract";
+} from "@/modules/crm/contracts/contact-contract";
 import {
   createCompositionRoot,
   type CompositionRoot,

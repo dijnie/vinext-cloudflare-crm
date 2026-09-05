@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { handleAuthRequest } from "@/auth/auth";
-import type { AuthEmailAdapter, AuthEmailMessage } from "@/auth/email-adapter";
-import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
+import { handleAuthRequest } from "@/modules/auth/auth";
+import type { AuthEmailAdapter, AuthEmailMessage } from "@/modules/auth/email-adapter";
+import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
 import { createCompositionRoot, type RuntimeEnv } from "@/server/composition-root";
 class RecordingEmailAdapter implements AuthEmailAdapter {
   verificationMessages: AuthEmailMessage[] = [];
@@ -57,10 +57,10 @@ async function clearState() {
   ]);
 }
 
-import { FIELD_TYPES } from "@/fields/field-contracts";
+import { FIELD_TYPES } from "@/modules/fields/field-contracts";
 import { and } from "drizzle-orm";
 import { company as companyTable } from "@/db/schema";
-import { fieldFilterConditions } from "@/fields/field-list-query";
+import { fieldFilterConditions } from "@/modules/fields/field-list-query";
 import { createFieldsGetHandler, createFieldsPostHandler, createFieldsPatchHandler } from "../../src/app/api/crm/fields/route";
 import { createFieldGetHandler, createFieldPatchHandler, createFieldDeleteHandler } from "../../src/app/api/crm/fields/[fieldId]/route";
 import { createFieldValuesGetHandler, createFieldValuesPatchHandler } from "../../src/app/api/crm/fields/values/route";

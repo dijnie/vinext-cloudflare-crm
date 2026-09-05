@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { handleAuthRequest } from "@/auth/auth";
-import type { AuthEmailAdapter, AuthEmailMessage } from "@/auth/email-adapter";
-import { SINGLETON_WORKSPACE_ID } from "@/auth/singleton-workspace";
+import { handleAuthRequest } from "@/modules/auth/auth";
+import type { AuthEmailAdapter, AuthEmailMessage } from "@/modules/auth/email-adapter";
+import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
 import { createCompositionRoot, type RuntimeEnv } from "@/server/composition-root";
 class RecordingEmailAdapter implements AuthEmailAdapter {
   verificationMessages: AuthEmailMessage[] = [];
@@ -60,10 +60,10 @@ async function clearState() {
 
 
 import { requireRequestContext } from "@/server/request-context";
-import { DashboardRepository } from "@/dashboard/dashboard-repository";
+import { DashboardRepository } from "@/modules/dashboard/dashboard-repository";
 import { createDashboardGetHandler } from "../../src/app/api/crm/dashboard/route";
-import { DealRepository } from "@/crm/deals/deal-repository";
-import { dealListInputSchema } from "@/crm/contracts/deal-contract";
+import { DealRepository } from "@/modules/crm/deals/deal-repository";
+import { dealListInputSchema } from "@/modules/crm/contracts/deal-contract";
 const NOW=new Date("2026-09-04T12:00:00.000Z");
 async function context(cookie:string) {return requireRequestContext(new Headers({cookie}),root());}
 async function fixture() {

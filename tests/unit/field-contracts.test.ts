@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FIELD_TYPES, fieldCreateInputSchema, fieldDeleteInputSchema, fieldKeyFromLabel, fieldReorderInputSchema, fieldValuesInputSchema } from "@/fields/field-contracts";
+import { FIELD_TYPES, fieldCreateInputSchema, fieldDeleteInputSchema, fieldKeyFromLabel, fieldReorderInputSchema, fieldValuesInputSchema } from "@/modules/fields/field-contracts";
 
 describe("custom field contracts", () => {
   it("accepts all ten field types on all three entities with stable defaults", () => {

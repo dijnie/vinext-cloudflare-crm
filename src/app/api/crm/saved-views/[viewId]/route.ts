@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
-import { savedViewOutputSchema, savedViewUpdateSchema } from "@/views/saved-view-contracts";
-import { stableIdSchema } from "@/crm/contracts/list-contract";
+import { savedViewOutputSchema, savedViewUpdateSchema } from "@/modules/views/saved-view-contracts";
+import { stableIdSchema } from "@/modules/crm/contracts/list-contract";
 import { HttpError } from "@/server/http-errors";
 import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
 import { createRouteHandler } from "@/server/route-handler";

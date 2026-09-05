@@ -1,6 +1,6 @@
 import type { CrmDictionary } from "@/i18n/crm-dictionary";
-import type { FieldDefinition, FieldValue } from "@/fields/field-contracts";
-import { formatMinor } from "@/currency/currency-catalog";
+import type { FieldDefinition, FieldValue } from "@/modules/fields/field-contracts";
+import { formatMinor } from "@/modules/currency/currency-catalog";
 
 export interface CrmRecord {
   id: string;

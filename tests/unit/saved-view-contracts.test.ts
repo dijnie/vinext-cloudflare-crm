@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { captureSavedViewState, savedViewCreateSchema, validateSavedViewState } from "@/views/saved-view-contracts";
-import { parseListState } from "@/crm/list-state";
+import { captureSavedViewState, savedViewCreateSchema, validateSavedViewState } from "@/modules/views/saved-view-contracts";
+import { parseListState } from "@/modules/crm/list-state";
 
 describe("saved view URL contracts", () => {
   it("round-trips filters and custom columns while removing ephemeral navigation", () => {

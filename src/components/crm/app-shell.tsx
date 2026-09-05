@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState } from "react";
 
-import { authClient } from "@/auth/auth-client";
+import { authClient } from "@/modules/auth/auth-client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { AppLocale } from "@/i18n/config";

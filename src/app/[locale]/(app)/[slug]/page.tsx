@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DashboardSummary } from "@/components/dashboard/dashboard-summary";
-import { dashboardInputSchema } from "@/dashboard/dashboard-contracts";
+import { dashboardInputSchema } from "@/modules/dashboard/dashboard-contracts";
 import { isAppLocale } from "@/i18n/config";
 import { getCrmDictionary } from "@/i18n/crm-dictionary";
 import { createCompositionRoot, type RuntimeEnv } from "@/server/composition-root";

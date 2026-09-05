@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { CURRENCIES, CURRENCY_CODES, MAX_AMOUNT_MINOR, formatMinor, minorUnitsOf } from "@/currency/currency-catalog";
-import { currencyCodeSchema, rateSchema } from "@/currency/currency-contracts";
-import { canonicalRate, conversionFields, convertMinor, rateMantissa } from "@/currency/conversion-service";
+import { CURRENCIES, CURRENCY_CODES, MAX_AMOUNT_MINOR, formatMinor, minorUnitsOf } from "@/modules/currency/currency-catalog";
+import { currencyCodeSchema, rateSchema } from "@/modules/currency/currency-contracts";
+import { canonicalRate, conversionFields, convertMinor, rateMantissa } from "@/modules/currency/conversion-service";
 
 describe("exact currency arithmetic",()=>{
   it("supports precisely eleven currencies and identity minor units",()=>{

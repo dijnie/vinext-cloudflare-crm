@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { reconcileSingletonMembership } from "@/auth/singleton-workspace";
+import { reconcileSingletonMembership } from "@/modules/auth/singleton-workspace";
 import { createDatabase } from "@/db/client";
 import {
   activity,
@@ -18,7 +18,7 @@ import {
   singletonWorkspace,
   user,
 } from "@/db/schema";
-import { MemberService } from "@/members/member-service";
+import { MemberService } from "@/modules/members/member-service";
 import type { RequestContext } from "@/server/request-context";
 
 const db = createDatabase(env.DB);

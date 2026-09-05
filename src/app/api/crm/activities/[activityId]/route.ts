@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
-import { activityCompleteInputSchema, activityEntryOutputSchema } from "@/crm/contracts/activity-contract";
-import { stableIdSchema } from "@/crm/contracts/list-contract";
+import { activityCompleteInputSchema, activityEntryOutputSchema } from "@/modules/crm/contracts/activity-contract";
+import { stableIdSchema } from "@/modules/crm/contracts/list-contract";
 import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
 import { HttpError } from "@/server/http-errors";
 import { createRouteHandler } from "@/server/route-handler";

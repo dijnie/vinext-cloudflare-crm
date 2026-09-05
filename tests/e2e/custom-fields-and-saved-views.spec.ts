@@ -1,5 +1,5 @@
 import { expect, request, test, type APIRequestContext, type Page } from "@playwright/test";
-import { FIELD_TYPES, type FieldDefinition } from "../../src/fields/field-contracts";
+import { FIELD_TYPES, type FieldDefinition } from "../../src/modules/fields/field-contracts";
 import { getCrmDictionary } from "../../src/i18n/crm-dictionary";
 
 test.use({ actionTimeout: 10_000 });
