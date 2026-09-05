@@ -1,5 +1,5 @@
 {
-	"name": "saas-admin",
+	"name": "vinext-cloudflare-crm",
 	"description": "Bilingual CRM built with Vinext, shadcn/ui, Cloudflare Workers, and D1",
 	"cloudflare": {
 		"label": "Vinext CRM",
