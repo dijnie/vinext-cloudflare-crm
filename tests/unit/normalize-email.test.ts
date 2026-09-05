@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeEmail } from "@/auth/normalize-email";
+import { normalizeEmail } from "@/modules/auth/normalize-email";
 
 describe("email normalization", () => {
   it("normalizes whitespace and case", () => {

@@ -167,9 +167,3 @@ export const singletonMembership = sqliteTable(
     ),
   ],
 );
-
-export const company = sqliteTable("company", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-});

@@ -1,16 +1,14 @@
 {
 	"name": "saas-admin",
-	"description": "Admin dashboard template built with Vinext, shadcn/ui, and Cloudflare's developer stack",
+	"description": "Bilingual CRM built with Vinext, shadcn/ui, Cloudflare Workers, and D1",
 	"cloudflare": {
-		"label": "SaaS Admin Template",
+		"label": "Vinext CRM",
 		"products": [
 			"Workers",
 			"D1"
 		],
 		"categories": [],
 		"docs_url": "https://developers.cloudflare.com/workers/",
-		"preview_icon_url": "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/c2a0b13a-8cd1-464a-561b-3a7371c7c700/public",
-		"preview_image_url": "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/661a4884-fb10-4867-7b4e-b72763d12100/preview",
 		"publish": true
 	},
 	"dependencies": {
@@ -67,18 +65,25 @@
 	"scripts": {
 		"build": "vinext build",
 		"cf-typegen": "wrangler types",
-		"check": "npm run typecheck && npm run test:unit && npm run test:integration && npm run build && vinext-cloudflare deploy --dry-run",
-		"db:migrate": "wrangler d1 migrations apply DB --local",
-		"db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+		"check": "npm run typecheck && npm run test:scripts && npm run test:unit && npm run test:integration && npm run build && vinext-cloudflare deploy --dry-run",
+		"db:inspect:local": "node scripts/d1-migrations.mjs --target local",
+		"db:inspect:preview": "node scripts/d1-migrations.mjs --target preview",
+		"db:inspect:production": "node scripts/d1-migrations.mjs --target production",
+		"db:migrate:local": "node scripts/d1-migrations.mjs --target local --apply",
+		"db:migrate:built": "node scripts/d1-migrations.mjs --target local --built --apply",
+		"db:migrate:preview": "node scripts/d1-migrations.mjs --target preview --apply",
+		"db:migrate:production": "node scripts/d1-migrations.mjs --target production --apply",
 		"deploy": "vinext-cloudflare deploy",
-		"dev": "npm run db:migrate && vinext dev --port 4321",
-		"e2e:dev": "npm run db:migrate && vinext dev",
+		"dev": "npm run db:migrate:local && vinext dev --port 4321",
+		"e2e:dev": "npm run db:migrate:local && vinext dev",
 		"preview": "npm run build && npm run start",
-		"start": "wrangler d1 migrations apply DB --local --persist-to .wrangler/state --config dist/server/wrangler.json && wrangler dev --config dist/server/wrangler.json --persist-to .wrangler/state --port 8787 --local-protocol https",
+		"start": "npm run db:migrate:built && wrangler dev --config dist/server/wrangler.json --persist-to .wrangler/state --port 8787 --local-protocol https",
 		"test": "npm run test:unit && npm run test:integration",
 		"test:e2e": "playwright test",
+		"test:e2e:local": "npm run build && node scripts/e2e-local.mjs",
 		"test:integration": "vitest run --dir tests/integration",
 		"test:unit": "vitest run --dir tests/unit",
+		"test:scripts": "node --test tests/scripts/*.test.mjs",
 		"typecheck": "tsc --noEmit"
 	}
 }

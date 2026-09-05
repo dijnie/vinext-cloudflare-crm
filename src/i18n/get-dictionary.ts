@@ -1,27 +1,11 @@
-const dictionaries = {
-  vi: {
-    title: "Công ty",
-    empty: "Chưa có công ty",
-    open: "Mở chi tiết",
-    close: "Đóng",
-    signInTitle: "Đăng nhập",
-    signInDescription: "Đăng nhập bằng tài khoản email đã xác minh.",
-  },
-  en: {
-    title: "Companies",
-    empty: "No companies yet",
-    open: "Open details",
-    close: "Close",
-    signInTitle: "Sign in",
-    signInDescription: "Sign in with a verified email account.",
-  },
-} as const;
+import type { AppLocale } from "./config";
+import { en } from "./dictionaries/en";
+import { vi } from "./dictionaries/vi";
 
-export type AppLocale = keyof typeof dictionaries;
+export type { AppLocale } from "./config";
+export { isAppLocale } from "./config";
 
-export function isAppLocale(value: string): value is AppLocale {
-  return value === "vi" || value === "en";
-}
+const dictionaries = { vi, en } as const;
 
 export function getDictionary(locale: AppLocale) {
   return dictionaries[locale];

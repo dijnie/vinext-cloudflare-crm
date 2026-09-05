@@ -32,7 +32,9 @@
     {
       "binding": "DB",
       "database_name": "saas-admin",
-      "database_id": "d306b8d4-a311-4dc3-b8ea-0df09ceb85b7"
+      "database_id": "d306b8d4-a311-4dc3-b8ea-0df09ceb85b7",
+      "preview_database_id": "d306b8d4-a311-4dc3-b8ea-0df09ceb85b7",
+      "migrations_dir": "migrations/crm"
     }
   ]
 }

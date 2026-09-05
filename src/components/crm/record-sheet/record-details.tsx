@@ -1,0 +1,10 @@
+import type { AppLocale } from "@/i18n/config";
+import type { CrmDictionary } from "@/i18n/crm-dictionary";
+import type { EntityType } from "@/modules/crm/list-state";
+import { displayValue, fieldLabel, recordName, type CrmRecord } from "../record-types";
+import { RecordLink } from "./record-link";
+
+const detailFields = { company: ["domain", "website", "industry", "description", "city", "countryCode", "phone", "email", "owner", "createdAt", "updatedAt"], contact: ["email", "phone", "title", "owner", "createdAt", "updatedAt"], deal: ["stage", "amount", "currency", "expectedCloseAt", "description", "closedReason", "owner", "createdAt", "updatedAt"] };
+export function RecordDetails({ entity, record, locale, labels }: { entity: EntityType; record: CrmRecord; locale: AppLocale; labels: CrmDictionary }) {
+  return <div className="space-y-6"><dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">{detailFields[entity].map(key => <div key={key} className="min-w-0"><dt className="text-sm text-muted-foreground">{fieldLabel(key, labels)}</dt><dd className="break-words whitespace-pre-wrap text-sm">{displayValue(record, key, locale, labels)}</dd></div>)}</dl><section className="space-y-3 border-t pt-4"><h3 className="font-medium">{labels.related}</h3>{record.company && <p className="text-sm">{labels.labels.company}: <RecordLink entity="company" id={record.company.id}>{record.company.name}</RecordLink></p>}{(["contacts", "deals"] as const).map(key => record[key] && <div className="space-y-2" key={key}><h4 className="text-sm text-muted-foreground">{labels[key === "contacts" ? "contact" : "deal"]}</h4>{record[key]?.length ? <ul className="divide-y rounded-lg border">{record[key]?.map(related => <li className="px-3 py-3 text-sm" key={related.id}><RecordLink entity={key === "contacts" ? "contact" : "deal"} id={related.id}>{recordName(related)}</RecordLink>{related.archivedAt && <span className="ml-2 text-muted-foreground">{labels.archived}</span>}</li>)}</ul> : <p className="text-sm">{labels.none}</p>}</div>)}</section></div>;
+}

@@ -2,17 +2,17 @@ import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { handleAuthRequest } from "@/auth/auth";
+import { handleAuthRequest } from "@/modules/auth/auth";
 import type {
   AuthEmailAdapter,
   AuthEmailMessage,
-} from "@/auth/email-adapter";
+} from "@/modules/auth/email-adapter";
 import {
   changeSingletonRole,
   reconcileSingletonMembership,
   revokeSingletonMembership,
   SINGLETON_WORKSPACE_ID,
-} from "@/auth/singleton-workspace";
+} from "@/modules/auth/singleton-workspace";
 import {
   account,
   company,
@@ -79,13 +79,18 @@ async function clearState() {
   await db.delete(session);
   await db.delete(account);
   await db.delete(verification);
-  await db.delete(singletonMembership);
   await db.delete(company);
-  await db
-    .update(singletonWorkspace)
-    .set({ ownerUserId: null, updatedAt: new Date() })
-    .where(eq(singletonWorkspace.id, SINGLETON_WORKSPACE_ID));
+  await db.delete(singletonWorkspace);
+  await db.delete(singletonMembership);
   await db.delete(user);
+  const now = new Date();
+  await db.insert(singletonWorkspace).values({
+    id: SINGLETON_WORKSPACE_ID,
+    slug: "crm",
+    ownerUserId: null,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 function jsonBody(value: unknown): string {
@@ -257,6 +262,22 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     );
     const currentUser = await harness.root.db.query.user.findFirst();
     if (!currentUser) throw new Error("Expected the verified user");
+    const now = new Date();
+    await harness.root.db.insert(user).values({
+      id: "backup-owner",
+      name: "Backup Owner",
+      email: "backup-owner@example.com",
+      emailVerified: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await harness.root.db.insert(singletonMembership).values({
+      userId: "backup-owner",
+      role: "owner",
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    });
     await harness.root.db
       .update(singletonMembership)
       .set({ status: "revoked", updatedAt: new Date() })
@@ -523,10 +544,11 @@ describe.sequential("Better Auth compatibility under workerd", () => {
       { userId: "owner-b", role: "owner", status: "active", createdAt: now, updatedAt: now },
     ]);
 
-    await Promise.all([
-      changeSingletonRole(root.db, "owner-a", "owner-a", "member"),
-      revokeSingletonMembership(root.db, "owner-b", "owner-b"),
+    const removals = await Promise.all([
+      revokeSingletonMembership(root.db, "owner-a", "owner-b"),
+      revokeSingletonMembership(root.db, "owner-b", "owner-a"),
     ]);
+    expect(removals.filter(Boolean)).toHaveLength(1);
     const activeOwners = await root.db.query.singletonMembership.findMany({
       where: (table, { and, eq }) =>
         and(eq(table.role, "owner"), eq(table.status, "active")),

@@ -16,10 +16,10 @@ export default defineConfig({
       miniflare: {
         compatibilityDate: "2025-10-08",
         compatibilityFlags: ["nodejs_compat"],
-        d1Databases: ["DB"],
+        d1Databases: ["DB", "UPGRADE_DB"],
         bindings: {
           TEST_MIGRATIONS: await readD1Migrations(
-            path.join(rootDirectory, "migrations"),
+            path.join(rootDirectory, "migrations/crm"),
           ),
           BETTER_AUTH_SECRET: "test-secret-with-at-least-32-characters",
           AUTH_BASE_URL: "https://auth.test",
