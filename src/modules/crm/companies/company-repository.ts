@@ -28,7 +28,7 @@ export class CompanyRepository {
     await validateFieldFilters(this.db, "company", input.fields);
     const where = this.where(input);
     const order = this.order(input.sort, input.dir);
-    const rows = await this.db
+    const rowsQuery = this.db
       .select({
         id: company.id,
         name: company.name,
@@ -51,12 +51,16 @@ export class CompanyRepository {
       .orderBy(order, asc(company.id))
       .limit(input.pageSize)
       .offset((input.page - 1) * input.pageSize);
-    const [{ total }] = await this.db
+    const countQuery = this.db
       .select({ total: sql<number>`count(*)` })
       .from(company)
       .where(where);
     const facetWhere = this.where({ ...input, owner: [], industry: [], fields: {} });
-    const facets = await listFacets(this.db, "company", facetWhere);
+    const [rows, [{ total }], facets] = await Promise.all([
+      rowsQuery,
+      countQuery,
+      listFacets(this.db, "company", facetWhere),
+    ]);
     const fields = await fieldListData(this.db, "company", rows.map(row => row.id), facetWhere);
     return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldUserLabels: fields.fieldUserLabels };
   }

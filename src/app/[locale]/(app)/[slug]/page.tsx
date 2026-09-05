@@ -1,13 +1,10 @@
-import { env } from "cloudflare:workers";
-import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DashboardSummary } from "@/components/dashboard/dashboard-summary";
 import { dashboardInputSchema } from "@/modules/dashboard/dashboard-contracts";
 import { isAppLocale } from "@/i18n/config";
 import { getCrmDictionary } from "@/i18n/crm-dictionary";
-import { createCompositionRoot, type RuntimeEnv } from "@/server/composition-root";
-import { requireRequestContext } from "@/server/request-context";
+import { getPageContext } from "@/server/page-context";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +14,7 @@ export default async function DashboardPage({ params, searchParams }: {
 }) {
   const { locale, slug } = await params;
   if (!isAppLocale(locale)) notFound();
-  const root = createCompositionRoot(env as RuntimeEnv);
-  const context = await requireRequestContext(new Headers(await headers()), root);
+  const { root, context } = await getPageContext();
   const query = await searchParams;
   // Record-sheet parameters belong to the shared shell, not dashboard scope.
   const input = dashboardInputSchema.safeParse({ scope: query.scope });

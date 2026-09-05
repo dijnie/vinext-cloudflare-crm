@@ -64,7 +64,7 @@ for (const locale of ["vi", "en"] as const) {
     test.setTimeout(90_000);
     await page.goto(`/${locale}/crm/settings/currencies`);
     await page.getByLabel(labels.base, { exact: true }).selectOption("EUR");
-    await expect(page.locator("[aria-busy]")).toHaveAttribute("aria-busy", "false");
+    await expect(page.locator("#main-content [aria-busy]")).toHaveAttribute("aria-busy", "false");
     await page.getByLabel(labels.currency, { exact: true }).selectOption("USD");
     await page.getByLabel(labels.rate, { exact: true }).fill("0.9");
     await page.getByRole("button", { name: labels.addRate, exact: true }).click();

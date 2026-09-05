@@ -26,6 +26,79 @@ async function create(path: string, data: object): Promise<{ id: string }> {
 async function settled(page: Page) { await expect(page.locator("section[aria-busy]")).toHaveAttribute("aria-busy", "false"); }
 async function query(page: Page, key: string, value: string | null) { await expect.poll(() => new URL(page.url()).searchParams.get(key)).toBe(value); }
 
+test("SSR list avoids a duplicate fetch and refreshes after mutation and query navigation", async ({ page }) => {
+  const labels = getCrmDictionary("en");
+  const prefix = `snapshot-${Date.now()}`;
+  const company = await create("companies", { name: `${prefix}-before` });
+  const listRequests: string[] = [];
+  page.on("request", req => {
+    if (req.method() === "GET" && new URL(req.url()).pathname === "/api/crm/companies") listRequests.push(req.url());
+  });
+  await page.goto(`/en/crm/companies?q=${prefix}`);
+  await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toBeVisible();
+  // Opening a client-only control proves hydration completed before counting requests.
+  await page.getByRole("button", { name: labels.add, exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("dialog").getByRole("button", { name: labels.cancel, exact: true }).click();
+  await settled(page);
+  expect(listRequests).toHaveLength(0);
+
+  const updated = await api.patch(`/api/crm/companies/${company.id}`, { data: { action: "update", data: { name: `${prefix}-after` } } });
+  expect(updated.ok()).toBe(true);
+  const refreshed = page.waitForResponse(res => new URL(res.url()).pathname === "/api/crm/companies" && res.request().method() === "GET");
+  await page.evaluate(() => window.dispatchEvent(new Event("crm:invalidate")));
+  expect((await refreshed).ok()).toBe(true);
+  await expect(page.getByRole("link", { name: `${prefix}-after`, exact: true })).toBeVisible();
+  await settled(page);
+  expect(listRequests).toHaveLength(1);
+
+  await page.getByRole("textbox", { name: labels.search, exact: true }).fill(`${prefix}-missing`);
+  await page.getByRole("button", { name: labels.search, exact: true }).click();
+  await query(page, "q", `${prefix}-missing`);
+  await settled(page);
+  await expect(page.getByRole("link", { name: `${prefix}-after`, exact: true })).toHaveCount(0);
+  await page.goBack();
+  await query(page, "q", prefix);
+  await expect(page.getByRole("link", { name: `${prefix}-after`, exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toHaveCount(0);
+});
+
+test("sidebar navigation announces pending while the destination response is held", async ({ page }) => {
+  const labels = getCrmDictionary("en");
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route(url => url.pathname.startsWith("/en/crm/contacts"), async route => { await gate; await route.continue(); });
+  try {
+    await page.goto("/en/crm/companies");
+    await settled(page);
+    await page.locator("aside").getByRole("link", { name: labels.contact, exact: true }).click();
+    await expect(page.locator("[data-navigation-pending]")).toBeVisible();
+    await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "true");
+    release();
+    await expect(page.locator("[data-list-heading]")).toHaveText(labels.contact);
+    await expect(page.locator("[data-navigation-pending]")).toHaveCount(0);
+  } finally { release(); }
+});
+
+test("Back refreshes a cached company list after invalidation on another page", async ({ page }) => {
+  const labels = getCrmDictionary("en");
+  const prefix = `off-page-${Date.now()}`;
+  const company = await create("companies", { name: `${prefix}-before` });
+  await page.goto(`/en/crm/companies?q=${prefix}`);
+  await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toBeVisible();
+  await page.locator("aside").getByRole("link", { name: labels.contact, exact: true }).click();
+  await expect(page.locator("[data-list-heading]")).toHaveText(labels.contact);
+  await settled(page);
+  const updated = await api.patch(`/api/crm/companies/${company.id}`, { data: { action: "update", data: { name: `${prefix}-after` } } });
+  expect(updated.ok()).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("crm:invalidate")));
+  await settled(page);
+  await page.goBack();
+  await query(page, "q", prefix);
+  await expect(page.getByRole("link", { name: `${prefix}-after`, exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toHaveCount(0);
+});
+
 for (const locale of ["vi", "en"] as const) {
   const labels = getCrmDictionary(locale);
   test(`${locale}: choosing a company survives searching other companies`, async ({ page }) => {

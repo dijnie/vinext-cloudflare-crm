@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getCoreRowModel, useReactTable, type ColumnDef, type RowSelectionState } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
@@ -16,23 +16,46 @@ import { customFieldValue } from "./fields/field-columns";
 import { SavedViewsMenu } from "./saved-views-menu";
 import { RecordLink } from "./record-sheet/record-link";
 import { crmRequest, displayValue, fieldLabel, recordName, type CrmRecord, type ListData } from "./record-types";
+import { useCrmInvalidation } from "./use-crm-invalidation";
 
-export function EntityList({ entity, initialData, locale }: { entity: EntityType; initialData: ListData; locale: AppLocale }) {
+const emptyRows: CrmRecord[] = [];
+
+export function EntityList({ entity, initialData, initialQueryKey, locale }: { entity: EntityType; initialData: ListData; initialQueryKey: string; locale: AppLocale }) {
   const router = useRouter(); const path = usePathname(); const search = useSearchParams(); const labels = getCrmDictionary(locale);
   const state = parseListState(entity, new URLSearchParams(search.toString())); const query = listApiSearch(new URLSearchParams(search.toString()));
-  const [data, setData] = useState(initialData); const [error, setError] = useState(false); const [loading, setLoading] = useState(true); const [revision, setRevision] = useState(0);
-  const [dataKey, setDataKey] = useState(`${entity}?${query}`);
-  const currentRows = dataKey === `${entity}?${query}` ? data.rows : [];
+  const queryKey = `${entity}:${JSON.stringify(state.list)}`;
+  const mutationRevision = useCrmInvalidation();
+  const initialSnapshot = useRef({ key: initialQueryKey, eligible: true });
+  const [data, setData] = useState(initialData); const [error, setError] = useState(false); const [fetching, setFetching] = useState(false); const [revision, setRevision] = useState(0);
+  const [dataKey, setDataKey] = useState(initialQueryKey);
+  const loading = fetching || dataKey !== queryKey;
+  const currentRows = dataKey === queryKey ? data.rows : emptyRows;
   const [selection, setSelection] = useState<RowSelectionState>({}); const [creating, setCreating] = useState(false);
   const [partialFailure, setPartialFailure] = useState(false);
-  useEffect(() => { const handler = () => setRevision(value => value + 1); window.addEventListener("crm:invalidate", handler); return () => window.removeEventListener("crm:invalidate", handler); }, []);
   useEffect(() => { setSelection({}); }, [query, entity]);
-  useEffect(() => { const controller = new AbortController(); setLoading(true); setError(false); crmRequest<ListData>(`/api/crm/${entityPaths[entity]}?${query}`, { signal: controller.signal }).then(value => { if (controller.signal.aborted) return; setData(value); setDataKey(`${entity}?${query}`); setSelection(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => value.rows.some(row => row.id === id)))); }).catch(() => { if (!controller.signal.aborted) { setData({ rows: [], total: 0, facets: {}, customFields: [], fieldFacets: {}, fieldUserLabels: {} }); setSelection({}); setError(true); } }).finally(() => { if (!controller.signal.aborted) setLoading(false); }); return () => controller.abort(); }, [query, entity, revision]);
+  useEffect(() => {
+    // Only the mount snapshot is trusted: a later RSC response may predate a mutation.
+    if (initialSnapshot.current.eligible && initialSnapshot.current.key === queryKey && revision === 0 && mutationRevision === 0) return;
+    initialSnapshot.current.eligible = false;
+    const controller = new AbortController();
+    setFetching(true); setError(false);
+    crmRequest<ListData>(`/api/crm/${entityPaths[entity]}?${query}`, { signal: controller.signal }).then(value => {
+      if (controller.signal.aborted) return;
+      setData(value); setDataKey(queryKey);
+      setSelection(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => value.rows.some(row => row.id === id))));
+    }).catch(() => {
+      if (!controller.signal.aborted) {
+        setData({ rows: [], total: 0, facets: {}, customFields: [], fieldFacets: {}, fieldUserLabels: {} });
+        setDataKey(queryKey); setSelection({}); setError(true);
+      }
+    }).finally(() => { if (!controller.signal.aborted) setFetching(false); });
+    return () => controller.abort();
+  }, [query, queryKey, entity, revision, mutationRevision]);
   const customFields = data.customFields?.filter(field => !field.archivedAt) ?? [];
   const configuredColumns = state.columns?.length ? state.columns : [...entityColumns[entity], ...customFields.filter(field => field.showOnTable).map(field => `field:${field.key}`)];
   const visibleColumns: readonly string[] = configuredColumns.filter(key => !key.startsWith("field:") || customFields.some(field => `field:${field.key}` === key));
   const columns = useMemo<ColumnDef<CrmRecord>[]>(() => [{ id: "select", header: ({ table }) => <input type="checkbox" aria-label={labels.selectPage} disabled={table.options.enableRowSelection === false || table.getRowModel().rows.length === 0} checked={table.getIsAllRowsSelected()} ref={node => { if (node) node.indeterminate = table.getIsSomeRowsSelected(); }} onChange={table.getToggleAllRowsSelectedHandler()} className="size-4" />, cell: ({ row }) => <label className="flex min-h-11 min-w-11 items-center justify-center"><input className="size-4" type="checkbox" aria-label={`${labels.select} ${recordName(row.original)}`} disabled={!row.getCanSelect()} checked={row.getIsSelected()} onChange={row.getToggleSelectedHandler()} /></label> }, ...visibleColumns.map(key => { const field = key.startsWith("field:") ? customFields.find(definition => definition.key === key.slice(6)) : undefined; return { id: key, header: field?.label ?? fieldLabel(key, labels), cell: ({ row }: { row: { original: CrmRecord } }) => field ? <span className="block max-w-80 whitespace-pre-wrap break-words tabular-nums">{customFieldValue(field, row.original.fields?.[field.key], locale, labels, data.fieldUserLabels)}</span> : key === "name" || key === "firstName" ? <RecordLink entity={entity} id={row.original.id}>{recordName(row.original)}</RecordLink> : key === "company" && row.original.company ? <RecordLink entity="company" id={row.original.company.id}>{row.original.company.name}</RecordLink> : <span className="tabular-nums">{displayValue(row.original, key, locale, labels)}</span> }; }), ...(!visibleColumns.includes("name") && !visibleColumns.includes("firstName") ? [{ id: "open", header: labels.details, cell: ({ row }: { row: { original: CrmRecord } }) => <RecordLink entity={entity} id={row.original.id}>{labels.details}</RecordLink> }] : [])], [visibleColumns.join(","), entity, locale, data.customFields, data.fieldUserLabels]);
-  const table = useReactTable({ data: currentRows, columns, getCoreRowModel: getCoreRowModel(), getRowId: row => row.id, enableRowSelection: !loading && !error && dataKey === `${entity}?${query}`, state: { rowSelection: selection }, onRowSelectionChange: setSelection });
+  const table = useReactTable({ data: currentRows, columns, getCoreRowModel: getCoreRowModel(), getRowId: row => row.id, enableRowSelection: !loading && !error && dataKey === queryKey, state: { rowSelection: selection }, onRowSelectionChange: setSelection });
   const ids = loading || error ? [] : currentRows.filter(row => selection[row.id]).map(row => row.id);
   function change(changes: Record<string, string | null>) { router.push(`${path}?${changeListState(new URLSearchParams(search.toString()), changes)}`, { scroll: false }); }
   return <section className="mx-auto min-w-0 max-w-7xl space-y-4" aria-busy={loading}>

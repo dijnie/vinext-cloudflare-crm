@@ -31,10 +31,20 @@ export function fieldFilterConditions(entity: EntityType, filters: Filters): SQL
 export async function fieldListData(db: AppDatabase, entity: EntityType, ids: string[], facetWhere: SQL) {
   const definitions = await db.select().from(definition).where(and(eq(definition.entity, entity), isNull(definition.archivedAt), sql`${definition}.deleted_at is null`)).orderBy(asc(definition.position), asc(definition.id));
   const definitionIds = definitions.map(field => field.id);
-  const options = definitionIds.length ? await db.select().from(option).where(inJsonArray(option.fieldId, definitionIds)).orderBy(asc(option.position), asc(option.id)) : [];
+  const filterIds = definitions.filter(field => field.showOnFilter && ["select", "user"].includes(field.type)).map(field => field.id);
+  const [[options, values], facetRows] = await Promise.all([
+    definitionIds.length ? db.batch([
+      db.select().from(option).where(inJsonArray(option.fieldId, definitionIds)).orderBy(asc(option.position), asc(option.id)),
+      db.select().from(value).where(and(inJsonArray(anchors[entity], ids), inJsonArray(value.fieldId, definitionIds))),
+    ]) : Promise.resolve([[], []] as [typeof option.$inferSelect[], typeof value.$inferSelect[]]),
+    filterIds.length ? db.select({ fieldId: value.fieldId, optionId: value.optionId, memberId: value.userMembershipId, label: sql<string>`coalesce(${option.label}, ${user.name}, '')`, count: sql<number>`count(*)` }).from(value)
+      .innerJoin(tables[entity], eq(anchors[entity], tables[entity].id))
+      .leftJoin(option, eq(option.id, value.optionId)).leftJoin(user, eq(user.id, value.userMembershipId)).leftJoin(singletonMembership, eq(singletonMembership.userId, value.userMembershipId))
+      .where(and(facetWhere, inJsonArray(value.fieldId, filterIds), or(and(sql`${value.optionId} is not null`, isNull(option.archivedAt)), and(sql`${value.userMembershipId} is not null`, eq(singletonMembership.status, "active")))))
+      .groupBy(value.fieldId, value.optionId, value.userMembershipId, option.label, user.name).orderBy(asc(value.fieldId), asc(option.label), asc(user.name)).limit(2000) : Promise.resolve([]),
+  ]);
   const customFields = definitions.map(field => ({ id: field.id, entity: field.entity, key: field.key, label: field.label, type: field.type, required: field.required, showOnSheet: field.showOnSheet, showOnTable: field.showOnTable, showOnFilter: field.showOnFilter, position: field.position, archivedAt: null, options: options.filter(item => item.fieldId === field.id).map(item => ({ id: item.id, label: item.label, position: item.position, archivedAt: item.archivedAt?.toISOString() ?? null })) }));
   const byId = new Map(definitions.map(field => [field.id, field]));
-  const values = ids.length && definitionIds.length ? await db.select().from(value).where(and(inJsonArray(anchors[entity], ids), inJsonArray(value.fieldId, definitionIds))) : [];
   const memberIds = [...new Set(values.flatMap(row => row.userMembershipId ? [row.userMembershipId] : []))];
   const members = memberIds.length ? await db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(inJsonArray(user.id, memberIds)) : [];
   const fieldUserLabels = Object.fromEntries(members.map(member => [member.id, member.name || member.email]));
@@ -46,14 +56,6 @@ export async function fieldListData(db: AppDatabase, entity: EntityType, ids: st
     (fieldsByRecord[recordId] ??= {})[field.key] = scalar;
   }
   const fieldFacets: Record<string, { value: string; label: string; count: number }[]> = {};
-  const filterIds = definitions.filter(field => field.showOnFilter && ["select", "user"].includes(field.type)).map(field => field.id);
-  if (filterIds.length) {
-    const rows = await db.select({ fieldId: value.fieldId, optionId: value.optionId, memberId: value.userMembershipId, label: sql<string>`coalesce(${option.label}, ${user.name}, '')`, count: sql<number>`count(*)` }).from(value)
-      .innerJoin(tables[entity], eq(anchors[entity], tables[entity].id))
-      .leftJoin(option, eq(option.id, value.optionId)).leftJoin(user, eq(user.id, value.userMembershipId)).leftJoin(singletonMembership, eq(singletonMembership.userId, value.userMembershipId))
-      .where(and(facetWhere, inJsonArray(value.fieldId, filterIds), or(and(sql`${value.optionId} is not null`, isNull(option.archivedAt)), and(sql`${value.userMembershipId} is not null`, eq(singletonMembership.status, "active")))))
-      .groupBy(value.fieldId, value.optionId, value.userMembershipId, option.label, user.name).orderBy(asc(value.fieldId), asc(option.label), asc(user.name)).limit(2000);
-    for (const row of rows) { const key = byId.get(row.fieldId)!.key; (fieldFacets[key] ??= []).push({ value: row.optionId ?? row.memberId!, label: row.label, count: row.count }); }
-  }
+  for (const row of facetRows) { const key = byId.get(row.fieldId)!.key; (fieldFacets[key] ??= []).push({ value: row.optionId ?? row.memberId!, label: row.label, count: row.count }); }
   return { customFields, fieldsByRecord, fieldFacets, fieldUserLabels };
 }

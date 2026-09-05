@@ -31,7 +31,7 @@ export class ContactRepository {
   async list(input: ContactListInput) {
     await validateFieldFilters(this.db, "contact", input.fields);
     const where = this.where(input);
-    const rows = await this.db
+    const rowsQuery = this.db
       .select({
         id: contact.id,
         firstName: contact.firstName,
@@ -57,12 +57,16 @@ export class ContactRepository {
       .orderBy(this.order(input.sort, input.dir), asc(contact.id))
       .limit(input.pageSize)
       .offset((input.page - 1) * input.pageSize);
-    const [{ total }] = await this.db
+    const countQuery = this.db
       .select({ total: sql<number>`count(*)` })
       .from(contact)
       .where(where);
     const facetWhere = this.where({ ...input, owner: [], company: [], title: [], fields: {} });
-    const facets = await listFacets(this.db, "contact", facetWhere);
+    const [rows, [{ total }], facets] = await Promise.all([
+      rowsQuery,
+      countQuery,
+      listFacets(this.db, "contact", facetWhere),
+    ]);
     const fields = await fieldListData(this.db, "contact", rows.map(row => row.id), facetWhere);
     return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldUserLabels: fields.fieldUserLabels };
   }

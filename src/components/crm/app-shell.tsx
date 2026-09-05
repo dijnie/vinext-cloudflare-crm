@@ -3,7 +3,7 @@
 import { Building2, ChartNoAxesCombined, Coins, LogOut, Menu, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useTransition } from "react";
 
 import { authClient } from "@/modules/auth/auth-client";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,15 @@ import { LocaleSwitcher } from "./locale-switcher";
 import { getCrmDictionary } from "@/i18n/crm-dictionary";
 import { RecordSheetHost } from "./record-sheet/record-sheet-host";
 import { getCurrencyDictionary } from "@/i18n/currency-dictionary";
+import { useCrmInvalidation } from "./use-crm-invalidation";
 
 export function AppShell({ children, dictionary, locale, role, slug }: { children: ReactNode; dictionary: AppDictionary; locale: AppLocale; role: "owner" | "member"; slug: string }) {
+  useCrmInvalidation();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
+  const [navigationPending, startNavigation] = useTransition();
   const base = `/${locale}/${slug}`;
   const crmLabels = getCrmDictionary(locale);
   const currencyLabels = getCurrencyDictionary(locale);
@@ -41,7 +44,11 @@ export function AppShell({ children, dictionary, locale, role, slug }: { childre
     else router.push(`/${locale}/sign-in`);
   }
 
-  const navigation = <nav aria-label={crmLabels.navigation} className="space-y-1 p-3">{links.map(({ href, label, icon: Icon }) => <Link aria-current={pathname === href || href !== base && pathname.startsWith(`${href}/`) ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground", (pathname === href || href !== base && pathname.startsWith(`${href}/`)) && "bg-accent text-primary")} href={href} key={href} onClick={() => setOpen(false)}><Icon aria-hidden="true" />{label}</Link>)}</nav>;
+  const navigation = <nav aria-label={crmLabels.navigation} className="space-y-1 p-3">{links.map(({ href, label, icon: Icon }) => <Link aria-current={pathname === href || href !== base && pathname.startsWith(`${href}/`) ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground", (pathname === href || href !== base && pathname.startsWith(`${href}/`)) && "bg-accent text-primary")} href={href} key={href} onClick={event => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault(); setOpen(false);
+    startNavigation(() => router.push(href));
+  }}><Icon aria-hidden="true" />{label}</Link>)}</nav>;
 
   return <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-muted/30">
     <a className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-background focus:p-3" href="#main-content">{crmLabels.skip}</a>
@@ -50,9 +57,10 @@ export function AppShell({ children, dictionary, locale, role, slug }: { childre
       <Link className="flex items-center gap-2 font-semibold text-primary" href={base}><span className="grid size-8 place-items-center rounded-md bg-primary text-sm text-primary-foreground">C</span>{dictionary.common.appName}</Link>
       <div className="ml-auto flex items-center gap-2">{signOutError ? <p className="text-sm text-destructive" role="alert">{dictionary.auth.signOutError}</p> : null}<LocaleSwitcher label={dictionary.common.language} locale={locale} /><Button aria-label={dictionary.auth.signOut} className="min-h-11" onClick={signOut} size="sm" type="button" variant="ghost"><LogOut aria-hidden="true" /><span className="hidden sm:inline">{dictionary.auth.signOut}</span></Button></div>
     </header>
+    {navigationPending && <div role="status" data-navigation-pending className="border-b bg-background px-4 py-2 text-sm text-muted-foreground md:px-6">{crmLabels.loading}</div>}
     <div className="flex min-h-0 flex-1">
       <aside className="hidden w-56 shrink-0 border-r bg-background md:block">{navigation}</aside>
-      <main className="min-h-0 min-w-0 flex-1 overflow-auto p-4 md:p-6" id="main-content" tabIndex={-1}>{children}</main>
+      <main aria-busy={navigationPending} className="min-h-0 min-w-0 flex-1 overflow-auto p-4 md:p-6" id="main-content" tabIndex={-1}>{children}</main>
     </div>
     <RecordSheetHost locale={locale} />
   </div>;

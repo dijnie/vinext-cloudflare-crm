@@ -110,6 +110,29 @@ test("owner sees localized members and canonical stale slugs", async ({ browser,
   await api.dispose();
 });
 
+test("page authorization rechecks membership after revocation", async ({ browser, baseURL }) => {
+  if (!baseURL) throw new Error("E2E_BASE_URL is required for preview E2E");
+  const owner = await signedInContext(browser, baseURL, "E2E_OWNER_EMAIL", "E2E_OWNER_PASSWORD");
+  const member = await signedInContext(browser, baseURL, "E2E_DISPOSABLE_MEMBER_EMAIL", "E2E_DISPOSABLE_MEMBER_PASSWORD");
+  try {
+    const session = await member.api.get("/api/auth/get-session");
+    expect(session.ok()).toBe(true);
+    const memberId = (await session.json()).user.id;
+    const page = await member.context.newPage();
+    await page.goto("/en/crm/companies");
+    await expect(page.locator("[data-list-heading]")).toHaveText("Companies");
+    const removed = await owner.api.delete(`/api/crm/members/${memberId}`, { data: {} });
+    expect(removed.ok()).toBe(true);
+    await page.goto("/en/crm/contacts");
+    await expect(page).toHaveURL(/\/en\/sign-in$/);
+    await expect(page.locator("[data-list-heading]")).toHaveCount(0);
+    expect((await member.api.get("/api/crm/companies")).status()).toBe(401);
+  } finally {
+    await owner.context.close(); await owner.api.dispose();
+    await member.context.close(); await member.api.dispose();
+  }
+});
+
 test("member cannot see or call owner-only member management", async ({ browser, baseURL }) => {
   if (!baseURL) throw new Error("E2E_BASE_URL is required for preview E2E");
   const { api, context } = await signedInContext(browser, baseURL, "E2E_MEMBER_EMAIL", "E2E_MEMBER_PASSWORD");
