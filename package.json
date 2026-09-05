@@ -73,7 +73,7 @@
 		"db:migrate:built": "node scripts/d1-migrations.mjs --target local --built --apply",
 		"db:migrate:preview": "node scripts/d1-migrations.mjs --target preview --apply",
 		"db:migrate:production": "node scripts/d1-migrations.mjs --target production --apply",
-		"deploy": "vinext-cloudflare deploy",
+		"deploy": "node scripts/deploy.mjs",
 		"dev": "npm run db:migrate:local && vinext dev --port 4321",
 		"e2e:dev": "npm run db:migrate:local && vinext dev",
 		"preview": "npm run build && npm run start",

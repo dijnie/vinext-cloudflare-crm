@@ -141,8 +141,22 @@ write-freeze gates, preview smoke ownership, production approval, and rollback
 decisions. It lives in the parent workspace's plans directory; a standalone
 application checkout needs that release record from the operator.
 
-Remote migrations are separate from deployment. Version upload, preview writes,
-and production promotion require their respective operational approval. Use
+`npm run deploy` automatically inspects and applies pending CRM migrations to
+the remote `DB` selected in `wrangler.jsonc`, verifies the ledger, then deploys
+the Worker. Invoking this command authorizes those migrations for the configured
+database; no per-deploy database ID flag is needed. In Cloudflare Builds, keep
+the build command `npm run build` and deploy command `npm run deploy`. The build
+token needs D1 write permission as well as Worker deployment permission.
+Migration errors stop deployment; incompatible ledgers are never reset or
+rewritten. Review migrations and backup/recovery policy before release: a later
+deployment failure does not roll back an already-applied migration, so migrations
+must remain compatible with the currently deployed Worker.
+
+`npm run deploy -- --dry-run` and `--help` do not run migrations. Other argument
+overrides are rejected so migration and deployment cannot select different
+targets. Direct Wrangler commands and version uploads bypass this wrapper.
+Standalone remote migration commands retain their exact-ID approval requirement.
+Version upload, preview writes, and production promotion require their respective operational approval. Use
 version-scoped secrets for reviewed uploads; `wrangler secret put` immediately
 deploys and is unsuitable for staging an unreviewed auth configuration.
 Set `AUTH_BASE_URL` to the exact HTTPS origin being tested and verify its cookies
