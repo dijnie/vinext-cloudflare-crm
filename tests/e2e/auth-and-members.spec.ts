@@ -62,7 +62,8 @@ for (const locale of ["vi", "en"] as const) {
     await expect(dialog).toBeVisible();
     await expect(dialog.locator(":focus")).toHaveCount(1);
     const settingsLink = dialog.getByRole("link", { name: vi ? "Cài đặt" : "Settings", exact: true });
-    for (let step = 0; step < 5; step++) {
+    const focusableCount = await dialog.locator('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])').count();
+    for (let step = 0; step <= focusableCount; step++) {
       await page.keyboard.press("Tab");
       await expect(dialog.locator(":focus")).toHaveCount(1);
       if (await settingsLink.evaluate((element) => element === document.activeElement)) break;

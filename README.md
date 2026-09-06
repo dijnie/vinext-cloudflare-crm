@@ -73,9 +73,10 @@ ticket, appointment, and contract due events before dispatching the outbox and
 delivering claimed webhooks. AI remains
 disabled and makes no provider calls while no provider is selected and its
 budget is zero. Workspace deletion requires the exact workspace name and keeps
-a 30-day cancellation window. Execution atomically claims the due request and
-removes D1 references first; an operational ledger retries private R2 deletion
-without exposing object keys.
+a 30-day cancellation window. Execution atomically claims the due request,
+freezes new file references during a short drain window, and records every
+private object in an operational ledger. It retries R2 deletion before deleting
+D1 business data, without exposing object keys.
 
 Shared controls live in `src/components/ui`; source-derived styles live in
 `src/styles/globals.css`. Use the unified `radix-ui` package for modal, popover

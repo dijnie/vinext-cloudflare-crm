@@ -39,6 +39,7 @@ const defaultGroups = [
   ["contracts-reviews"],
   ["reporting"],
   ["operations"],
+  ["crm-lifecycle"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();
