@@ -420,6 +420,9 @@ export const crmSetting = sqliteTable(
   {
     id: text("id").primaryKey(),
     reportingCurrency: text("reporting_currency").default("USD").notNull(),
+    timeZone: text("time_zone").default("Asia/Ho_Chi_Minh").notNull(),
+    countryCode: text("country_code").default("VN").notNull(),
+    calendarRevision: integer("calendar_revision").default(0).notNull(),
     activeConversionVersion: text("active_conversion_version").default("initial").notNull(),
     pendingJobId: text("pending_job_id"),
     ratesRevision: integer("rates_revision").default(0).notNull(),

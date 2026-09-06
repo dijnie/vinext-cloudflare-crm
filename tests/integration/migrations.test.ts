@@ -30,6 +30,7 @@ describe("CRM baseline migration", () => {
       { name: "0004_custom_field_invariants.sql" },
       { name: "0005_currency_conversion_versions.sql" },
       { name: "0006_branches_and_profiles.sql" },
+      { name: "0007_business_calendar_settings.sql" },
     ]);
   });
 

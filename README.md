@@ -69,6 +69,15 @@ Revocation removes branch assignments and sessions while preserving profile
 configuration and historical authorship. Restoring membership does not restore
 owner status or old branch assignments.
 
+At `/{locale}/crm/settings/general`, members can read the business timezone and
+country; owners can change them. Defaults are `Asia/Ho_Chi_Minh` and `VN`.
+Concurrent saves use a revision check so a stale form cannot overwrite a newer
+selection. System timestamps remain UTC instants; calendar dates and their
+exclusive day-end boundaries use the configured zone, including daylight-saving
+changes. The current opportunity dashboard retains its existing UTC periods;
+new calendar workflows use the shared business-date helpers. Changing calendar
+settings does not rewrite records, currency amounts or conversion history.
+
 ## Tech Stack
 
 - Frontend: [Vinext](https://github.com/cloudflare/vinext)

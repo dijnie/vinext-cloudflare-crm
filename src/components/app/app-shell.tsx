@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { AppLocale } from "@/lib/i18n/config";
 import type { AppDictionary } from "@/lib/i18n/dictionary";
 import { getCrmDictionary } from "@/lib/i18n/crm-dictionary";
+import { getBusinessSettingsDictionary } from "@/lib/i18n/business-settings-dictionary";
 import { getAccessDictionary } from "@/lib/i18n/access-dictionary";
 import { getCurrencyDictionary } from "@/lib/i18n/currency-dictionary";
 import { getShellInterfaceDictionary } from "@/lib/i18n/shell-interface-dictionary";
@@ -42,7 +43,7 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
   const [dark, setDark] = useState(false);
   useEffect(() => { setDark(document.documentElement.classList.contains("dark")); }, []);
   const base = `/${locale}/${slug}`; const crm = getCrmDictionary(locale); const currency = getCurrencyDictionary(locale); const copy = getShellInterfaceDictionary(locale);
-  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, ...(role === "owner" ? [{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
+  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, { href: `${base}/settings/general`, label: getBusinessSettingsDictionary(locale).title }, ...(role === "owner" ? [{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
   const links = [
     { href: base, label: currency.dashboard, icon: Dashboard },
     { href: `${base}/companies`, label: dictionary.navigation.companies, icon: Building },
