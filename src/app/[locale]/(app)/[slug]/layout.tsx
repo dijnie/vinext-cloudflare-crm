@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { SINGLETON_WORKSPACE_ID } from "@/lib/services/members/singleton-workspace";
+import { ModuleProvider } from "@/components/app/module-provider";
 import { AppShell } from "@/components/app/app-shell";
 import { singletonWorkspace } from "@/lib/db/schema";
 import { canonicalWorkspacePath, isAppLocale } from "@/lib/i18n/config";
@@ -29,5 +30,6 @@ export default async function ProtectedLayout({ children, params }: { children: 
     const suffix = `/${path.split("/").slice(3).join("/") || "companies"}`;
     redirect(canonicalWorkspacePath(locale, workspace.slug, requestHeaders.get("x-request-search") ?? "", suffix));
   }
-  return <AppShell dictionary={getDictionary(locale)} locale={locale} role={viewer.role} user={viewer.user} slug={workspace.slug}>{children}</AppShell>;
+  const modules = await root.modules.get(viewer);
+  return <ModuleProvider initialSettings={modules} locale={locale}><AppShell dictionary={getDictionary(locale)} locale={locale} role={viewer.role} user={viewer.user} slug={workspace.slug}>{children}</AppShell></ModuleProvider>;
 }

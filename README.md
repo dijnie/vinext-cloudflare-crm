@@ -368,8 +368,8 @@ Customer-linked records must be archived rather than hard-deleted while referenc
 These values extend the existing field definition/value tables without replacing
 IDs, timestamps, tombstones, options, user references or saved views. Member and
 customer names are returned in separate label maps. Multiselect and customer
-filters share list/count/facet predicates. File, module lifecycle and configurable
-layouts remain work in the active rebuild plan.
+filters share list/count/facet predicates. Configurable layouts remain work in
+the active rebuild plan.
 
 Formula fields compute numeric results at read time and never accept direct value
 writes or required-input settings. Expressions support arithmetic, parentheses,
@@ -467,3 +467,15 @@ Wrangler config declares the intended private bucket name; local tests emulate
 R2 and do not create that bucket remotely. Before an authorized release, provision
 or select the intended bucket and verify the binding with public access disabled.
 Changing source configuration alone is not proof of a production bucket or upload.
+
+Owners manage company, contact and deal availability at
+`/{locale}/{workspaceSlug}/settings/modules`. Disabling a module preserves historical
+records, relations, files and exports while blocking its record mutations, including
+owner writes and uploads already in progress. Re-enabling restores editing. Settings
+use revisions to reject stale updates. See [module policy](src/lib/services/modules/module-policy.ts).
+
+An enabled deal can still change stage and append its automatic history when the
+company module is disabled; the disabled company row is unchanged. Manual activity
+mutations require every attached record module to be enabled. Existing owner-managed
+currency projection jobs and membership handover remain administrative operations;
+module settings do not change their authorization or original money/history rules.

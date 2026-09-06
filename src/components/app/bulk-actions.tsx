@@ -1,4 +1,5 @@
 "use client";
+import { useModules } from "./module-provider";
 import { useState } from "react";
 import { Archive, UserFollow } from "@carbon/icons-react";
 import { Button } from "@/components/ui/button";
@@ -14,13 +15,16 @@ export function BulkActions({ entity, ids, archived, labels, onSuccess, onPartia
   entity: EntityType; ids: string[]; archived: boolean; labels: CrmDictionary;
   onSuccess: () => void; onPartial: () => void;
 }) {
+  const { isEnabled } = useModules();
+  const moduleEnabled = isEnabled(entity);
+
   const [action, setAction] = useState<"archive" | "ownership" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [owner, setOwner] = useState<OwnerOption | null>(null);
   const validSelection = ids.length > 0 && ids.length <= 100;
   async function submit() {
-    if (!validSelection) return;
+    if (!validSelection || !moduleEnabled) return;
     const ownership = ownershipInputSchema.safeParse({ entity, ids, ownerMembershipId: owner?.membershipId ?? null });
     if (action === "ownership" && !ownership.success) { setError(labels.invalid); return; }
     setBusy(true); setError("");
@@ -36,8 +40,8 @@ export function BulkActions({ entity, ids, archived, labels, onSuccess, onPartia
   const title = action === "ownership" ? labels.activity.reassign : archived ? labels.restore : labels.archive;
   return <div className="flex min-h-8 flex-wrap items-center gap-2">
     <span role="status" className="mr-auto text-xs text-muted-foreground">{ids.length} {labels.selected}</span>
-    <Button size="sm" variant="outline" disabled={!validSelection} onClick={() => { setError(""); setAction("archive"); }}><Archive />{archived ? labels.restore : labels.archive}</Button>
-    <Button size="sm" variant="outline" disabled={!validSelection} onClick={() => { setError(""); setOwner(null); setAction("ownership"); }}><UserFollow />{labels.activity.reassign}</Button>
+    <Button size="sm" variant="outline" disabled={!moduleEnabled || !validSelection} onClick={() => { setError(""); setAction("archive"); }}><Archive />{archived ? labels.restore : labels.archive}</Button>
+    <Button size="sm" variant="outline" disabled={!moduleEnabled || !validSelection} onClick={() => { setError(""); setOwner(null); setAction("ownership"); }}><UserFollow />{labels.activity.reassign}</Button>
     <Button size="sm" variant="ghost" onClick={onSuccess}>{labels.clear}</Button>
     <Dialog open={action !== null} onOpenChange={value => { if (!busy && !value) setAction(null); }}>
       <DialogContent closeLabel={labels.close}>
@@ -46,12 +50,12 @@ export function BulkActions({ entity, ids, archived, labels, onSuccess, onPartia
         <form className="space-y-4" onSubmit={event => { event.preventDefault(); void submit(); }}>
           {action === "ownership" && <div className="space-y-1">
             <label htmlFor="bulk-owner" className="text-sm">{labels.labels.owner}{entity === "deal" ? " *" : ""}</label>
-            <OwnerPicker id="bulk-owner" value={owner} onChange={setOwner} labels={labels} required={entity === "deal"} disabled={busy} />
+            <OwnerPicker id="bulk-owner" value={owner} onChange={setOwner} labels={labels} required={entity === "deal"} disabled={!moduleEnabled || busy} />
           </div>}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" disabled={busy} onClick={() => setAction(null)}>{labels.cancel}</Button>
-            <Button type="submit" disabled={busy || !validSelection}>{busy ? labels.loading : labels.confirm}</Button>
+            <Button type="submit" disabled={!moduleEnabled || busy || !validSelection}>{busy ? labels.loading : labels.confirm}</Button>
           </div>
         </form>
       </DialogContent>

@@ -1,3 +1,4 @@
+import { ModuleService } from "@/lib/services/modules/module-service";
 import { FileService } from "@/lib/services/files/file-service";
 import { createAuth } from "@/lib/auth/auth";
 import type { AuthEmailAdapter } from "@/lib/email/email-adapter";
@@ -55,6 +56,7 @@ export function createCompositionRoot(
   return {
     access: new AccessService(db, securityLogger),
     settings: new BusinessSettingsService(db, securityLogger),
+    modules: new ModuleService(db),
     files: new FileService(db, runtimeBindings.CRM_FILES),
     currency,
     dashboard,

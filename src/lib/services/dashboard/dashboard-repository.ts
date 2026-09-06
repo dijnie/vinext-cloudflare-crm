@@ -43,7 +43,7 @@ export class DashboardRepository {
         co.id AS company_id, co.name AS company_name, u.id AS owner_id, u.name AS owner_name
         ${FROM} INNER JOIN company co ON co.id = d.company_id INNER JOIN user u ON u.id = d.owner_membership_id
         WHERE ${where} AND ${OPEN} ORDER BY base_amount_minor DESC, d.expected_close_at ASC, d.id ASC LIMIT 6`, args),
-      prepare(`SELECT a.id, a.subject, a.due_at, co.id AS company_id, co.name AS company_name, d.id AS deal_id, d.name AS deal_name
+      prepare(`SELECT a.id, a.subject, a.due_at, a.company_id AS anchor_company_id, a.contact_id AS anchor_contact_id, a.deal_id AS anchor_deal_id, co.id AS company_id, co.name AS company_name, d.id AS deal_id, d.name AS deal_name
         FROM activity a LEFT JOIN company co ON co.id = a.company_id LEFT JOIN deal d ON d.id = a.deal_id
         WHERE a.type = 'task' AND a.completed_at IS NULL AND a.due_at < ? AND a.author_user_id = ?
         ORDER BY a.due_at ASC, a.id ASC LIMIT 10`, [now.getTime(), userId]),

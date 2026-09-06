@@ -30,6 +30,7 @@ import { LocaleSwitcher } from "./locale-switcher";
 import { RecordSheetHost } from "./record-sheet/record-sheet-host";
 import { useCrmInvalidation } from "./use-crm-invalidation";
 import { NavigationSkeleton } from "./navigation-skeleton";
+import { useModules } from "./module-provider";
 import { ShellLogo } from "./shell-logo";
 
 export function AppShell({ children, dictionary, locale, role, slug, user }: {
@@ -37,18 +38,19 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
   user?: { name: string; email: string; image?: string | null };
 }) {
   useCrmInvalidation();
+  const modules = useModules();
   const pathname = usePathname(); const router = useRouter();
   const [open, setOpen] = useState(false); const [signOutError, setSignOutError] = useState(false);
   const [navigationPending, startNavigation] = useTransition();
   const [dark, setDark] = useState(false);
   useEffect(() => { setDark(document.documentElement.classList.contains("dark")); }, []);
   const base = `/${locale}/${slug}`; const crm = getCrmDictionary(locale); const currency = getCurrencyDictionary(locale); const copy = getShellInterfaceDictionary(locale);
-  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, { href: `${base}/settings/general`, label: getBusinessSettingsDictionary(locale).title }, ...(role === "owner" ? [{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
+  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, { href: `${base}/settings/general`, label: getBusinessSettingsDictionary(locale).title }, ...(role === "owner" ? [{ href: `${base}/settings/modules`, label: modules.labels.title },{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
   const links = [
     { href: base, label: currency.dashboard, icon: Dashboard },
-    { href: `${base}/companies`, label: dictionary.navigation.companies, icon: Building },
-    { href: `${base}/contacts`, label: crm.contact, icon: UserMultiple },
-    { href: `${base}/deals`, label: crm.deal, icon: Partnership },
+    { href: `${base}/companies`, label: `${dictionary.navigation.companies}${modules.isEnabled("company") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },
+    { href: `${base}/contacts`, label: `${crm.contact}${modules.isEnabled("contact") ? "" : ` · ${modules.labels.disabled}`}`, icon: UserMultiple },
+    { href: `${base}/deals`, label: `${crm.deal}${modules.isEnabled("deal") ? "" : ` · ${modules.labels.disabled}`}`,  icon: Partnership },
     { href: settings[0].href, match: `${base}/settings`, label: copy.settings, icon: Settings },
   ];
   const inSettings = pathname.startsWith(`${base}/settings`);

@@ -1,4 +1,5 @@
 "use client";
+import { ModuleReadOnlyBanner, useModules } from "./module-provider";
 import { pushListQuery } from "./list-navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -27,6 +28,9 @@ import { useCrmInvalidation } from "./use-crm-invalidation";
 const emptyRows: CrmRecord[] = [];
 
 export function EntityList({ entity, initialData, initialQueryKey, locale }: { entity: EntityType; initialData: ListData; initialQueryKey: string; locale: AppLocale }) {
+  const { isEnabled } = useModules();
+  const moduleEnabled = isEnabled(entity);
+
   const path = usePathname(); const search = useSearchParams(); const labels = getCrmDictionary(locale); const listLabels = getListInterfaceDictionary(locale);
   const state = parseListState(entity, new URLSearchParams(search.toString())); const query = listApiSearch(new URLSearchParams(search.toString()));
   const queryKey = `${entity}:${JSON.stringify(state.list)}`;
@@ -72,15 +76,16 @@ export function EntityList({ entity, initialData, initialQueryKey, locale }: { e
       if (key === "name" || key === "firstName") return <div className="flex min-w-0 items-center gap-2.5">{entity !== "deal" && <Avatar className={entity === "company" ? "size-7 rounded-md" : "size-7"}><AvatarFallback className={entity === "company" ? "rounded-md text-[10px]" : "text-[10px]"}>{recordName(record).split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase()}</AvatarFallback></Avatar>}<div className="min-w-0 [&_a]:block [&_a]:truncate [&_a]:text-foreground"><RecordLink entity={entity} id={record.id}>{recordName(record)}</RecordLink>{entity === "company" && typeof record.contactCount === "number" && typeof record.openDealCount === "number" && <div className="mt-0.5 text-[10px] text-muted-foreground">{record.contactCount} {labels.contact.toLowerCase()} · {record.openDealCount} {listLabels.openDeals}</div>}</div></div>;
       if (key === "company" && record.company) return <span className="[&_a]:text-foreground"><RecordLink entity="company" id={record.company.id}>{record.company.name}</RecordLink></span>;
       if (key === "owner" && record.owner) { const name = record.owner.name || record.owner.email || "—"; return <span className="flex items-center gap-2"><Avatar className="size-5"><AvatarFallback className="text-[9px]">{name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar><span className="truncate">{name}</span></span>; }
-      if (key === "stage") return <ListStageMenu id={record.id} stage={String(record.stageId ?? "")} disabled={Boolean(record.archivedAt)} labels={labels} />;
+      if (key === "stage") return <ListStageMenu id={record.id} stage={String(record.stageId ?? "")} disabled={!moduleEnabled || Boolean(record.archivedAt)} labels={labels} />;
       return <span className={`tabular-nums ${key.endsWith("At") || key === "domain" || key === "email" ? "text-muted-foreground" : ""}`}>{displayValue(record, key, locale, labels)}</span>;
     } };
-  }), ...(!visibleColumns.includes("name") && !visibleColumns.includes("firstName") ? [{ id: "open", header: labels.details, cell: ({ row }: { row: { original: CrmRecord } }) => <RecordLink entity={entity} id={row.original.id}>{labels.details}</RecordLink> }] : [])], [visibleColumns.join(","), entity, locale, data.customFields, data.fieldUserLabels, data.fieldCustomerLabels, data.fieldFileLabels]);
-  const table = useReactTable({ data: currentRows, columns, getCoreRowModel: getCoreRowModel(), getRowId: row => row.id, enableRowSelection: !loading && !error && dataKey === queryKey, state: { rowSelection: selection }, onRowSelectionChange: setSelection });
-  const ids = loading || error ? [] : currentRows.filter(row => selection[row.id]).map(row => row.id);
+  }), ...(!visibleColumns.includes("name") && !visibleColumns.includes("firstName") ? [{ id: "open", header: labels.details, cell: ({ row }: { row: { original: CrmRecord } }) => <RecordLink entity={entity} id={row.original.id}>{labels.details}</RecordLink> }] : [])], [visibleColumns.join(","), entity, locale, data.customFields, data.fieldUserLabels, data.fieldCustomerLabels, data.fieldFileLabels, moduleEnabled]);
+  const table = useReactTable({ data: currentRows, columns, getCoreRowModel: getCoreRowModel(), getRowId: row => row.id, enableRowSelection: moduleEnabled && !loading && !error && dataKey === queryKey, state: { rowSelection: selection }, onRowSelectionChange: setSelection });
+  const ids = !moduleEnabled || loading || error ? [] : currentRows.filter(row => selection[row.id]).map(row => row.id);
   function change(changes: Record<string, string | null>) { pushListQuery(`${path}?${changeListState(new URLSearchParams(search.toString()), changes)}`); }
   return <section className="mx-auto flex min-h-0 w-full min-w-0 max-w-7xl flex-1 flex-col gap-6" aria-busy={loading}>
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-medium tracking-tight md:text-3xl" tabIndex={-1} data-list-heading>{labels[entity]}</h1><p className="mt-2 text-sm text-muted-foreground">{listLabels.description[entity]}</p></div><div className="flex flex-wrap gap-2"><FieldsSheet entity={entity} labels={labels} /><Button size="sm" onClick={() => setCreating(true)}><Add />{labels.add}</Button></div></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-medium tracking-tight md:text-3xl" tabIndex={-1} data-list-heading>{labels[entity]}</h1><p className="mt-2 text-sm text-muted-foreground">{listLabels.description[entity]}</p></div><div className="flex flex-wrap gap-2"><FieldsSheet entity={entity} labels={labels} /><Button size="sm" disabled={!moduleEnabled} onClick={() => setCreating(true)}><Add />{labels.add}</Button></div></div>
+    <ModuleReadOnlyBanner entity={entity} />
     <div className="flex min-h-0 flex-1 flex-col gap-3">
     <div className={ids.length > 0 ? "hidden" : ""}><ListToolbar entity={entity} labels={labels} facets={data.facets} columns={visibleColumns} customFields={customFields} fieldFacets={data.fieldFacets} actions={<SavedViewsMenu entity={entity} labels={labels} />} /></div>
     {ids.length > 0 && <BulkActions entity={entity} ids={ids} archived={state.list.archived} labels={labels} onSuccess={() => { setSelection({}); setPartialFailure(false); }} onPartial={() => setPartialFailure(true)} />}

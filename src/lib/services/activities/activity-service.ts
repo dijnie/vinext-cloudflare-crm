@@ -1,3 +1,4 @@
+import { activityModules, requireModulesEnabled } from "../modules/module-policy";
 import { requirePermission } from "../permissions/permission-policy";
 import type { Permission } from "../permissions/access-contracts";
 import { eq } from "drizzle-orm";
@@ -22,6 +23,7 @@ export class ActivityService {
     const companyId = input.companyId ?? dealRow?.companyId ?? contactRow?.companyId ?? null;
     if (companyId && !(await this.db.select({ id: company.id }).from(company).where(eq(company.id, companyId)).get())) throw new HttpError(404, "not_found", "Activity company was not found");
     if ((contactRow && companyId && contactRow.companyId !== companyId) || (dealRow && dealRow.companyId !== companyId)) throw new HttpError(409, "conflict", "Activity records must belong to the same company");
+    await requireModulesEnabled(this.db, activityModules({ companyId, contactId: input.contactId, dealId: input.dealId }));
     const now = new Date();
     try {
       const row = await this.repository.create({
@@ -47,6 +49,7 @@ export class ActivityService {
     const current = await this.repository.byId(id);
     if (!current) throw new HttpError(404, "not_found", "Activity was not found");
     if (current.type !== "task") throw new HttpError(400, "validation_failed", "Only tasks can be completed");
+    await requireModulesEnabled(this.db, activityModules(current));
     const row = await this.repository.complete(id, completed, context);
     if (!row) throw new HttpError(409, "conflict", "Task changed before completion");
     return this.serialize(row);

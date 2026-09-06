@@ -186,7 +186,8 @@ export class DealRepository {
         FROM deal WHERE id = ? AND changes() = 1`)
         .bind(auditId, authorId, expectedStage, values.stageId, now.getTime(), now.getTime(), now.getTime(), id),
       this.db.$client.prepare(`UPDATE company SET last_activity_at = max(coalesce(last_activity_at, 0), ?), updated_at = ?
-        WHERE id = (SELECT company_id FROM activity WHERE id = ?)`)
+        WHERE id = (SELECT company_id FROM activity WHERE id = ?)
+        AND EXISTS (SELECT 1 FROM module_setting WHERE entity='company' AND enabled=1)`)
         .bind(now.getTime(), now.getTime(), auditId),
       ] : []),
       ...(fx ? [prepared(fx.conversion),prepared(fx.finish)] : []),

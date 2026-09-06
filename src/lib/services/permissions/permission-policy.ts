@@ -1,3 +1,4 @@
+import { moduleWritePredicate } from "../modules/module-policy";
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
 import { actionOperationGuard } from "@/lib/db/schema";
@@ -8,7 +9,7 @@ import type { Permission } from "./access-contracts";
 export function permissionPredicate(context: RequestContext, permissions: readonly Permission[] = [], ownerOnly = false): SQL {
   return sql`EXISTS (SELECT 1 FROM singleton_membership AS actor
     WHERE actor.user_id = ${context.membershipId} AND actor.user_id = ${context.userId} AND actor.status = 'active'
-    AND ${ownerOnly ? sql`actor.role = 'owner'` : sql`(actor.role = 'owner' OR NOT EXISTS (
+    AND (${moduleWritePredicate(permissions)}) AND ${ownerOnly ? sql`actor.role = 'owner'` : sql`(actor.role = 'owner' OR NOT EXISTS (
       SELECT 1 FROM json_each(${JSON.stringify(permissions)}) AS wanted WHERE NOT EXISTS (
         SELECT 1 FROM membership_access AS assignment JOIN access_grant AS grant ON grant.profile_id = assignment.profile_id
         WHERE assignment.membership_id = actor.user_id AND grant.permission = wanted.value

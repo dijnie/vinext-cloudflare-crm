@@ -1,4 +1,5 @@
-import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
+import { requireModulesEnabled } from "../modules/module-policy";
+import { and, getTableColumns, asc, eq, gt, lt, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
 import { customFieldDefinition as definition, customFieldValue as value, fieldConversionPreview as preview, fieldConversionGuard as conversion, fieldValueRevision, operationConditionGuard } from "@/lib/db/schema";
 import { HttpError } from "@/lib/http/http-errors";
@@ -77,8 +78,9 @@ export class FieldConversionService {
 
   async apply(context: RequestContext, id: string, token: string) {
     await requirePermission(this.db, context, ["field.configure"]);
-    const row = await this.db.select().from(preview).where(and(eq(preview.id, token), eq(preview.fieldId, id), eq(preview.userId, context.userId))).get();
+    const row = await this.db.select({ ...getTableColumns(preview), entity: definition.entity }).from(preview).innerJoin(definition, eq(definition.id, preview.fieldId)).where(and(eq(preview.id, token), eq(preview.fieldId, id), eq(preview.userId, context.userId))).get();
     if (!row || row.expiresAt <= Date.now()) stale();
+    await requireModulesEnabled(this.db, [row.entity]);
     const source = fieldTypeSchema.parse(row.sourceType), target = fieldTypeSchema.parse(row.targetType);
     if (!supportsConversion(source, target)) stale();
     const guardId = crypto.randomUUID();
@@ -90,6 +92,7 @@ export class FieldConversionService {
           join field_configuration_revision c on c.entity=f.entity
           join field_value_revision v on v.field_id=f.id
           where p.id=${token} and p.field_id=${id} and p.user_id=${context.userId} and p.expires_at>${Date.now()}
+          and exists (select 1 from module_setting m where m.entity=f.entity and m.enabled=1)
           and f.type=p.source_type and f.archived_at is null and f.deleted_at is null
           and c.revision=p.configuration_revision and v.revision=p.value_revision
           and p.source_type=${source} and p.target_type=${target} and p.config_json=${row.configJson}

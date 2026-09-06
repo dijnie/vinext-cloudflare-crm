@@ -1,3 +1,4 @@
+import { activityModules, modulesEnabledPredicate } from "../modules/module-policy";
 import type { RequestContext } from "@/lib/http/request-context";
 import { actionGuard, permissionError } from "../permissions/permission-policy";
 import { and, desc, eq, getTableColumns, isNotNull, isNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
@@ -34,7 +35,7 @@ export class ActivityRepository {
 
   async create(values: typeof activity.$inferInsert, context: RequestContext) {
     const now = values.createdAt;
-    const op = actionGuard(this.db, context, ["activity.create"]);
+    const op = actionGuard(this.db, context, ["activity.create"], false, modulesEnabledPredicate(activityModules(values)));
     try { await this.db.batch([
       op.begin,
       this.db.insert(activity).values(values),
@@ -49,7 +50,10 @@ export class ActivityRepository {
   async complete(id: string, completed: boolean, context: RequestContext) {
     const now = new Date();
     const stamp = (column: typeof activity.companyId | typeof activity.contactId | typeof activity.dealId) => sql`(select ${column} from ${activity} where ${activity.id} = ${id} and ${activity.type} = 'task')`;
-    const op = actionGuard(this.db, context, ["activity.update"]);
+    const op = actionGuard(this.db, context, ["activity.update"], false, sql`exists (select 1 from activity a where a.id=${id}
+      and (a.company_id is null or ${modulesEnabledPredicate(["company"])})
+      and (a.contact_id is null or ${modulesEnabledPredicate(["contact"])})
+      and (a.deal_id is null or ${modulesEnabledPredicate(["deal"])}))`);
     try {
     const [, rows] = await this.db.batch([
       op.begin,

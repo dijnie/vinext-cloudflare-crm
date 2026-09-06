@@ -532,3 +532,14 @@ export const crmFile = sqliteTable("crm_file", {
   check("crm_file_size_check", sql`typeof(${table.size}) = 'integer' and ${table.size} between 0 and 10485760`),
   check("crm_file_ready_check", sql`(${table.status} = 'ready' and ${table.readyAt} is not null) or (${table.status} != 'ready' and ${table.readyAt} is null)`),
 ]);
+
+export const moduleSetting = sqliteTable("module_setting", {
+  entity: text("entity", { enum: ["company", "contact", "deal"] }).primaryKey(),
+  enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
+  revision: integer("revision").default(0).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, table => [
+  check("module_setting_entity_check", sql`${table.entity} in ('company','contact','deal')`),
+  check("module_setting_enabled_check", sql`${table.enabled} in (0,1)`),
+  check("module_setting_revision_check", sql`typeof(${table.revision}) = 'integer' and ${table.revision} >= 0`),
+]);

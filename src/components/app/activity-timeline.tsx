@@ -1,4 +1,5 @@
 "use client";
+import { useModules } from "./module-provider";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { ActivityEntry, TimelineInput } from "@/lib/services/activities/activity-contract";
@@ -11,7 +12,10 @@ import { FormSelect } from "./record-sheet/form-select";
 import { Document, Phone, Events, Checkbox, ArrowsHorizontal, Checkmark } from "@carbon/icons-react";
 import { crmRequest, requestError } from "./record-types";
 
-export function ActivityTimeline({ entity, recordId, locale, labels }: { entity: EntityType; recordId: string; locale: AppLocale; labels: CrmDictionary }) {
+export function ActivityTimeline({ entity, recordId, companyId, locale, labels }: { entity: EntityType; recordId: string; companyId?: string; locale: AppLocale; labels: CrmDictionary }) {
+  const modules = useModules();
+  const canCompose = modules.isEnabled(entity) && (!companyId || modules.isEnabled("company"));
+  const canChange = (entry: ActivityEntry) => (!entry.companyId || modules.isEnabled("company")) && (!entry.contactId || modules.isEnabled("contact")) && (!entry.dealId || modules.isEnabled("deal"));
   const [filter, setFilter] = useState<TimelineInput["filter"]>("all");
   const [cursor, setCursor] = useState<string>(); const [revision, setRevision] = useState(0);
   const [data, setData] = useState<{ key: string; entries: ActivityEntry[]; nextCursor: string | null }>({ key: "", entries: [], nextCursor: null });
@@ -26,13 +30,15 @@ export function ActivityTimeline({ entity, recordId, locale, labels }: { entity:
     return () => controller.abort();
   }, [entity, recordId, filter, cursor, revision, key, labels]);
   async function complete(entry: ActivityEntry) {
+    if (!canChange(entry)) return;
     setBusyId(entry.id); setError("");
     try { await crmRequest(`/api/crm/activities/${entry.id}`, { method: "PATCH", body: JSON.stringify({ completed: !entry.completedAt }) }); invalidateCrm("activity"); }
     catch (reason) { setError(requestError(reason, labels)); } finally { setBusyId(undefined); }
   }
   const time = (value: string) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
   return <section className="space-y-5" aria-label={labels.activities}>
-    <ActivityComposer entity={entity} recordId={recordId} labels={labels} />
+    {!canCompose && <p role="status" className="text-sm text-muted-foreground">{modules.labels.activityReadOnly}</p>}
+    <ActivityComposer disabled={!canCompose} entity={entity} recordId={recordId} labels={labels} />
     <div className="flex items-center justify-between gap-3 border-b pb-2"><label htmlFor="activity-filter" className="text-xs font-medium text-muted-foreground">{copy.filter}</label><div className="w-44"><FormSelect id="activity-filter" value={filter} onValueChange={value => { setCursor(undefined); setFilter(value as TimelineInput["filter"]); }} options={Object.entries(copy.filters).map(([value, label]) => ({ value, label }))} /></div></div>
     {error && <div role="alert" className="text-sm text-destructive">{error}<Button variant="ghost" onClick={() => { setCursor(undefined); setRevision(value => value + 1); }}>{labels.retry}</Button></div>}
     <ol aria-busy={loading}>{entries.map(entry => { const Icon = entry.type === "call" ? Phone : entry.type === "meeting" ? Events : entry.type === "task" ? entry.completedAt ? Checkmark : Checkbox : entry.metadata ? ArrowsHorizontal : Document; return <li key={entry.id} className="relative ml-3 space-y-2 border-l pb-6 pl-7"><span className="absolute -left-3 top-0 flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground" aria-hidden="true"><Icon size={14} /></span>
@@ -42,7 +48,7 @@ export function ActivityTimeline({ entity, recordId, locale, labels }: { entity:
       {entry.content && <p className="whitespace-pre-wrap break-words text-xs leading-5">{entry.content}</p>}
       {entry.dueAt && <p className="text-xs">{copy.dueAt}: <time dateTime={entry.dueAt}>{time(entry.dueAt)}</time></p>}
       {entry.completedAt && <p className="text-xs">{copy.completedAt}: <time dateTime={entry.completedAt}>{time(entry.completedAt)}</time></p>}
-      {entry.type === "task" && <Button variant="outline" size="sm" disabled={Boolean(busyId)} onClick={() => void complete(entry)}>{busyId === entry.id ? labels.loading : entry.completedAt ? copy.reopen : copy.complete}</Button>}
+      {entry.type === "task" && <Button variant="outline" size="sm" disabled={Boolean(busyId) || !canChange(entry)} onClick={() => void complete(entry)}>{busyId === entry.id ? labels.loading : entry.completedAt ? copy.reopen : copy.complete}</Button>}
     </li>; })}</ol>
     {loading && <p role="status" className="text-xs">{labels.loading}</p>}{!loading && !error && !entries.length && <p className="text-sm text-muted-foreground">{copy.empty}</p>}
     {data.key === key && data.nextCursor && <Button variant="outline" disabled={loading} onClick={() => setCursor(data.nextCursor ?? undefined)}>{copy.more}</Button>}
