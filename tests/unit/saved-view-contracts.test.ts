@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captureSavedViewState, savedViewCreateSchema, validateSavedViewState } from "@/lib/services/saved-views/saved-view-contracts";
+import { captureSavedViewState, savedViewDefaultInputSchema, savedViewCreateSchema, validateSavedViewState } from "@/lib/services/saved-views/saved-view-contracts";
 import { parseListState } from "@/lib/listing/list-state";
 
 describe("saved view URL contracts", () => {
@@ -17,4 +17,11 @@ describe("saved view URL contracts", () => {
     for (const state of [{ version: 2, query: "" }, { query: "" }, { version: 1, query: "", unsafe: true }, null]) expect(() => validateSavedViewState("company", state)).toThrow();
     expect(savedViewCreateSchema.safeParse({ entity: "company", name: "x", state: { version: 1, query: "" }, ownerMembershipId: "other" }).success).toBe(false);
   });
+  it("accepts personal defaults and rejects injected owners, invalid IDs and unknown entities", () => {
+    const viewId = crypto.randomUUID();
+    expect(savedViewDefaultInputSchema.parse({ entity: "company", viewId })).toEqual({ entity: "company", viewId });
+    expect(savedViewDefaultInputSchema.parse({ entity: "contact", viewId: null })).toEqual({ entity: "contact", viewId: null });
+    for (const input of [{ entity: "unknown", viewId }, { entity: "company", viewId: "bad" }, { entity: "company" }, { entity: "company", viewId, userId: "other" }]) expect(savedViewDefaultInputSchema.safeParse(input).success).toBe(false);
+  });
+
 });

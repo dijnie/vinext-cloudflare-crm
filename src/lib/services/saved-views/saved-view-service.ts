@@ -7,7 +7,7 @@ import type { EntityType } from "@/lib/listing/list-state";
 import { relationError } from "@/lib/services/shared/service-utils";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
-import { savedViewCreateSchema, savedViewUpdateSchema, validateSavedViewState } from "./saved-view-contracts";
+import { savedViewCreateSchema, savedViewUpdateSchema, savedViewDefaultInputSchema, validateSavedViewState, type SavedViewDefaultInput } from "./saved-view-contracts";
 import { SavedViewRepository } from "./saved-view-repository";
 
 export class SavedViewService {
@@ -15,13 +15,37 @@ export class SavedViewService {
   constructor(private readonly db: AppDatabase) { this.repository = new SavedViewRepository(db); }
   private guard(context: RequestContext, permissions: Permission[] = []) { return requirePermission(this.db, context, permissions); }
   private state(entity: EntityType, input: unknown) { try { return validateSavedViewState(entity, input); } catch { throw new HttpError(400, "validation_failed", "Saved view state is invalid"); } }
-  private serialize(row: typeof savedView.$inferSelect, userId: string) {
+  private serialize(row: typeof savedView.$inferSelect & { isDefault?: number }, userId: string) {
     // Stored state is validated before any caller can apply it to a list query.
     let state;
     try { state = validateSavedViewState(row.entity, JSON.parse(row.stateJson)); } catch { throw new HttpError(409, "conflict", "Stored saved view needs repair"); }
-    return { id: row.id, entity: row.entity, name: row.name, shared: row.shared, state, mine: row.creatorUserId === userId, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+    return { id: row.id, entity: row.entity, name: row.name, shared: row.shared, state, mine: row.creatorUserId === userId, isDefault: Boolean(row.isDefault), createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
   }
   async list(context: RequestContext, entity: EntityType) { await this.guard(context); return (await this.repository.list(entity, context.userId)).map(row => this.serialize(row, context.userId)); }
+  async preferred(context: RequestContext, entity: EntityType) {
+    await this.guard(context);
+    const row = await this.repository.preferred(entity, context.userId);
+    if (!row) return null;
+    try { return this.serialize(row, context.userId); }
+    catch (error) { if (error instanceof HttpError && error.status === 409) return null; throw error; }
+  }
+  async setPreferred(context: RequestContext, raw: SavedViewDefaultInput) {
+    await this.guard(context);
+    const parsed = savedViewDefaultInputSchema.safeParse(raw);
+    if (!parsed.success) throw new HttpError(400, "validation_failed", "Invalid default view");
+    const { entity, viewId } = parsed.data;
+    if (viewId !== null) {
+      const row = await this.repository.visible(viewId, entity, context.userId);
+      if (!row) throw new HttpError(404, "not_found", "Saved view not found");
+      this.serialize(row, context.userId);
+    }
+    try { await this.repository.setPreferred(entity, viewId, context); }
+    catch (error) {
+      if ((String(error) + (error instanceof Error ? String(error.cause) : "")).includes("default_view_unavailable")) throw new HttpError(409, "conflict", "Saved view changed before selection");
+      throw error;
+    }
+    return { entity, viewId };
+  }
   async create(context: RequestContext, input: z.infer<typeof savedViewCreateSchema>) {
     await this.guard(context, ["view.create"]); const state = this.state(input.entity, input.state); const now = new Date();
     try { const row = await this.repository.create({ id: crypto.randomUUID(), entity: input.entity, name: input.name, shared: input.shared, stateJson: JSON.stringify(state), creatorUserId: context.userId, ownerMembershipId: context.userId, createdAt: now, updatedAt: now }, context); return this.serialize(row, context.userId); } catch (error) { relationError(error, "Saved view name already exists"); }

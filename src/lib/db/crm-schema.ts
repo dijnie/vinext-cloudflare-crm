@@ -384,6 +384,16 @@ export const savedView = sqliteTable(
   ],
 );
 
+export const savedViewDefault = sqliteTable("saved_view_default", {
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  entity: text("entity", { enum: ["company", "contact", "deal"] }).notNull(),
+  viewId: text("view_id").notNull().references(() => savedView.id, { onDelete: "cascade" }),
+}, table => [
+  primaryKey({ columns: [table.userId, table.entity] }),
+  index("saved_view_default_view_idx").on(table.viewId),
+  check("saved_view_default_entity_check", sql`${table.entity} in ('company','contact','deal')`),
+]);
+
 export const exchangeRate = sqliteTable(
   "exchange_rate",
   {

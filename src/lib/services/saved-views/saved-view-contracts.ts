@@ -4,7 +4,9 @@ import { entityTypeSchema, parseListState, type EntityType } from "@/lib/listing
 export const savedViewStateSchema = z.object({ version: z.literal(1), query: z.string().max(12000) }).strict();
 export const savedViewCreateSchema = z.object({ entity: entityTypeSchema, name: z.string().trim().min(1).max(120), shared: z.boolean().default(false), state: savedViewStateSchema }).strict();
 export const savedViewUpdateSchema = savedViewCreateSchema.omit({ entity: true }).partial().refine(value => Object.keys(value).length > 0);
-export const savedViewOutputSchema = savedViewCreateSchema.extend({ id: z.uuid(), mine: z.boolean(), createdAt: z.iso.datetime(), updatedAt: z.iso.datetime() });
+export const savedViewOutputSchema = savedViewCreateSchema.extend({ id: z.uuid(), mine: z.boolean(), isDefault: z.boolean(), createdAt: z.iso.datetime(), updatedAt: z.iso.datetime() });
+export const savedViewDefaultInputSchema = z.object({ entity: entityTypeSchema, viewId: z.uuid().nullable() }).strict();
+export type SavedViewDefaultInput = z.infer<typeof savedViewDefaultInputSchema>;
 export type SavedView = z.infer<typeof savedViewOutputSchema>;
 export type SavedViewState = z.infer<typeof savedViewStateSchema>;
 

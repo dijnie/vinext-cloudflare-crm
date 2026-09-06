@@ -16,14 +16,22 @@ export async function EntityListPage({ entity, params, searchParams }: EntityPag
   const { locale, slug } = await params; if (!isAppLocale(locale)) notFound();
   const { root, context } = await getPageContext();
   const query = new URLSearchParams(); for (const [key, value] of Object.entries(await searchParams)) { for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item); }
-  let state; try { state = parseListState(entity, query); } catch { const labels = getCrmDictionary(locale); return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}/${entityPaths[entity]}`}>{labels.reset}</Link></div>; }
+  if (query.size === 0) {
+    const preferred = await root.views.preferred(context, entity);
+    if (preferred) {
+      const next = new URLSearchParams(preferred.state.query);
+      next.set("view", preferred.id);
+      redirect(`/${locale}/${slug}/${entityPaths[entity]}?${next}`);
+    }
+  }
+  let state; try { state = parseListState(entity, query); } catch { const labels = getCrmDictionary(locale); return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}/${entityPaths[entity]}?page=1`}>{labels.reset}</Link></div>; }
   try {
     const initialData = entity === "company" ? await root.companies.list(context, state.list as CompanyListInput) : entity === "contact" ? await root.contacts.list(context, state.list as ContactListInput) : await root.deals.list(context, state.list as DealListInput);
     return <EntityList entity={entity} initialData={initialData} initialQueryKey={`${entity}:${JSON.stringify(state.list)}`} locale={locale} />;
   } catch (error) {
     if (!isHttpError(error) || error.status !== 400) throw error;
     const labels = getCrmDictionary(locale);
-    return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}/${entityPaths[entity]}`}>{labels.reset}</Link></div>;
+    return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}/${entityPaths[entity]}?page=1`}>{labels.reset}</Link></div>;
   }
 }
 export async function DirectRecordPage({ entity, locale, slug, id, searchParams }: { entity: EntityType; locale: string; slug: string; id: string; searchParams: EntityPageProps["searchParams"] }) {

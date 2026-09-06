@@ -347,3 +347,11 @@ units, avoiding JavaScript number precision loss. Query ownership is in
 [DashboardRepository](src/lib/services/dashboard/dashboard-repository.ts), with the response
 contract in [dashboard-contracts](src/lib/services/dashboard/dashboard-contracts.ts).
 s
+
+Personal default views use `PUT /api/crm/saved-views/default` with `{ entity, viewId }`
+(`viewId: null` clears the preference). Each active member can choose a visible
+view for each entity, including a shared view created by someone else. This does
+not grant permission to edit that view. A bare list URL opens the preferred
+filters; explicit query parameters and direct record links take precedence.
+Deleting a view or making it private clears other users' affected defaults.
+The list reset link bypasses defaults so outdated field filters cannot trap a user.
