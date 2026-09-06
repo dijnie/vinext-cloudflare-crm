@@ -22,16 +22,24 @@ export async function validateFieldFilters(db: AppDatabase, entity: EntityType, 
 }
 
 export function fieldFilterConditions(entity: EntityType, filters: Filters): SQL[] {
-  return Object.entries(filters).filter(([, values]) => values.length).map(([key, selected]) => sql`exists (
-    select 1 from ${value} inner join ${definition} on ${definition.id} = ${value.fieldId}
-    where ${anchors[entity]} = ${tables[entity].id} and ${definition.entity} = ${entity}
-    and ${definition.key} = ${key} and ${definition.archivedAt} is null and ${definition}.deleted_at is null
-    and ${definition.showOnFilter} = 1 and (
-      (${definition.type} = 'select' and ${inJsonArray(value.optionId, selected)}) or
-      (${definition.type} = 'user' and ${inJsonArray(value.userMembershipId, selected)}) or
-      (${definition.type} = 'customer' and ${inJsonArray(value.customerReferenceId, selected)}) or
-      (${definition.type} = 'multiselect' and exists (select 1 from json_each(${value.jsonValue}) selected where ${inJsonArray(sql`selected.value`, selected)}))
-    ))`);
+  const selected = Object.fromEntries(Object.entries(filters).filter(([, values]) => values.length));
+  if (!Object.keys(selected).length) return [];
+  // Bind the complete filter map once so many filters can accompany computed sorts.
+  return [sql`not exists (
+    select 1 from json_each(${JSON.stringify(selected)}) wanted
+    where not exists (
+      select 1 from ${value} inner join ${definition} on ${definition.id}=${value.fieldId}
+      where ${anchors[entity]}=${tables[entity].id} and ${definition.entity}=${entity}
+        and ${definition.key}=wanted.key and ${definition.archivedAt} is null and ${definition}.deleted_at is null
+        and ${definition.showOnFilter}=1 and (
+          (${definition.type}='select' and exists (select 1 from json_each(wanted.value) chosen where chosen.value=${value.optionId})) or
+          (${definition.type}='user' and exists (select 1 from json_each(wanted.value) chosen where chosen.value=${value.userMembershipId})) or
+          (${definition.type}='customer' and exists (select 1 from json_each(wanted.value) chosen where chosen.value=${value.customerReferenceId})) or
+          (${definition.type}='multiselect' and exists (select 1 from json_each(${value.jsonValue}) actual
+            inner join json_each(wanted.value) chosen on chosen.value=actual.value))
+        )
+    )
+  )`];
 }
 
 export async function fieldListData(db: AppDatabase, entity: EntityType, ids: string[], facetWhere: SQL) {

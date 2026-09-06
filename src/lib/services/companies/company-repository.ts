@@ -1,3 +1,4 @@
+import { customFieldSort } from "../custom-fields/field-sort";
 import type { RequestContext } from "@/lib/http/request-context";
 import { authorizedWrite } from "../permissions/permission-policy";
 import { inJsonArray } from "@/lib/db/sql-filters";
@@ -28,10 +29,12 @@ export class CompanyRepository {
 
   async list(input: CompanyListInput) {
     await validateFieldFilters(this.db, "company", input.fields);
+    const fieldSort = await customFieldSort(this.db, "company", input.sort, input.dir);
     const where = this.where(input);
     const order = this.order(input.sort, input.dir);
     const rowsQuery = this.db
       .select({
+        internalFieldSortValue: fieldSort?.value ?? sql`null`,
         id: company.id,
         name: company.name,
         domain: company.domain,
@@ -50,7 +53,7 @@ export class CompanyRepository {
       .from(company)
       .leftJoin(user, eq(user.id, company.ownerMembershipId))
       .where(where)
-      .orderBy(order, asc(company.id))
+      .orderBy(...(fieldSort?.order ?? [order]), asc(company.id))
       .limit(input.pageSize)
       .offset((input.page - 1) * input.pageSize);
     const countQuery = this.db
@@ -64,7 +67,7 @@ export class CompanyRepository {
       listFacets(this.db, "company", facetWhere),
     ]);
     const fields = await fieldListData(this.db, "company", rows.map(row => row.id), facetWhere);
-    return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
+    return { rows: rows.map(({ internalFieldSortValue: _sortValue, ...row }) => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
   }
 
   async byId(id: string) {

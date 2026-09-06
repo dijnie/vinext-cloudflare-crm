@@ -1,3 +1,4 @@
+import { customFieldSort } from "../custom-fields/field-sort";
 import type { RequestContext } from "@/lib/http/request-context";
 import { actionGuard, authorizedWrite, permissionError } from "../permissions/permission-policy";
 import { inJsonArray } from "@/lib/db/sql-filters";
@@ -36,9 +37,11 @@ export class DealRepository {
 
   async list(input: DealListInput) {
     await validateFieldFilters(this.db, "deal", input.fields);
+    const fieldSort = await customFieldSort(this.db, "deal", input.sort, input.dir);
     const where = this.where(input);
     const rowsQuery = this.db
       .select({
+        internalFieldSortValue: fieldSort?.value ?? sql`null`,
         id: deal.id,
         name: deal.name,
         description: deal.description,
@@ -72,7 +75,7 @@ export class DealRepository {
       .innerJoin(dealStage, eq(dealStage.id, deal.stageId))
       .innerJoin(user, eq(user.id, deal.ownerMembershipId))
       .where(where)
-      .orderBy(...(input.sort === "amount" ? [asc(sql`${dealConversion.baseAmountMinor} is null`)] : []), this.order(input.sort, input.dir), asc(deal.id))
+      .orderBy(...(fieldSort?.order ?? [...(input.sort === "amount" ? [asc(sql`${dealConversion.baseAmountMinor} is null`)] : []), this.order(input.sort, input.dir)]), asc(deal.id))
       .limit(input.pageSize)
       .offset((input.page - 1) * input.pageSize);
     const countQuery = this.db
@@ -86,7 +89,7 @@ export class DealRepository {
       listFacets(this.db, "deal", facetWhere),
     ]);
     const fields = await fieldListData(this.db, "deal", rows.map(row => row.id), facetWhere);
-    return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
+    return { rows: rows.map(({ internalFieldSortValue: _sortValue, ...row }) => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
   }
 
   async byId(id: string) {

@@ -399,3 +399,12 @@ with `{ action: "apply", token }` within fifteen minutes. Data, definition or op
 changes invalidate the preview; permissions are checked again inside the atomic
 application batch. A conflict requires a new preview. The supported transformations
 are owned by [conversion rules](src/lib/services/custom-fields/field-conversion-values.ts).
+
+List sort menus and table headers support scalar custom fields through
+`sort=field:<stable_key>`. Numbers, dates and booleans retain typed ordering;
+reference fields use their displayed labels and formulas use computed results.
+Missing values sort last in either direction, with record IDs breaking ties before
+pagination. Text uses the existing SQLite ordering, not locale-aware collation.
+Money and multi-value collections are not assigned an implicit scalar ordering.
+Saved/default views retain these sort keys; an archived/deleted sorted field
+requires resetting the list query without deleting the saved view.

@@ -25,6 +25,7 @@ const defaultGroups = [
   ["extended-fields"],
   ["formula-fields"],
   ["field-conversion"],
+  ["field-sorting"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();

@@ -1,3 +1,4 @@
+import { customFieldSort } from "../custom-fields/field-sort";
 import type { RequestContext } from "@/lib/http/request-context";
 import { authorizedWrite } from "../permissions/permission-policy";
 import { inJsonArray } from "@/lib/db/sql-filters";
@@ -32,9 +33,11 @@ export class ContactRepository {
 
   async list(input: ContactListInput) {
     await validateFieldFilters(this.db, "contact", input.fields);
+    const fieldSort = await customFieldSort(this.db, "contact", input.sort, input.dir);
     const where = this.where(input);
     const rowsQuery = this.db
       .select({
+        internalFieldSortValue: fieldSort?.value ?? sql`null`,
         id: contact.id,
         firstName: contact.firstName,
         lastName: contact.lastName,
@@ -56,7 +59,7 @@ export class ContactRepository {
       .leftJoin(company, eq(company.id, contact.companyId))
       .leftJoin(user, eq(user.id, contact.ownerMembershipId))
       .where(where)
-      .orderBy(this.order(input.sort, input.dir), asc(contact.id))
+      .orderBy(...(fieldSort?.order ?? [this.order(input.sort, input.dir)]), asc(contact.id))
       .limit(input.pageSize)
       .offset((input.page - 1) * input.pageSize);
     const countQuery = this.db
@@ -70,7 +73,7 @@ export class ContactRepository {
       listFacets(this.db, "contact", facetWhere),
     ]);
     const fields = await fieldListData(this.db, "contact", rows.map(row => row.id), facetWhere);
-    return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
+    return { rows: rows.map(({ internalFieldSortValue: _sortValue, ...row }) => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
   }
 
   async byId(id: string) {

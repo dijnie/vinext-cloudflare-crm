@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { HttpError } from "@/lib/http/http-errors";
+import { customFieldSortSchema } from "@/lib/services/custom-fields/field-sort-contracts";
 
 export const DEFAULT_PAGE_SIZE = 25;
 export const facetOutputSchema = z.record(z.string(), z.array(z.object({ value: z.string(), label: z.string(), count: z.number().int().nonnegative() })));
@@ -34,7 +35,7 @@ export function listContract<TSort extends readonly [string, ...string[]]>(
   return z.object({
     fields: customFieldQuerySchema,
     q: z.string().trim().max(200).default(""),
-    sort: z.enum(sortValues).optional(),
+    sort: z.union([z.enum(sortValues), customFieldSortSchema]).optional(),
     dir: z.enum(["asc", "desc"]).default("desc"),
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce
