@@ -39,6 +39,7 @@ describe("CRM baseline migration", () => {
       { name: "0012_private_file_fields.sql" },
       { name: "0013_module_availability.sql" },
       { name: "0014_record_forms.sql" },
+      { name: "0015_deal_stage_configuration.sql" },
     ]);
   });
 

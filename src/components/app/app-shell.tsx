@@ -1,4 +1,6 @@
 "use client";
+import { DealStageRefreshStatus } from "./deal-stage-provider";
+import { getDealStageDictionary } from "@/lib/i18n/deal-stage-dictionary";
 import { getLayoutDictionary } from "@/lib/i18n/layout-dictionary";
 
 import Building from "@carbon/icons-react/es/Building";
@@ -46,7 +48,7 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
   const [dark, setDark] = useState(false);
   useEffect(() => { setDark(document.documentElement.classList.contains("dark")); }, []);
   const base = `/${locale}/${slug}`; const crm = getCrmDictionary(locale); const currency = getCurrencyDictionary(locale); const copy = getShellInterfaceDictionary(locale);
-  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, { href: `${base}/settings/general`, label: getBusinessSettingsDictionary(locale).title }, ...(role === "owner" ? [{ href: `${base}/settings/layouts`, label: getLayoutDictionary(locale).title }, { href: `${base}/settings/modules`, label: modules.labels.title },{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
+  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, { href: `${base}/settings/general`, label: getBusinessSettingsDictionary(locale).title }, ...(role === "owner" ? [{ href: `${base}/settings/deal-stages`, label: getDealStageDictionary(locale).title }, { href: `${base}/settings/layouts`, label: getLayoutDictionary(locale).title }, { href: `${base}/settings/modules`, label: modules.labels.title },{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
   const links = [
     { href: base, label: currency.dashboard, icon: Dashboard },
     { href: `${base}/companies`, label: `${dictionary.navigation.companies}${modules.isEnabled("company") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },
@@ -89,6 +91,7 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
         {inSettings && <aside className="shrink-0 border-b md:w-56 md:border-b-0 md:border-r"><nav aria-label={copy.settings} className="flex gap-1 overflow-x-auto p-2 md:flex-col md:gap-0.5 md:p-3">{settings.map(({ href, label }) => <Button asChild key={href} variant="ghost" className={cn("shrink-0 justify-start px-3 font-normal text-muted-foreground", isActive(href) && "bg-muted text-foreground hover:bg-muted")}><Link prefetch={false} href={href} aria-current={isActive(href) ? "page" : undefined} onClick={event => navigate(event, href)}>{label}</Link></Button>)}</nav></aside>}
         <main aria-busy={navigationPending} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto p-4 md:p-6" id="main-content" tabIndex={-1}>
+          <DealStageRefreshStatus />
           {navigationPending && <NavigationSkeleton label={crm.loading} />}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col [&>div]:w-full" hidden={navigationPending} inert={navigationPending} style={navigationPending ? { display: "none" } : undefined}>{children}</div>
         </main>

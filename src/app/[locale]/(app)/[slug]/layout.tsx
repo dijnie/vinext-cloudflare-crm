@@ -1,3 +1,4 @@
+import { DealStageProvider } from "@/components/app/deal-stage-provider";
 import { eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -30,6 +31,6 @@ export default async function ProtectedLayout({ children, params }: { children: 
     const suffix = `/${path.split("/").slice(3).join("/") || "companies"}`;
     redirect(canonicalWorkspacePath(locale, workspace.slug, requestHeaders.get("x-request-search") ?? "", suffix));
   }
-  const modules = await root.modules.get(viewer);
-  return <ModuleProvider initialSettings={modules} locale={locale}><AppShell dictionary={getDictionary(locale)} locale={locale} role={viewer.role} user={viewer.user} slug={workspace.slug}>{children}</AppShell></ModuleProvider>;
+  const [modules, stages] = await Promise.all([root.modules.get(viewer), root.dealStages.get(viewer)]);
+  return <ModuleProvider initialSettings={modules} locale={locale}><DealStageProvider initialCatalog={stages} locale={locale}><AppShell dictionary={getDictionary(locale)} locale={locale} role={viewer.role} user={viewer.user} slug={workspace.slug}>{children}</AppShell></DealStageProvider></ModuleProvider>;
 }

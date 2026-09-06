@@ -1,4 +1,5 @@
 "use client";
+import { useDealStages } from "./deal-stage-provider";
 import { useRecordLayout, visibleLayoutFields } from "./layouts/use-record-layout";
 import { FieldEditor } from "./fields/field-editor";
 import type { FieldValue } from "@/lib/services/custom-fields/field-contracts";
@@ -7,7 +8,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { DEAL_STAGE_IDS, dealCreateInputSchema, dealUpdateInputSchema } from "@/lib/services/deals/deal-contract";
+import { dealCreateInputSchema, dealUpdateInputSchema } from "@/lib/services/deals/deal-contract";
 import { companyCreateInputSchema, companyUpdateInputSchema } from "@/lib/services/companies/company-contract";
 import { contactCreateInputSchema, contactUpdateInputSchema } from "@/lib/services/contacts/contact-contract";
 import { membershipIdSchema } from "@/lib/listing/list-contract";
@@ -23,9 +24,10 @@ import { OwnerPicker, type OwnerOption } from "./owner-picker";
 import { CURRENCIES } from "@/lib/services/currencies/currency-catalog";
 import type { CurrencySettings } from "@/lib/services/currencies/currency-contracts";
 
-export function EntityForm({ entity, record, labels, onSaved, onCancel }: { entity: EntityType; record?: CrmRecord; labels: CrmDictionary; onSaved: (id: string) => void; onCancel: () => void }) {
+export function EntityForm({ entity, record, labels, onSaved, onCancel, readOnly }: { entity: EntityType; record?: CrmRecord; readOnly?: boolean; labels: CrmDictionary; onSaved: (id: string) => void; onCancel: () => void }) {
+  const stageCatalog = useDealStages();
   const { isEnabled } = useModules();
-  const moduleEnabled = isEnabled(entity);
+  const moduleEnabled = isEnabled(entity) && !readOnly;
   const { layout, error: layoutError, reload: reloadLayout } = useRecordLayout(entity);
   const [customValues, setCustomValues] = useState<Record<string, FieldValue>>({});
   const [customChanged, setCustomChanged] = useState<Record<string, FieldValue>>({});
@@ -50,6 +52,8 @@ export function EntityForm({ entity, record, labels, onSaved, onCancel }: { enti
 
 
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedStage, setSelectedStage] = useState(String(record?.stageId ?? stageCatalog.defaultStageId));
+  const invalidStage = entity === "deal" && selectedStage !== record?.stageId && stageCatalog.all.some(stage => stage.id === selectedStage && stage.archivedAt);
   const [calendarStale, setCalendarStale] = useState(false);
   const [currencyPending, setCurrencyPending] = useState(false);
   useEffect(() => {
@@ -75,11 +79,11 @@ export function EntityForm({ entity, record, labels, onSaved, onCancel }: { enti
   ]).values()];
   useEffect(() => { if (entity === "company") return; const controller = new AbortController(); const timer = setTimeout(() => { crmRequest<ListData>(`/api/crm/companies?pageSize=100&q=${encodeURIComponent(companySearch)}`, { signal: controller.signal }).then(data => { setCompanies(data.rows); setOptionsError(false); }).catch(() => { if (!controller.signal.aborted) setOptionsError(true); }); }, 250); return () => { clearTimeout(timer); controller.abort(); }; }, [entity, companySearch]);
   async function submit(form: HTMLFormElement) {
-    if (!moduleEnabled || layoutError || customError || !layout || !customReady || needsDraft && !draftId) return;
+    if (invalidStage || entity === "deal" && stageCatalog.unavailable || !moduleEnabled || layoutError || customError || !layout || !customReady || needsDraft && !draftId) return;
     setError(""); setErrors({}); const data: Record<string, unknown> = {}; const formData = new FormData(form);
     for (const key of visibleFields.filter(field => field.kind === "builtin").map(field => field.key)) {
       if (record && entity === "deal" && ["amountMinor", "currency"].includes(key) && currencyPending) continue;
-      const rawValue = String(formData.get(key) ?? "").trim();
+      const rawValue = key === "stageId" ? selectedStage : String(formData.get(key) ?? "").trim();
       const raw = rawValue === "__unassigned__" ? "" : rawValue;
       data[key] = key === "amountMinor" ? raw === "" ? null : Number(raw) : key === "expectedCloseAt" ? raw ? new Date(`${raw}T00:00:00Z`).toISOString() : null : raw === "" ? (record || key === "companyId" || key === "ownerMembershipId" ? null : undefined) : raw;
     }
@@ -95,6 +99,8 @@ export function EntityForm({ entity, record, labels, onSaved, onCancel }: { enti
   }
   return <form className="flex min-h-full flex-col gap-5" onSubmit={event => { event.preventDefault(); void submit(event.currentTarget); }}>
     {entity === "deal" && currencyPending && <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">{labels.currencyPending}</p>}
+    {invalidStage && <p role="alert">{stageCatalog.labels.archivedChoice}</p>}
+    {entity === "deal" && stageCatalog.unavailable && <p role="alert">{stageCatalog.labels.unavailable}<Button type="button" variant="outline" onClick={stageCatalog.refresh}>{labels.retry}</Button></p>}
     {optionsError && <p role="alert" className="text-sm text-destructive">{labels.error}</p>}
     {(layoutError || customError) && <p role="alert">{labels.error}<Button type="button" variant="outline" onClick={() => { if (customError) { setCustomError(false); setLoadRevision(value => value + 1); } reloadLayout(); }}>{labels.retry}</Button></p>}
     {!layout || !customReady || needsDraft && !draftId ? !(layoutError || customError) && <p role="status">{labels.loading}</p> : visibleFields.map(entry => {
@@ -106,9 +112,9 @@ export function EntityForm({ entity, record, labels, onSaved, onCancel }: { enti
       }
       const key = entry.key; const id = `record-${key}`; const required = key === "name" || key === "firstName" || entity === "deal" && ["companyId", "ownerMembershipId", "currency", "stageId"].includes(key); const initial = String(record?.[key] ?? (key === "currency" ? "USD" : key === "stageId" ? "demo-booked" : ""));
       return <div key={key} className="space-y-2"><label className="text-xs font-medium" htmlFor={id}>{fieldLabel(key, labels)}{required ? " *" : ""}</label>
-      {key === "companyId" ? <><input type="hidden" name={key} value={selectedCompany?.id ?? ""} /><Popover open={companyOpen} onOpenChange={setCompanyOpen}><PopoverTrigger asChild><Button id={id} type="button" variant="outline" role="combobox" aria-expanded={companyOpen} className="w-full justify-between font-normal" disabled={!moduleEnabled || busy}>{selectedCompany?.name || labels.chooseCompany}<ChevronDown size={16} /></Button></PopoverTrigger><PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0"><Command shouldFilter={false}><CommandInput placeholder={labels.chooseCompany} value={companySearch} onValueChange={setCompanySearch} /><CommandList><CommandEmpty>{optionsError ? labels.error : labels.none}</CommandEmpty>{!required && <CommandItem value="none" onSelect={() => { setSelectedCompany(null); setCompanyOpen(false); }}>{labels.none}</CommandItem>}{companyOptions.map(company => <CommandItem value={company.id} key={company.id} onSelect={() => { setSelectedCompany(company); setCompanyOpen(false); }}>{company.name || company.id}</CommandItem>)}</CommandList></Command></PopoverContent></Popover></> : key === "ownerMembershipId" ? <OwnerPicker id={id} name={key} value={selectedOwner} onChange={setSelectedOwner} labels={labels} required={required} disabled={!moduleEnabled || busy} /> : key === "currency" ? <FormSelect name={key} id={id} defaultValue={initial} disabled={!moduleEnabled || busy || currencyPending} options={CURRENCIES.map(item => ({ value: item.code, label: item.code }))} /> : key === "stageId" ? <FormSelect name={key} id={id} defaultValue={initial} disabled={!moduleEnabled || busy} options={DEAL_STAGE_IDS.map(stage => ({ value: stage, label: labels.stages[stage] }))} /> : ["description", "closedReason"].includes(key) ? <Textarea disabled={!moduleEnabled || busy} id={id} name={key} defaultValue={initial} /> : <Input id={id} name={key} disabled={!moduleEnabled || busy || key === "amountMinor" && currencyPending} defaultValue={key === "expectedCloseAt" ? initial.slice(0, 10) : initial} required={required} type={key === "email" ? "email" : key === "amountMinor" ? "number" : key === "expectedCloseAt" ? "date" : "text"} min={key === "amountMinor" ? 0 : undefined} step={key === "amountMinor" ? 1 : undefined} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `${id}-error` : undefined} />}
+      {key === "companyId" ? <><input type="hidden" name={key} value={selectedCompany?.id ?? ""} /><Popover open={companyOpen} onOpenChange={setCompanyOpen}><PopoverTrigger asChild><Button id={id} type="button" variant="outline" role="combobox" aria-expanded={companyOpen} className="w-full justify-between font-normal" disabled={!moduleEnabled || busy}>{selectedCompany?.name || labels.chooseCompany}<ChevronDown size={16} /></Button></PopoverTrigger><PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0"><Command shouldFilter={false}><CommandInput placeholder={labels.chooseCompany} value={companySearch} onValueChange={setCompanySearch} /><CommandList><CommandEmpty>{optionsError ? labels.error : labels.none}</CommandEmpty>{!required && <CommandItem value="none" onSelect={() => { setSelectedCompany(null); setCompanyOpen(false); }}>{labels.none}</CommandItem>}{companyOptions.map(company => <CommandItem value={company.id} key={company.id} onSelect={() => { setSelectedCompany(company); setCompanyOpen(false); }}>{company.name || company.id}</CommandItem>)}</CommandList></Command></PopoverContent></Popover></> : key === "ownerMembershipId" ? <OwnerPicker id={id} name={key} value={selectedOwner} onChange={setSelectedOwner} labels={labels} required={required} disabled={!moduleEnabled || busy} /> : key === "currency" ? <FormSelect name={key} id={id} defaultValue={initial} disabled={!moduleEnabled || busy || currencyPending} options={CURRENCIES.map(item => ({ value: item.code, label: item.code }))} /> : key === "stageId" ? <FormSelect name={key} id={id} value={selectedStage} onValueChange={setSelectedStage} disabled={!moduleEnabled || busy || stageCatalog.unavailable} options={stageCatalog.options(selectedStage)} /> : ["description", "closedReason"].includes(key) ? <Textarea disabled={!moduleEnabled || busy} id={id} name={key} defaultValue={initial} /> : <Input id={id} name={key} disabled={!moduleEnabled || busy || key === "amountMinor" && currencyPending} defaultValue={key === "expectedCloseAt" ? initial.slice(0, 10) : initial} required={required} type={key === "email" ? "email" : key === "amountMinor" ? "number" : key === "expectedCloseAt" ? "date" : "text"} min={key === "amountMinor" ? 0 : undefined} step={key === "amountMinor" ? 1 : undefined} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `${id}-error` : undefined} />}
       {key === "amountMinor" && <p className="text-xs text-muted-foreground">{labels.currencyHelp}</p>}{errors[key] && <p className="text-sm text-destructive" id={`${id}-error`}>{errors[key]}</p>}</div>;
     })}
-    {error && <div role="alert" className="text-sm text-destructive">{error}{calendarStale && <Button type="button" variant="outline" onClick={() => { reloadLayout(); setCalendarStale(false); setError(""); }}>{labels.custom.reloadFields}</Button>}</div>}<div className="sticky bottom-0 mt-auto flex flex-col-reverse gap-2 border-t bg-background py-4 pb-[max(1rem,env(safe-area-inset-bottom))]"><Button type="button" variant="outline" disabled={busy} onClick={onCancel}>{labels.cancel}</Button><Button type="submit" disabled={!moduleEnabled || busy || !layout || !customReady || layoutError || customError || needsDraft && !draftId || entity === "deal" && !record && currencyPending}>{busy ? labels.loading : labels.save}</Button></div>
+    {error && <div role="alert" className="text-sm text-destructive">{error}{calendarStale && <Button type="button" variant="outline" onClick={() => { reloadLayout(); setCalendarStale(false); setError(""); }}>{labels.custom.reloadFields}</Button>}</div>}<div className="sticky bottom-0 mt-auto flex flex-col-reverse gap-2 border-t bg-background py-4 pb-[max(1rem,env(safe-area-inset-bottom))]"><Button type="button" variant="outline" disabled={busy} onClick={onCancel}>{labels.cancel}</Button><Button type="submit" disabled={invalidStage || entity === "deal" && stageCatalog.unavailable || !moduleEnabled || busy || !layout || !customReady || layoutError || customError || needsDraft && !draftId || entity === "deal" && !record && currencyPending}>{busy ? labels.loading : labels.save}</Button></div>
   </form>;
 }

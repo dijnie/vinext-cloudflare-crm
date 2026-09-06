@@ -15,16 +15,8 @@ import {
   stableIdSchema,
 } from "../../listing/list-contract";
 
-export const DEAL_STAGE_IDS = [
-  "demo-booked",
-  "qualified-to-buy",
-  "unqualified-to-buy",
-  "decision-maker-bought-in",
-  "contract-sent",
-  "closed-won",
-  "closed-lost",
-] as const;
-export const dealStageSchema = z.enum(DEAL_STAGE_IDS);
+import { dealStageSchema } from "./deal-stage-contracts";
+export { DEAL_STAGE_IDS, dealStageSchema } from "./deal-stage-contracts";
 const currencySchema = currencyCodeSchema;
 const amountSchema = z.number().int().min(0).max(99_999_999_999_999).nullable();
 
@@ -39,7 +31,7 @@ export const dealListInputSchema = listContract([
 ] as const)
   .extend({
     owner: z.array(membershipIdSchema).max(100).default([]),
-    stage: z.array(dealStageSchema).max(DEAL_STAGE_IDS.length).default([]),
+    stage: z.array(dealStageSchema).max(100).default([]),
     company: z.array(stableIdSchema).max(100).default([]),
   })
   .strict();
@@ -111,6 +103,7 @@ const dealListRowOutputSchema = z.object({
   owner: ownerReferenceSchema,
   stageId: dealStageSchema,
   stageLabelKey: z.string(),
+  stageLabel: z.string().nullable(),
   closedState: z.enum(["open", "won", "lost"]),
   amountMinor: z.number().int().nullable(),
   ...dealConversionOutputSchema.shape,

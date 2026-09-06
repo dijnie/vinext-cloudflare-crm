@@ -505,3 +505,26 @@ Layout API updates use `{entity, revision, fields: [{kind, key, visible}]}`.
 Builtin/custom identity stays distinct even when their keys match. Layout arrays
 allow up to 500 entries within the existing 64 KiB JSON body limit; other routes
 retain their existing validation limits.
+
+Owners configure deal stages at `/{locale}/{workspaceSlug}/settings/deal-stages`.
+`GET /api/crm/deal-stages` returns the retained catalog; revisioned PATCH actions
+create, relabel, reorder, archive or restore a stage. New stages use stable UUIDs;
+the seven existing IDs, translated names and default `demo-booked` remain valid.
+The default cannot be archived. A stage's open/won/lost outcome is immutable.
+
+Archiving preserves records, timestamps, historical events and saved filters.
+Archived stages are unavailable for new selections, but a deal already in one
+can receive unrelated edits. Archive races roll back record, custom-value, money
+and history writes together. Stage labels and ordering propagate through forms,
+list controls, historical filters, timelines and dashboard; custom names display
+as entered in either locale. See [stage service](src/lib/services/deals/deal-stage-service.ts).
+
+Dashboard and related-record counts use the stored stage outcome. This corrects
+the previous classification of `unqualified-to-buy` as open on some surfaces; its
+existing stored outcome has always been lost. Archived open stages containing live
+deals remain in pipeline totals. Reporting keeps the existing 11-statement snapshot
+and exact currency-conversion rules.
+
+Once custom stage IDs are used, an older application restricted to the seven
+legacy IDs cannot safely read all records/history/filters. Preserve the additive
+schema and use a forward fix instead of reverting to that incompatible reader.

@@ -1,5 +1,5 @@
 import type { PreparedRecordFields, PreparedRecordCreation } from "../shared/record-fields-contract";
-import { operationConditionGuard } from "@/lib/db/schema";
+import { dealStage, operationConditionGuard } from "@/lib/db/schema";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { fieldConditionQuery } from "../custom-fields/field-condition-query";
 import { customFieldSort } from "../custom-fields/field-sort";
@@ -113,6 +113,9 @@ export class ContactRepository {
         id: deal.id,
         name: deal.name,
         stageId: deal.stageId,
+        stageLabel: dealStage.label,
+        stageLabelKey: dealStage.labelKey,
+        closedState: dealStage.closedState,
         role: dealContact.role,
         amountMinor: deal.amountMinor,
         currency: deal.currency,
@@ -120,6 +123,7 @@ export class ContactRepository {
       })
       .from(dealContact)
       .innerJoin(deal, eq(deal.id, dealContact.dealId))
+      .innerJoin(dealStage, eq(dealStage.id, deal.stageId))
       .where(eq(dealContact.contactId, id))
       .orderBy(asc(deal.name), asc(deal.id));
     return { ...record, deals };

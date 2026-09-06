@@ -64,6 +64,10 @@ import { DashboardRepository } from "@/lib/services/dashboard/dashboard-reposito
 import { createDashboardGetHandler } from "../../src/app/api/crm/dashboard/route";
 import { DealRepository } from "@/lib/services/deals/deal-repository";
 import { dealListInputSchema } from "@/lib/services/deals/deal-contract";
+import { CompanyRepository } from "@/lib/services/companies/company-repository";
+import { ContactRepository } from "@/lib/services/contacts/contact-repository";
+import { listFacets } from "@/lib/services/shared/facet-repository";
+import { sql } from "drizzle-orm";
 const NOW=new Date("2026-09-04T12:00:00.000Z");
 async function context(cookie:string) {return requireRequestContext(new Headers({cookie}),root());}
 async function fixture() {
@@ -78,6 +82,49 @@ async function seedDeal(id:string,owner:string,options:{stage?:string;amount?:nu
 }
 describe.sequential("SQL dashboard summaries",()=>{
   beforeEach(clearState);
+  it("uses immutable stage semantics for custom and archived stages across reporting and related records", async () => {
+    const { actor, other } = await fixture();
+    const stages: Record<string, string> = {};
+    for (const [key, state] of [["used", "open"], ["empty", "open"], ["hidden", "open"], ["other", "open"], ["won", "won"], ["lost", "lost"]] as const) {
+      const id = crypto.randomUUID(); stages[key] = id;
+      await env.DB.prepare("INSERT INTO deal_stage(id,label_key,label,position,closed_state) SELECT ?,?,?,COALESCE(MAX(position),-1)+1,? FROM deal_stage").bind(id, `stage.${id}`, `Custom ${key}`, state).run();
+    }
+    await seedDeal("custom-open", actor.id, { stage: stages.used, base: 100, expected: "2026-09-30T23:59:59.999Z" });
+    await seedDeal("custom-missing", actor.id, { stage: stages.used, base: 400, version: "old", currency: "EUR" });
+    await seedDeal("custom-archived-record", actor.id, { stage: stages.used, base: 1000, archived: true });
+    await seedDeal("custom-other", other.id, { stage: stages.other, base: 200, expected: "2026-10-01T00:00:00.000Z" });
+    await seedDeal("custom-won", actor.id, { stage: stages.won, base: 250, closed: "2026-09-02T00:00:00.000Z" });
+    await seedDeal("custom-lost", actor.id, { stage: stages.lost, base: 500, closed: "2026-09-03T00:00:00.000Z" });
+    await seedDeal("legacy-unqualified", actor.id, { stage: "unqualified-to-buy", base: 700, closed: "2026-09-03T00:00:00.000Z" });
+    for (const key of ["used", "hidden", "other", "won", "lost"]) await env.DB.prepare("UPDATE deal_stage SET archived_at=1 WHERE id=?").bind(stages[key]).run();
+    const ctx = await context(actor.cookie);
+    const mine = await root().dashboard.summary(ctx, { scope: "me" }, NOW);
+    expect(mine.pipeline).toMatchObject({ totalDeals: 2, totalMinor: "100" });
+    expect(mine.pipeline.stages.find(stage => stage.stageId === stages.used)).toMatchObject({ count: 2, valueMinor: "100", stageLabel: "Custom used", stageLabelKey: `stage.${stages.used}` });
+    expect(mine.pipeline.stages.find(stage => stage.stageId === stages.empty)).toMatchObject({ count: 0, valueMinor: "0" });
+    for (const id of [stages.hidden, stages.other, stages.won, stages.lost, "unqualified-to-buy"]) expect(mine.pipeline.stages.some(stage => stage.stageId === id)).toBe(false);
+    expect(mine.pipeline.stages.findIndex(stage => stage.stageId === stages.used)).toBeLessThan(mine.pipeline.stages.findIndex(stage => stage.stageId === stages.empty));
+    expect(mine.wonThisMonth).toEqual({ count: 1, valueMinor: "250" });
+    expect(mine.performance).toMatchObject({ wins: 1, losses: 2, winRate: 1 / 3, avgDealMinor: "250", avgCycleDays: 1 });
+    expect(mine.closingThisMonthTotal).toEqual({ count: 1, valueMinor: "100" });
+    expect(mine.trend.at(-1)).toMatchObject({ wonMinor: "250", createdMinor: "1550" });
+    expect(mine.unconverted).toEqual({ count: 1, currencies: ["EUR"] });
+    expect(mine.biggestOpen.map(row => row.id)).toEqual(["custom-open", "custom-missing"]);
+    expect(mine.biggestOpen[0]).toMatchObject({ stageLabel: "Custom used", stageLabelKey: `stage.${stages.used}` });
+    const all = await root().dashboard.summary(ctx, { scope: "everyone" }, NOW);
+    expect(all.pipeline).toMatchObject({ totalDeals: 3, totalMinor: "300" });
+    expect(all.pipeline.stages.find(stage => stage.stageId === stages.other)).toMatchObject({ count: 1, valueMinor: "200" });
+    expect((await new DashboardRepository(root().db).snapshot(actor.id, { scope: "me" }, NOW)).statements).toBe(11);
+    const company = await new CompanyRepository(root().db).byId("dashboard-company");
+    expect(company?.deals.find(row => row.id === "legacy-unqualified")).toMatchObject({ closedState: "lost", stageLabel: null });
+    expect(company?.deals.find(row => row.id === "custom-won")).toMatchObject({ closedState: "won", stageLabel: "Custom won" });
+    await env.DB.prepare("INSERT INTO contact(id,first_name,company_id,created_at,updated_at) VALUES('stage-contact','Stage contact','dashboard-company',0,0)").run();
+    await env.DB.prepare("INSERT INTO deal_contact(deal_id,contact_id) VALUES('custom-won','stage-contact')").run();
+    expect((await new ContactRepository(root().db).byId("stage-contact"))?.deals[0]).toMatchObject({ closedState: "won", stageLabel: "Custom won" });
+    const facets = await listFacets(root().db, "deal", sql`deal.archived_at IS NULL`);
+    expect(facets.stage.find(stage => stage.value === stages.used)).toMatchObject({ label: "Custom used", count: 2 });
+    expect(facets.stage.find(stage => stage.value === "unqualified-to-buy")?.label).toBe("dealStage.unqualifiedToBuy");
+  });
   it("sorts deals by frozen base amount rather than original mixed-currency amounts with nulls last",async()=>{
     const {actor}=await fixture();
     await seedDeal("large-original",actor.id,{amount:1000000,currency:"JPY",base:100});

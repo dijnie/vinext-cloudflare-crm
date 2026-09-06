@@ -1,4 +1,5 @@
 "use client";
+import { useDealStages } from "./deal-stage-provider";
 import { useModules } from "./module-provider";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { Document, Phone, Events, Checkbox, ArrowsHorizontal, Checkmark } from "
 import { crmRequest, requestError } from "./record-types";
 
 export function ActivityTimeline({ entity, recordId, companyId, locale, labels }: { entity: EntityType; recordId: string; companyId?: string; locale: AppLocale; labels: CrmDictionary }) {
+  const stageCatalog = useDealStages();
   const modules = useModules();
   const canCompose = modules.isEnabled(entity) && (!companyId || modules.isEnabled("company"));
   const canChange = (entry: ActivityEntry) => (!entry.companyId || modules.isEnabled("company")) && (!entry.contactId || modules.isEnabled("contact")) && (!entry.dealId || modules.isEnabled("deal"));
@@ -44,7 +46,7 @@ export function ActivityTimeline({ entity, recordId, companyId, locale, labels }
     <ol aria-busy={loading}>{entries.map(entry => { const Icon = entry.type === "call" ? Phone : entry.type === "meeting" ? Events : entry.type === "task" ? entry.completedAt ? Checkmark : Checkbox : entry.metadata ? ArrowsHorizontal : Document; return <li key={entry.id} className="relative ml-3 space-y-2 border-l pb-6 pl-7"><span className="absolute -left-3 top-0 flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground" aria-hidden="true"><Icon size={14} /></span>
       <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-xs font-medium">{entry.subject || copy.types[entry.type]}</h3><span className="text-xs text-muted-foreground">{copy.types[entry.type]}</span></div>
       <p className="text-xs text-muted-foreground">{copy.author}: {entry.author.name || entry.author.email} · <time dateTime={entry.occurredAt ?? entry.createdAt}>{time(entry.occurredAt ?? entry.createdAt)}</time></p>
-      {entry.metadata && <p className="text-xs">{copy.stageChange}: {labels.stages[entry.metadata.fromStageId]} → {labels.stages[entry.metadata.toStageId]}</p>}
+      {entry.metadata && <p className="text-xs">{copy.stageChange}: {stageCatalog.label(entry.metadata.fromStageId)} → {stageCatalog.label(entry.metadata.toStageId)}</p>}
       {entry.content && <p className="whitespace-pre-wrap break-words text-xs leading-5">{entry.content}</p>}
       {entry.dueAt && <p className="text-xs">{copy.dueAt}: <time dateTime={entry.dueAt}>{time(entry.dueAt)}</time></p>}
       {entry.completedAt && <p className="text-xs">{copy.completedAt}: <time dateTime={entry.completedAt}>{time(entry.completedAt)}</time></p>}

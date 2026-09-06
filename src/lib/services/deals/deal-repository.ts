@@ -58,6 +58,7 @@ export class DealRepository {
         ownerEmail: user.email,
         stageId: deal.stageId,
         stageLabelKey: dealStage.labelKey,
+        stageLabel: dealStage.label,
         closedState: dealStage.closedState,
         amountMinor: deal.amountMinor,
         currency: deal.currency,
@@ -112,6 +113,7 @@ export class DealRepository {
         ownerEmail: user.email,
         stageId: deal.stageId,
         stageLabelKey: dealStage.labelKey,
+        stageLabel: dealStage.label,
         closedState: dealStage.closedState,
         stageChangedAt: deal.stageChangedAt,
         amountMinor: deal.amountMinor,
@@ -283,7 +285,7 @@ export class DealRepository {
       sort === "name"
         ? deal.name
         : sort === "stage"
-          ? deal.stageId
+          ? dealStage.position
           : sort === "amount"
             ? dealConversion.baseAmountMinor
             : sort === "expectedCloseAt"

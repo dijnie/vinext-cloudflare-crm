@@ -19,7 +19,7 @@ export function fieldLabel(key: string, labels: CrmDictionary) { return labels.l
 export function displayValue(row: CrmRecord, key: string, locale: string, labels: CrmDictionary): string {
   if (key === "owner") return row.owner?.name || row.owner?.email || "—";
   if (key === "company") return row.company?.name || "—";
-  if (key === "stage" || key === "stageId") return labels.stages[row.stageId as keyof CrmDictionary["stages"]] || "—";
+  if (key === "stage" || key === "stageId") return typeof row.stageLabel === "string" ? row.stageLabel : labels.stages[row.stageId as keyof CrmDictionary["stages"]] || String(row.stageId ?? "—");
   const value = row[key === "amount" ? "amountMinor" : key];
   if (value == null || value === "") return "—";
   if (key === "amount" && typeof value === "number" && typeof row.currency === "string") {

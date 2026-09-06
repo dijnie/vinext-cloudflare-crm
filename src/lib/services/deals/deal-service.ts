@@ -1,3 +1,4 @@
+import { dealStageWriteError } from "./deal-stage-service";
 import { FieldService } from "../custom-fields/field-service";
 import type { PreparedRecordCreation } from "../shared/record-fields-contract";
 import { requirePermission } from "../permissions/permission-policy";
@@ -90,7 +91,7 @@ export class DealService {
         "validation_failed",
         "Owner must be an active member",
       );
-    if (!stage)
+    if (!stage || stage.archivedAt)
       throw new HttpError(400, "validation_failed", "Deal stage is invalid");
     const id = creation?.recordId ?? crypto.randomUUID();
     const fields = await new FieldService(this.db).prepareValues(context, { entity: "deal", recordId: id, values: input.customFields ?? {}, calendarRevision: input.calendarRevision }, "create");
@@ -114,7 +115,7 @@ export class DealService {
       }, context, fields, creation);
       return { id: row.id, name: row.name, companyId: row.companyId };
     } catch (error) {
-      try { currencyError(error); } catch (classified) { relationError(classified, "Deal relationships are invalid"); }
+      try { dealStageWriteError(error); } catch (stageError) { try { currencyError(stageError); } catch (classified) { relationError(classified, "Deal relationships are invalid"); } }
     }
   }
 
@@ -134,7 +135,7 @@ export class DealService {
         "Owner must be an active member",
       );
     const stage = await this.repository.stage(stageId);
-    if (!stage)
+    if (!stage || (stageId !== current.stageId && stage.archivedAt))
       throw new HttpError(400, "validation_failed", "Deal stage is invalid");
     if (
       input.companyId &&
@@ -178,7 +179,7 @@ export class DealService {
       if (!row) throw new HttpError(409, "conflict", "Deal stage changed before this update");
       return { id: row.id, name: row.name };
     } catch (error) {
-      try { currencyError(error); } catch (classified) { relationError(classified, "Deal relationships are invalid"); }
+      try { dealStageWriteError(error); } catch (stageError) { try { currencyError(stageError); } catch (classified) { relationError(classified, "Deal relationships are invalid"); } }
     }
   }
 

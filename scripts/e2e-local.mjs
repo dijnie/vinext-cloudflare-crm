@@ -31,6 +31,7 @@ const defaultGroups = [
   ["file-fields"],
   ["module-lifecycle"],
   ["record-layouts"],
+  ["deal-stage-settings"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();

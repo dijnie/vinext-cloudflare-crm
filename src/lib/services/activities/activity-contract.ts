@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dealStageSchema } from "../deals/deal-contract";
+import { dealStageSchema } from "../deals/deal-stage-contracts";
 import { bulkIdsSchema, isoDateTimeSchema, membershipIdSchema, stableIdSchema } from "../../listing/list-contract";
 
 export const activityAnchorSchema = z.object({

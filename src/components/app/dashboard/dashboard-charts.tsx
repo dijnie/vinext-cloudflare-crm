@@ -1,4 +1,5 @@
 "use client";
+import { useDealStages } from "../deal-stage-provider";
 
 import { CompactMoney } from "./compact-money";
 import { useId } from "react";
@@ -27,9 +28,10 @@ export function SalesTrend({ data, locale }: { data: DashboardSummaryData; local
 }
 
 export function PipelineDonut({ data, locale }: { data: DashboardSummaryData; locale: AppLocale }) {
+  const stageCatalog = useDealStages();
   const labels = getCurrencyDictionary(locale); const crm = getCrmDictionary(locale); const copy = getShellInterfaceDictionary(locale);
   const total = BigInt(data.pipeline.totalMinor);
-  const slices = data.pipeline.stages.map((stage, index) => ({ ...stage, value: proportion(stage.valueMinor, total), fill: stageColors[index % stageColors.length], name: crm.stages[stage.stageId] })).filter(stage => BigInt(stage.valueMinor) > 0n);
+  const slices = data.pipeline.stages.map((stage, index) => ({ ...stage, value: proportion(stage.valueMinor, total), fill: stageColors[index % stageColors.length], name: stageCatalog.label(stage.stageId) })).filter(stage => BigInt(stage.valueMinor) > 0n);
   return <div className="relative h-[168px]" role="img" aria-label={copy.pipelineTitle}>
     {slices.length ? <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={slices} dataKey="value" innerRadius={58} outerRadius={76} paddingAngle={2} stroke="none" isAnimationActive={false}>{slices.map(slice => <Cell key={slice.stageId} fill={slice.fill} />)}</Pie><Tooltip content={({ active, payload }) => { const slice = payload?.[0]?.payload as typeof slices[number] | undefined; return active && slice ? <div className="rounded-lg border bg-popover px-3 py-2 text-xs shadow-md"><p className="font-medium">{slice.name}</p><p>{formatMinor(slice.valueMinor, data.reportingCurrency, locale)} · {slice.count} {labels.count.toLowerCase()}</p></div> : null; }} /></PieChart></ResponsiveContainer> : <div className="mx-auto mt-2 size-[152px] rounded-full border-[18px] border-muted" />}
     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><span className="max-w-28 break-words text-center text-sm font-medium tabular-nums">{<CompactMoney value={data.pipeline.totalMinor} currency={data.reportingCurrency} locale={locale} />}</span><span className="text-xs text-muted-foreground">{data.pipeline.totalDeals} {labels.count.toLowerCase()}</span></div>

@@ -1,6 +1,5 @@
 import { requirePermission } from "../permissions/permission-policy";
 import type { AppDatabase } from "@/lib/db/database";
-import { DEAL_STAGE_IDS } from "@/lib/services/deals/deal-contract";
 import { stageChangeMetadataSchema } from "@/lib/services/activities/activity-contract";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
@@ -24,7 +23,7 @@ export class DashboardService {
     const performance = performanceRows[0];
     const wins = count(performance.wins), losses = count(performance.losses), valued = count(performance.valued_wins);
     const monthKey = (offset: number) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1)).toISOString().slice(0, 7);
-    const stages = DEAL_STAGE_IDS.filter(id => !["closed-won", "closed-lost"].includes(id)).map(stageId => ({ stageId, ...monthly(stageRows.find(row => row.stage_id === stageId)) }));
+    const stages = stageRows.map(row => ({ stageId: String(row.stage_id), stageLabel: row.stage_label ?? null, stageLabelKey: String(row.stage_label_key), ...monthly(row) }));
     return dashboardSummarySchema.parse({
       scope: input.scope, reportingCurrency: setting.reporting_currency, activeVersion: setting.active_conversion_version,
       unconverted: { count: count(unconverted.reduce((total, row) => total + count(row.count), 0)), currencies: unconverted.map(row => String(row.currency)) },
@@ -32,7 +31,7 @@ export class DashboardService {
       wonThisMonth: monthly(months.find(row => row.month === monthKey(0))), wonPrevMonth: monthly(months.find(row => row.month === monthKey(-1))), closingThisMonthTotal: monthly(closing[0]),
       performance: { windowDays: 90, wins, losses, winRate: wins + losses ? wins / (wins + losses) : null, avgDealMinor: valued ? ((amount(performance) + BigInt(Math.floor(valued / 2))) / BigInt(valued)).toString() : null, avgCycleDays: performance.cycle_days == null ? null : Math.round(Number(performance.cycle_days)) },
       trend: Array.from({ length: 6 }, (_, index) => { const month = monthKey(index - 5); return { month, createdMinor: amount(createdTrend.find(row => row.month === month)).toString(), wonMinor: amount(wonTrend.find(row => row.month === month)).toString() }; }),
-      biggestOpen: biggest.map(row => ({ id: row.id, name: row.name, stageId: row.stage_id, company: brief(row, "company"), owner: { membershipId: row.owner_id, name: row.owner_name }, amountMinor: row.amount_minor, currency: row.currency, baseAmountMinor: row.base_amount_minor, expectedCloseAt: timestamp(row.expected_close_at) })),
+      biggestOpen: biggest.map(row => ({ id: row.id, name: row.name, stageId: row.stage_id, stageLabel: row.stage_label ?? null, stageLabelKey: row.stage_label_key, company: brief(row, "company"), owner: { membershipId: row.owner_id, name: row.owner_name }, amountMinor: row.amount_minor, currency: row.currency, baseAmountMinor: row.base_amount_minor, expectedCloseAt: timestamp(row.expected_close_at) })),
       overdueTasks: tasks.map(row => ({ companyId: row.anchor_company_id ?? null, contactId: row.anchor_contact_id ?? null, dealId: row.anchor_deal_id ?? null, id: row.id, subject: row.subject, dueAt: timestamp(row.due_at), company: brief(row, "company"), deal: brief(row, "deal") })),
       recentActivity: activity.map(row => ({ id: row.id, type: row.type, subject: row.subject, content: row.content, author: brief(row, "author"), createdAt: timestamp(row.created_at), company: brief(row, "company"), deal: brief(row, "deal"), metadata: row.type === "stage_change" ? stageChangeMetadataSchema.parse(JSON.parse(String(row.metadata_json))) : null })),
     });

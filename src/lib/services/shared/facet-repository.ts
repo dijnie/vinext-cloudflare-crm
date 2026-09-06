@@ -21,7 +21,7 @@ export async function listFacets(db: AppDatabase, entity: EntityType, where: SQL
       assertQueryLimits(ownerQuery, companyQuery, titleQuery);
       [facets.owner, facets.company, facets.title] = await Promise.all([ownerQuery, companyQuery, titleQuery]);
     } else {
-      const stageQuery = db.select({ value: deal.stageId, label: dealStage.labelKey, count: sql<number>`count(*)` }).from(deal).innerJoin(dealStage, eq(dealStage.id, deal.stageId)).where(where).groupBy(deal.stageId, dealStage.labelKey, dealStage.position).orderBy(asc(dealStage.position));
+      const stageQuery = db.select({ value: deal.stageId, label: sql<string>`coalesce(${dealStage.label}, ${dealStage.labelKey})`, count: sql<number>`count(*)` }).from(deal).innerJoin(dealStage, eq(dealStage.id, deal.stageId)).where(where).groupBy(deal.stageId, dealStage.label, dealStage.labelKey, dealStage.position).orderBy(asc(dealStage.position));
       assertQueryLimits(ownerQuery, companyQuery, stageQuery);
       [facets.owner, facets.company, facets.stage] = await Promise.all([ownerQuery, companyQuery, stageQuery]);
     }

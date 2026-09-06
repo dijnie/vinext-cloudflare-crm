@@ -21,6 +21,8 @@ export const dealStage = sqliteTable(
   {
     id: text("id").primaryKey(),
     labelKey: text("label_key").notNull(),
+    label: text("label"),
+    archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
     position: integer("position").notNull(),
     closedState: text("closed_state", {
       enum: ["open", "won", "lost"],
@@ -559,3 +561,8 @@ export const recordDraft = sqliteTable("record_draft", {
   consumedAt: integer("consumed_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 }, table => [check("record_draft_entity", sql`${table.entity} in ('company','contact','deal')`), check("record_draft_expiry", sql`${table.expiresAt} > ${table.createdAt}`)]);
+
+export const dealStageCatalogRevision = sqliteTable("deal_stage_catalog_revision", {
+  id: text("id").primaryKey(),
+  revision: integer("revision").notNull().default(0),
+}, table => [check("deal_stage_catalog_singleton", sql`${table.id} = 'stages'`), check("deal_stage_catalog_revision_nonnegative", sql`${table.revision} >= 0`)]);
