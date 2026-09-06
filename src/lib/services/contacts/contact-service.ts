@@ -1,3 +1,5 @@
+import { requirePermission } from "../permissions/permission-policy";
+import type { Permission } from "../permissions/access-contracts";
 import type { AppDatabase } from "@/lib/db/database";
 import type {
   ContactCreateInput,
@@ -17,12 +19,12 @@ import { ContactRepository } from "./contact-repository";
 
 export class ContactService {
   private readonly repository: ContactRepository;
-  constructor(db: AppDatabase) {
+  constructor(private readonly db: AppDatabase) {
     this.repository = new ContactRepository(db);
   }
 
   async list(context: RequestContext, input: ContactListInput) {
-    this.guard(context);
+    await this.guard(context);
     const result = await this.repository.list(input);
     return {
       total: result.total,
@@ -35,7 +37,7 @@ export class ContactService {
   }
 
   async byId(context: RequestContext, id: string) {
-    this.guard(context);
+    await this.guard(context);
     const row = await this.repository.byId(id);
     if (!row) throw new HttpError(404, "not_found", "Contact was not found");
     const { deals, ...record } = row;
@@ -71,7 +73,7 @@ export class ContactService {
   }
 
   async create(context: RequestContext, input: ContactCreateInput) {
-    this.guard(context);
+    await this.guard(context, ["contact.create", ...(input.ownerMembershipId ? ["contact.assign" as const] : [])]);
     await this.requireRelations(input.companyId, input.ownerMembershipId);
     const now = new Date();
     try {
@@ -86,7 +88,7 @@ export class ContactService {
         ownerMembershipId: input.ownerMembershipId ?? null,
         createdAt: now,
         updatedAt: now,
-      });
+      }, context);
       return { id: row.id, firstName: row.firstName, lastName: row.lastName };
     } catch (error) {
       relationError(error, "An active contact already uses that email");
@@ -94,7 +96,7 @@ export class ContactService {
   }
 
   async update(context: RequestContext, id: string, input: ContactUpdateData) {
-    this.guard(context);
+    await this.guard(context, ["contact.update", ...(input.ownerMembershipId !== undefined ? ["contact.assign" as const] : [])]);
     if (!(await this.repository.byId(id)))
       throw new HttpError(404, "not_found", "Contact was not found");
     await this.requireRelations(input.companyId, input.ownerMembershipId);
@@ -120,7 +122,7 @@ export class ContactService {
     if (input.ownerMembershipId !== undefined)
       values.ownerMembershipId = input.ownerMembershipId;
     try {
-      const row = await this.repository.update(id, values);
+      const row = await this.repository.update(id, values, context);
       return { id: row.id, firstName: row.firstName, lastName: row.lastName };
     } catch (error) {
       relationError(error, "An active contact already uses that email");
@@ -128,11 +130,12 @@ export class ContactService {
   }
 
   async archive(context: RequestContext, id: string, restore = false) {
-    this.guard(context);
+    await this.guard(context, [restore ? "contact.restore" : "contact.archive"]);
     try {
       const row = await this.repository.archive(
         id,
         restore ? null : new Date(),
+        context,
       );
       if (!row) throw new HttpError(404, "not_found", "Contact was not found");
       return {
@@ -147,9 +150,9 @@ export class ContactService {
   }
 
   async bulkArchive(context: RequestContext, ids: string[], restore = false) {
-    this.guard(context);
+    await this.guard(context, [restore ? "contact.restore" : "contact.archive"]);
     try {
-      const succeeded = await this.repository.bulkArchive(ids, restore ? null : new Date());
+      const succeeded = await this.repository.bulkArchive(ids, restore ? null : new Date(), context);
       return { requested: ids.length, succeeded, failed: ids.length - succeeded };
     } catch (error) { relationError(error, "Restored records conflict with active records"); }
   }
@@ -195,13 +198,8 @@ export class ContactService {
     };
   }
 
-  private guard(context: RequestContext) {
-    if (!context.userId || !context.membershipId)
-      throw new HttpError(
-        403,
-        "membership_required",
-        "Active membership is required",
-      );
+  private guard(context: RequestContext, permissions: Permission[] = []) {
+    return requirePermission(this.db, context, permissions);
   }
   private async requireRelations(
     companyId: string | null | undefined,

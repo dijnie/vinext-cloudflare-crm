@@ -1,0 +1,140 @@
+import { expect, request as createRequest, test } from "@playwright/test";
+import type { AccessSettings } from "../../src/lib/services/permissions/access-contracts";
+
+function requiredEnvironment(name: string) {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required for preview E2E`);
+  return value;
+}
+
+test("owner manages localized branch and permission forms with persisted API state", async ({ page, baseURL }) => {
+  const signedIn = await page.request.post("/api/auth/sign-in/email", { headers: { origin: baseURL! }, data: { email: requiredEnvironment("E2E_OWNER_EMAIL"), password: requiredEnvironment("E2E_OWNER_PASSWORD") } });
+  expect(signedIn.ok()).toBe(true);
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const branchName = `Access branch ${suffix}`;
+  const renamed = `${branchName} renamed`;
+  const profileName = `Access profile ${suffix}`;
+  let branchId: string | undefined;
+  let profileId: string | undefined;
+  let assignedMember: AccessSettings["members"][number] | undefined;
+  const memberApi = await createRequest.newContext({ baseURL, ignoreHTTPSErrors: true, extraHTTPHeaders: { origin: baseURL! } });
+  const restoreAssignments = async () => {
+    if (!assignedMember) return;
+    expect((await page.request.post("/api/crm/access", { headers: { origin: baseURL! }, data: { action: "assign-profile", membershipId: assignedMember.membershipId, profileId: assignedMember.profileId } })).ok()).toBe(true);
+    expect((await page.request.post("/api/crm/access", { headers: { origin: baseURL! }, data: { action: "assign-branches", membershipId: assignedMember.membershipId, branchIds: assignedMember.branchIds, primaryBranchId: assignedMember.primaryBranchId } })).ok()).toBe(true);
+    assignedMember = undefined;
+  };
+  const read = async () => { const response = await page.request.get("/api/crm/access"); expect(response.ok()).toBe(true); return await response.json() as AccessSettings; };
+  try {
+    await page.goto("/vi/crm/settings/access");
+    await expect(page.getByRole("heading", { name: "Chi nhánh và quyền", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Ngôn ngữ: EN" }).click();
+    await expect(page.getByRole("heading", { name: "Branches and permissions", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Create branch", exact: true }).click();
+    let dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel("Name", { exact: true })).toBeFocused();
+    await dialog.getByLabel("Name", { exact: true }).fill(branchName);
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("button", { name: "Create branch", exact: true })).toBeFocused();
+    branchId = (await read()).branches.find(branch => branch.name === branchName)?.id;
+    expect(branchId).toBeTruthy();
+    await page.getByRole("button", { name: `Rename branch: ${branchName}`, exact: true }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Name", { exact: true }).fill(renamed);
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await page.getByRole("button", { name: `Archive: ${renamed}`, exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Confirm change", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+    expect((await read()).branches.find(branch => branch.id === branchId)?.archivedAt).toBeTruthy();
+    await page.getByRole("button", { name: `Restore: ${renamed}`, exact: true }).click();
+    await expect(page.getByRole("button", { name: `Archive: ${renamed}`, exact: true })).toBeVisible();
+    expect((await read()).branches.find(branch => branch.id === branchId)?.archivedAt).toBeNull();
+    await page.getByRole("button", { name: "Create profile", exact: true }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Name", { exact: true }).fill(profileName);
+    await dialog.getByLabel("Create companies", { exact: true }).check();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    let profile = (await read()).profiles.find(item => item.name === profileName);
+    profileId = profile?.id;
+    expect(profile?.grants).toEqual(["company.create"]);
+    await page.getByRole("button", { name: `Edit profile: ${profileName}`, exact: true }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Create companies", { exact: true }).uncheck();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    profile = (await read()).profiles.find(item => item.id === profileId);
+    expect(profile?.grants).toEqual([]);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: profileName, exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit profile: Standard member", exact: true })).toHaveCount(0);
+    expect((await memberApi.post("/api/auth/sign-in/email", { data: { email: requiredEnvironment("E2E_DISPOSABLE_MEMBER_EMAIL"), password: requiredEnvironment("E2E_DISPOSABLE_MEMBER_PASSWORD") } })).ok()).toBe(true);
+    const sessionResponse = await memberApi.get("/api/auth/get-session");
+    expect(sessionResponse.ok()).toBe(true);
+    const memberId = (await sessionResponse.json()).user.id as string;
+    const beforeAssignments = await read();
+    const member = beforeAssignments.members.find(item => item.membershipId === memberId);
+    expect(member?.status).toBe("active");
+    if (!member) throw new Error("Disposable member must exist in access settings");
+    assignedMember = member;
+    const defaultBranch = beforeAssignments.branches.find(item => item.isDefault && !item.archivedAt);
+    if (!defaultBranch) throw new Error("An active default branch must exist");
+    await page.getByRole("button", { name: `Assign profile: ${member.name}`, exact: true }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByRole("combobox", { name: "Permission profile", exact: true }).click();
+    await page.getByRole("option", { name: profileName, exact: true }).click();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    expect((await read()).members.find(item => item.membershipId === memberId)?.profileId).toBe(profileId);
+    await page.getByRole("button", { name: `Assign branches: ${member.name}`, exact: true }).click();
+    dialog = page.getByRole("dialog");
+    for (const checkbox of await dialog.getByRole("checkbox").all()) await checkbox.uncheck();
+    await dialog.getByRole("checkbox", { name: defaultBranch.name, exact: true }).check();
+    await dialog.getByRole("checkbox", { name: renamed, exact: true }).check();
+    await dialog.getByRole("combobox", { name: "Primary branch", exact: true }).click();
+    await page.getByRole("option", { name: renamed, exact: true }).click();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    const assigned = (await read()).members.find(item => item.membershipId === memberId);
+    expect(assigned?.branchIds.slice().sort()).toEqual([defaultBranch.id, branchId].sort());
+    expect(assigned?.primaryBranchId).toBe(branchId);
+    const deniedCreate = await memberApi.post("/api/crm/companies", { data: { name: `Denied company ${suffix}` } });
+    expect(deniedCreate.status()).toBe(403);
+    expect(await deniedCreate.json()).toMatchObject({ error: { code: "permission_required" } });
+    expect((await memberApi.get("/api/crm/companies")).status()).toBe(200);
+    await page.reload();
+    await expect(page.getByRole("button", { name: `Assign branches: ${member.name}`, exact: true })).toBeVisible();
+    await restoreAssignments();
+    await page.reload();
+    await page.getByRole("button", { name: `Delete: ${profileName}`, exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Confirm change", exact: true }).click();
+    await expect(page.getByRole("heading", { name: profileName, exact: true })).toHaveCount(0);
+    expect((await read()).profiles.some(item => item.id === profileId)).toBe(false);
+    profileId = undefined;
+    await page.setViewportSize({ width: 375, height: 812 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath("access-mobile.png"), animations: "disabled" });
+  } finally {
+    await memberApi.dispose();
+    await restoreAssignments();
+    if (profileId) expect((await page.request.post("/api/crm/access", { headers: { origin: baseURL! }, data: { action: "delete-profile", id: profileId } })).ok()).toBe(true);
+    if (branchId) expect((await page.request.post("/api/crm/access", { headers: { origin: baseURL! }, data: { action: "archive-branch", id: branchId } })).ok()).toBe(true);
+  }
+});
+
+test("member cannot navigate to or mutate owner access settings", async ({ page, baseURL }) => {
+  expect((await page.request.post("/api/auth/sign-in/email", { headers: { origin: baseURL! }, data: { email: requiredEnvironment("E2E_MEMBER_EMAIL"), password: requiredEnvironment("E2E_MEMBER_PASSWORD") } })).ok()).toBe(true);
+  for (const locale of ["vi", "en"]) {
+    await page.goto(`/${locale}/crm/settings/currencies`);
+    await expect(page.getByRole("link", { name: locale === "vi" ? "Chi nhánh và quyền" : "Branches and permissions", exact: true })).toHaveCount(0);
+    await page.goto(`/${locale}/crm/settings/access`);
+    await expect(page.getByRole("heading", { name: locale === "vi" ? "Chi nhánh và quyền" : "Branches and permissions", exact: true })).toHaveCount(0);
+  }
+  expect((await page.request.get("/api/crm/access")).status()).toBe(403);
+  const response = await page.request.post("/api/crm/access", { headers: { origin: baseURL! }, data: { action: "create-branch", name: "Unauthorized branch" } });
+  expect(response.status()).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: "owner_required" } });
+});

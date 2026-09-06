@@ -1,3 +1,5 @@
+import type { RequestContext } from "@/lib/http/request-context";
+import { actionGuard, permissionError } from "../permissions/permission-policy";
 import { and, desc, eq, getTableColumns, isNotNull, isNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
 import { activity, company, contact, deal, user } from "@/lib/db/schema";
@@ -30,26 +32,34 @@ export class ActivityRepository {
       .orderBy(desc(activity.createdAt), desc(activity.id)).limit(input.limit + 1);
   }
 
-  async create(values: typeof activity.$inferInsert) {
+  async create(values: typeof activity.$inferInsert, context: RequestContext) {
     const now = values.createdAt;
-    await this.db.batch([
+    const op = actionGuard(this.db, context, ["activity.create"]);
+    try { await this.db.batch([
+      op.begin,
       this.db.insert(activity).values(values),
       this.db.update(company).set({ lastActivityAt: sql`max(coalesce(${company.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(company.id, values.companyId ?? "")),
       this.db.update(contact).set({ lastActivityAt: sql`max(coalesce(${contact.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(contact.id, values.contactId ?? "")),
       this.db.update(deal).set({ lastActivityAt: sql`max(coalesce(${deal.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(deal.id, values.dealId ?? "")),
-    ]);
+      op.end,
+    ]); } catch (error) { permissionError(error); }
     return (await this.byId(values.id))!;
   }
 
-  async complete(id: string, completed: boolean) {
+  async complete(id: string, completed: boolean, context: RequestContext) {
     const now = new Date();
     const stamp = (column: typeof activity.companyId | typeof activity.contactId | typeof activity.dealId) => sql`(select ${column} from ${activity} where ${activity.id} = ${id} and ${activity.type} = 'task')`;
-    const [rows] = await this.db.batch([
+    const op = actionGuard(this.db, context, ["activity.update"]);
+    try {
+    const [, rows] = await this.db.batch([
+      op.begin,
       this.db.update(activity).set({ completedAt: completed ? now : null, updatedAt: now }).where(and(eq(activity.id, id), eq(activity.type, "task"))).returning({ id: activity.id }),
       this.db.update(company).set({ lastActivityAt: sql`max(coalesce(${company.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(company.id, stamp(activity.companyId))),
       this.db.update(contact).set({ lastActivityAt: sql`max(coalesce(${contact.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(contact.id, stamp(activity.contactId))),
       this.db.update(deal).set({ lastActivityAt: sql`max(coalesce(${deal.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(deal.id, stamp(activity.dealId))),
+      op.end,
     ]);
     return rows.length ? this.byId(id) : undefined;
+    } catch (error) { permissionError(error); }
   }
 }

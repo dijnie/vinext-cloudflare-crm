@@ -1,3 +1,5 @@
+import { requirePermission } from "../permissions/permission-policy";
+import type { Permission } from "../permissions/access-contracts";
 import type { AppDatabase } from "@/lib/db/database";
 import { currencyError } from "@/lib/services/currencies/currency-service";
 import type {
@@ -14,12 +16,12 @@ import { DealRepository } from "./deal-repository";
 
 export class DealService {
   private readonly repository: DealRepository;
-  constructor(db: AppDatabase) {
+  constructor(private readonly db: AppDatabase) {
     this.repository = new DealRepository(db);
   }
 
   async list(context: RequestContext, input: DealListInput) {
-    this.guard(context);
+    await this.guard(context);
     const result = await this.repository.list(input);
     return {
       total: result.total,
@@ -32,7 +34,7 @@ export class DealService {
   }
 
   async byId(context: RequestContext, id: string) {
-    this.guard(context);
+    await this.guard(context);
     const row = await this.repository.byId(id);
     if (!row) throw new HttpError(404, "not_found", "Deal was not found");
     if (!row.companyId || !row.ownerMembershipId) {
@@ -72,7 +74,7 @@ export class DealService {
   }
 
   async create(context: RequestContext, input: DealCreateInput) {
-    this.guard(context);
+    await this.guard(context, ["deal.create", "deal.assign"]);
     const [company, owner, stage] = await Promise.all([
       this.repository.company(input.companyId),
       this.repository.activeMember(input.ownerMembershipId),
@@ -105,7 +107,7 @@ export class DealService {
         closedAt: stage.closedState === "open" ? null : now,
         createdAt: now,
         updatedAt: now,
-      });
+      }, context);
       return { id: row.id, name: row.name, companyId: row.companyId };
     } catch (error) {
       try { currencyError(error); } catch (classified) { relationError(classified, "Deal relationships are invalid"); }
@@ -113,7 +115,7 @@ export class DealService {
   }
 
   async update(context: RequestContext, id: string, input: DealUpdateData) {
-    this.guard(context);
+    await this.guard(context, ["deal.update", ...(input.ownerMembershipId !== undefined ? ["deal.assign" as const] : [])]);
     const current = await this.repository.byId(id);
     if (!current) throw new HttpError(404, "not_found", "Deal was not found");
     const companyId = input.companyId ?? current.companyId;
@@ -167,7 +169,7 @@ export class DealService {
     } else if (input.closedReason !== undefined)
       values.closedReason = input.closedReason;
     try {
-      const row = await this.repository.updateWithHistory(id, values, current.stageId, context.userId, moneyChanged ? { revision:current.moneyRevision,amountMinor:current.amountMinor,currency:current.currency } : undefined);
+      const row = await this.repository.updateWithHistory(id, values, current.stageId, context.userId, context, moneyChanged ? { revision:current.moneyRevision,amountMinor:current.amountMinor,currency:current.currency } : undefined);
       if (!row) throw new HttpError(409, "conflict", "Deal stage changed before this update");
       return { id: row.id, name: row.name };
     } catch (error) {
@@ -176,15 +178,15 @@ export class DealService {
   }
 
   async archive(context: RequestContext, id: string, restore = false) {
-    this.guard(context);
-    const row = await this.repository.archive(id, restore ? null : new Date());
+    await this.guard(context, [restore ? "deal.restore" : "deal.archive"]);
+    const row = await this.repository.archive(id, restore ? null : new Date(), context);
     if (!row) throw new HttpError(404, "not_found", "Deal was not found");
     return { id: row.id, name: row.name, archivedAt: toIso(row.archivedAt) };
   }
   async bulkArchive(context: RequestContext, ids: string[], restore = false) {
-    this.guard(context);
+    await this.guard(context, [restore ? "deal.restore" : "deal.archive"]);
     try {
-      const succeeded = await this.repository.bulkArchive(ids, restore ? null : new Date());
+      const succeeded = await this.repository.bulkArchive(ids, restore ? null : new Date(), context);
       return { requested: ids.length, succeeded, failed: ids.length - succeeded };
     } catch (error) { relationError(error, "Restored records conflict with active records"); }
   }
@@ -195,13 +197,14 @@ export class DealService {
     contactId: string,
     role: string | null = null,
   ) {
-    this.guard(context);
+    await this.guard(context, ["deal.update"]);
     await this.requireCompatible(dealId, contactId);
     try {
       return await this.repository.attachContact(
         dealId,
         contactId,
         blankToNull(role) ?? null,
+        context,
       );
     } catch (error) {
       relationError(error, "Contact is already attached to this deal");
@@ -214,11 +217,12 @@ export class DealService {
     contactId: string,
     role: string | null,
   ) {
-    this.guard(context);
+    await this.guard(context, ["deal.update"]);
     const row = await this.repository.setContactRole(
       dealId,
       contactId,
       blankToNull(role) ?? null,
+      context,
     );
     if (!row)
       throw new HttpError(404, "not_found", "Deal contact was not found");
@@ -229,8 +233,8 @@ export class DealService {
     dealId: string,
     contactId: string,
   ) {
-    this.guard(context);
-    const row = await this.repository.detachContact(dealId, contactId);
+    await this.guard(context, ["deal.update"]);
+    const row = await this.repository.detachContact(dealId, contactId, context);
     if (!row)
       throw new HttpError(404, "not_found", "Deal contact was not found");
     return row;
@@ -299,12 +303,7 @@ export class DealService {
       updatedAt: row.updatedAt.toISOString(),
     };
   }
-  private guard(context: RequestContext) {
-    if (!context.userId || !context.membershipId)
-      throw new HttpError(
-        403,
-        "membership_required",
-        "Active membership is required",
-      );
+  private guard(context: RequestContext, permissions: Permission[] = []) {
+    return requirePermission(this.db, context, permissions);
   }
 }

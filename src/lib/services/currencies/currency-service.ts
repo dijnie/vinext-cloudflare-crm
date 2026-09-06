@@ -1,7 +1,8 @@
+import { permissionPredicate } from "../permissions/permission-policy";
 import { and, asc, eq, gt, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { AppDatabase } from "@/lib/db/database";
-import { crmSetting, currencyJob, deal, dealConversion, exchangeRate, memberOperationGuard, singletonMembership } from "@/lib/db/schema";
+import { crmSetting, currencyJob, deal, dealConversion, exchangeRate, operationConditionGuard, singletonMembership } from "@/lib/db/schema";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
 import { CURRENCIES, CURRENCY_CODES } from "./currency-catalog";
@@ -13,7 +14,7 @@ const frozenRatesSchema = z.record(z.string(), z.object({ rate: rateSchema, asOf
 export function currencyError(error: unknown): never {
   if (error instanceof HttpError) throw error;
   const message = String(error) + (error instanceof Error ? String(error.cause) : "");
-  if (/currency_job_pending|deal_money_revision_conflict|member_operation_guard_authorized_check|CHECK constraint failed: authorized/i.test(message)) throw new HttpError(409, "conflict", "Currency operation changed or is busy");
+  if (/operation_conflict|currency_job_pending|deal_money_revision_conflict|member_operation_guard_authorized_check|CHECK constraint failed: authorized/i.test(message)) throw new HttpError(409, "conflict", "Currency operation changed or is busy");
   throw error;
 }
 export class CurrencyService {
@@ -21,12 +22,12 @@ export class CurrencyService {
   constructor(private readonly db: AppDatabase) { this.rates = new RateRepository(db); }
   private async guard(context: RequestContext, owner = false) {
     const member = await this.db.select().from(singletonMembership).where(and(eq(singletonMembership.userId, context.membershipId), eq(singletonMembership.status, "active"))).get();
-    if (!context.userId || !member) throw new HttpError(403, "membership_required", "Active membership required");
+    if (!context.userId || context.userId !== context.membershipId || !member) throw new HttpError(403, "membership_required", "Active membership required");
     if (owner && member.role !== "owner") throw new HttpError(403, "owner_required", "Owner required");
   }
   private operation(context: RequestContext, predicate: SQL) {
     const id = crypto.randomUUID();
-    return { begin: this.db.insert(memberOperationGuard).values({ id, authorized: sql<number>`case when (${predicate}) and exists(select 1 from singleton_membership where user_id=${context.membershipId} and status='active' and role='owner') then 1 else 0 end` }), end: this.db.delete(memberOperationGuard).where(eq(memberOperationGuard.id, id)) };
+    return { begin: this.db.insert(operationConditionGuard).values({ id, authorized: sql<number>`case when (${predicate}) and ${permissionPredicate(context, [], true)} then 1 else 0 end` }), end: this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, id)) };
   }
   async settings(context: RequestContext, baseCurrency?: string): Promise<CurrencySettings> {
     await this.guard(context); const setting = await this.rates.setting();

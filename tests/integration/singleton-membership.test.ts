@@ -131,8 +131,8 @@ describe.sequential("singleton membership foundation", () => {
       .where(eq(singletonMembership.userId, "sentinel-owner"));
 
     await expect(service.remove(staleContext, "member-a", "owner-b")).rejects.toMatchObject({
-      status: 409,
-      code: "conflict",
+      status: 403,
+      code: "owner_required",
     });
     expect(
       await db.query.singletonMembership.findFirst({

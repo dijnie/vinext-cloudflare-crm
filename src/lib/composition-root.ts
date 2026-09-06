@@ -12,6 +12,7 @@ import { SavedViewService } from "@/lib/services/saved-views/saved-view-service"
 import { FieldService } from "@/lib/services/custom-fields/field-service";
 import { DashboardService } from "@/lib/services/dashboard/dashboard-service";
 import { CurrencyService } from "@/lib/services/currencies/currency-service";
+import { AccessService } from "@/lib/services/permissions/access-service";
 
 import { defaultSecurityLogger, type SecurityLogger } from "./http/security-logging";
 
@@ -50,6 +51,7 @@ export function createCompositionRoot(
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
   return {
+    access: new AccessService(db, securityLogger),
     currency,
     dashboard,
     fields,

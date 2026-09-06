@@ -2,6 +2,7 @@ export type HttpErrorCode =
   | "authentication_required"
   | "membership_required"
   | "owner_required"
+  | "permission_required"
   | "invalid_origin"
   | "invalid_content_type"
   | "invalid_json"

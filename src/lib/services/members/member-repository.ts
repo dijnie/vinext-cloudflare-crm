@@ -120,7 +120,14 @@ export class MemberRepository {
              WHERE actor.user_id = ${actorMembershipId}
                AND actor.role = 'owner'
                AND actor.status = 'active'
-          ) THEN 1 ELSE 0 END
+          ) AND EXISTS (
+            SELECT 1 FROM singleton_membership AS target
+             WHERE target.user_id = ${targetMembershipId} AND target.status = 'active'
+          ) AND (${replacement} IS NULL OR EXISTS (
+            SELECT 1 FROM singleton_membership AS next_owner
+             WHERE next_owner.user_id = ${replacement} AND next_owner.status = 'active'
+               AND next_owner.user_id != ${targetMembershipId}
+          )) THEN 1 ELSE 0 END
         )`,
       }),
       this.db
@@ -174,6 +181,7 @@ export class MemberRepository {
         .delete(memberOperationGuard)
         .where(eq(memberOperationGuard.id, operationId)),
     ]);
-    return results.at(-2)?.meta.changes === 1;
+    // D1 includes rows removed by branch-cleanup triggers in the change count.
+    return (results.at(-2)?.meta.changes ?? 0) > 0;
   }
 }

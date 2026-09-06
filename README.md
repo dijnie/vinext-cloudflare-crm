@@ -47,6 +47,28 @@ Shared controls live in `src/components/ui`; source-derived styles live in
 and select controls so their focus scopes share one runtime. Source component
 attribution is in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
+## Branches and permission profiles
+
+Owners manage branches, member assignments and action profiles at
+`/{locale}/crm/settings/access`. Active members continue to read shared CRM
+records; branch assignments organize the team and do not restrict record
+visibility. Existing records are not assigned to a branch during upgrade.
+
+The immutable standard profile preserves existing write capabilities for
+existing memberships and newly verified signups. Owners can create profiles
+with explicit create, edit, archive, restore, assignment, field-configuration
+and saved-view permissions, then assign them to members. Export grants are
+stored separately for export workflows; granting one does not add an export
+feature. Administrative owner access and saved-view creator restrictions stay
+independent from profiles. Changes are checked at service entry and again
+atomically with writes, including ownership fields in create/edit requests.
+
+A referenced profile cannot be deleted. Default or assigned branches cannot
+be archived until owners change the default or move their member assignments.
+Revocation removes branch assignments and sessions while preserving profile
+configuration and historical authorship. Restoring membership does not restore
+owner status or old branch assignments.
+
 ## Tech Stack
 
 - Frontend: [Vinext](https://github.com/cloudflare/vinext)

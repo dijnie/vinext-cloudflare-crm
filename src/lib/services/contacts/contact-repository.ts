@@ -1,3 +1,5 @@
+import type { RequestContext } from "@/lib/http/request-context";
+import { authorizedWrite } from "../permissions/permission-policy";
 import { inJsonArray } from "@/lib/db/sql-filters";
 import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/lib/services/custom-fields/field-list-query";
 import {
@@ -114,30 +116,20 @@ export class ContactRepository {
     return { ...record, deals };
   }
 
-  create(values: typeof contact.$inferInsert) {
-    return this.db.insert(contact).values(values).returning().get();
+  async create(values: typeof contact.$inferInsert, context: RequestContext) {
+    const rows = await authorizedWrite(this.db, context, ["contact.create", ...(values.ownerMembershipId ? ["contact.assign" as const] : [])], this.db.insert(contact).values(values).returning());
+    return rows[0]!;
   }
-  update(id: string, values: Partial<typeof contact.$inferInsert>) {
-    return this.db
-      .update(contact)
-      .set(values)
-      .where(eq(contact.id, id))
-      .returning()
-      .get();
+  async update(id: string, values: Partial<typeof contact.$inferInsert>, context: RequestContext) {
+    const rows = await authorizedWrite(this.db, context, ["contact.update", ...(values.ownerMembershipId !== undefined ? ["contact.assign" as const] : [])], this.db.update(contact).set(values).where(eq(contact.id, id)).returning());
+    return rows[0]!;
   }
-  archive(id: string, archivedAt: Date | null) {
-    return this.db
-      .update(contact)
-      .set({ archivedAt, updatedAt: new Date() })
-      .where(eq(contact.id, id))
-      .returning()
-      .get();
+  async archive(id: string, archivedAt: Date | null, context: RequestContext) {
+    const rows = await authorizedWrite(this.db, context, [archivedAt ? "contact.archive" : "contact.restore"], this.db.update(contact).set({ archivedAt, updatedAt: new Date() }).where(eq(contact.id, id)).returning());
+    return rows[0];
   }
-  async bulkArchive(ids: string[], archivedAt: Date | null) {
-    const result = await this.db
-      .update(contact)
-      .set({ archivedAt, updatedAt: new Date() })
-      .where(inJsonArray(contact.id, ids));
+  async bulkArchive(ids: string[], archivedAt: Date | null, context: RequestContext) {
+    const result = await authorizedWrite(this.db, context, [archivedAt ? "contact.archive" : "contact.restore"], this.db.update(contact).set({ archivedAt, updatedAt: new Date() }).where(inJsonArray(contact.id, ids)));
     return result.meta.changes;
   }
   activeMember(id: string) {

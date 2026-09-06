@@ -1,3 +1,5 @@
+import { requirePermission } from "../permissions/permission-policy";
+import type { Permission } from "../permissions/access-contracts";
 import { eq } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
 import { company, contact, deal } from "@/lib/db/schema";
@@ -11,11 +13,9 @@ import { ActivityRepository } from "./activity-repository";
 export class ActivityService {
   private readonly repository: ActivityRepository;
   constructor(private readonly db: AppDatabase) { this.repository = new ActivityRepository(db); }
-  private guard(context: RequestContext) {
-    if (!context.userId || !context.membershipId) throw new HttpError(403, "membership_required", "Active membership is required");
-  }
+  private guard(context: RequestContext, permissions: Permission[] = []) { return requirePermission(this.db, context, permissions); }
   async create(context: RequestContext, input: ActivityCreateInput) {
-    this.guard(context);
+    await this.guard(context, ["activity.create"]);
     const contactRow = input.contactId ? await this.db.select().from(contact).where(eq(contact.id, input.contactId)).get() : undefined;
     const dealRow = input.dealId ? await this.db.select().from(deal).where(eq(deal.id, input.dealId)).get() : undefined;
     if ((input.contactId && !contactRow) || (input.dealId && !dealRow)) throw new HttpError(404, "not_found", "Activity record was not found");
@@ -29,12 +29,12 @@ export class ActivityService {
         companyId, contactId: input.contactId ?? null, dealId: input.dealId ?? null, authorUserId: context.userId,
         occurredAt: input.occurredAt ? new Date(input.occurredAt) : now, dueAt: input.dueAt ? new Date(input.dueAt) : null,
         completedAt: null, metadataJson: null, createdAt: now, updatedAt: now,
-      });
+      }, context);
       return this.serialize(row);
     } catch (error) { relationError(error, "Activity relationships changed"); }
   }
   async timeline(context: RequestContext, input: TimelineInput) {
-    this.guard(context);
+    await this.guard(context);
     const table = input.entity === "company" ? company : input.entity === "contact" ? contact : deal;
     if (!(await this.db.select({ id: table.id }).from(table).where(eq(table.id, input.recordId)).get())) throw new HttpError(404, "not_found", "Activity record was not found");
     const rows = await this.repository.timeline(input);
@@ -43,11 +43,11 @@ export class ActivityService {
     return { entries: page.map(row => this.serialize(row)), nextCursor: rows.length > input.limit && last ? `${last.createdAt.getTime()}:${last.id}` : null };
   }
   async complete(context: RequestContext, id: string, completed: boolean) {
-    this.guard(context);
+    await this.guard(context, ["activity.update"]);
     const current = await this.repository.byId(id);
     if (!current) throw new HttpError(404, "not_found", "Activity was not found");
     if (current.type !== "task") throw new HttpError(400, "validation_failed", "Only tasks can be completed");
-    const row = await this.repository.complete(id, completed);
+    const row = await this.repository.complete(id, completed, context);
     if (!row) throw new HttpError(409, "conflict", "Task changed before completion");
     return this.serialize(row);
   }

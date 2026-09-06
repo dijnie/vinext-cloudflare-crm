@@ -1,3 +1,5 @@
+import type { RequestContext } from "@/lib/http/request-context";
+import { authorizedWrite } from "../permissions/permission-policy";
 import { inJsonArray } from "@/lib/db/sql-filters";
 import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/lib/services/custom-fields/field-list-query";
 import {
@@ -118,30 +120,20 @@ export class CompanyRepository {
     return { ...record, contacts, deals };
   }
 
-  create(values: typeof company.$inferInsert) {
-    return this.db.insert(company).values(values).returning().get();
+  async create(values: typeof company.$inferInsert, context: RequestContext) {
+    const rows = await authorizedWrite(this.db, context, ["company.create", ...(values.ownerMembershipId ? ["company.assign" as const] : [])], this.db.insert(company).values(values).returning());
+    return rows[0]!;
   }
-  update(id: string, values: Partial<typeof company.$inferInsert>) {
-    return this.db
-      .update(company)
-      .set(values)
-      .where(eq(company.id, id))
-      .returning()
-      .get();
+  async update(id: string, values: Partial<typeof company.$inferInsert>, context: RequestContext) {
+    const rows = await authorizedWrite(this.db, context, ["company.update", ...(values.ownerMembershipId !== undefined ? ["company.assign" as const] : [])], this.db.update(company).set(values).where(eq(company.id, id)).returning());
+    return rows[0]!;
   }
-  archive(id: string, archivedAt: Date | null) {
-    return this.db
-      .update(company)
-      .set({ archivedAt, updatedAt: new Date() })
-      .where(eq(company.id, id))
-      .returning()
-      .get();
+  async archive(id: string, archivedAt: Date | null, context: RequestContext) {
+    const rows = await authorizedWrite(this.db, context, [archivedAt ? "company.archive" : "company.restore"], this.db.update(company).set({ archivedAt, updatedAt: new Date() }).where(eq(company.id, id)).returning());
+    return rows[0];
   }
-  async bulkArchive(ids: string[], archivedAt: Date | null) {
-    const result = await this.db
-      .update(company)
-      .set({ archivedAt, updatedAt: new Date() })
-      .where(inJsonArray(company.id, ids));
+  async bulkArchive(ids: string[], archivedAt: Date | null, context: RequestContext) {
+    const result = await authorizedWrite(this.db, context, [archivedAt ? "company.archive" : "company.restore"], this.db.update(company).set({ archivedAt, updatedAt: new Date() }).where(inJsonArray(company.id, ids)));
     return result.meta.changes;
   }
   activeMember(id: string) {

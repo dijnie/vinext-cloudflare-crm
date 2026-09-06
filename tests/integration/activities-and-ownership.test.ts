@@ -1,3 +1,4 @@
+import { requireRequestContext } from "@/lib/http/request-context";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { handleAuthRequest } from "@/lib/auth/auth";
@@ -233,7 +234,7 @@ describe.sequential("activities and ownership API", () => {
       history: await env.DB.prepare("SELECT count(*) AS count FROM activity WHERE deal_id = ?").bind(deal.id).first(),
     });
     const before = await snapshot();
-    const result = await new DealRepository(root().db).updateWithHistory(deal.id, { name: "must-not-write", stageId: "closed-won", updatedAt: new Date("2099-01-01T00:00:00.000Z") }, "demo-booked", actor.id);
+    const result = await new DealRepository(root().db).updateWithHistory(deal.id, { name: "must-not-write", stageId: "closed-won", updatedAt: new Date("2099-01-01T00:00:00.000Z") }, "demo-booked", actor.id, await requireRequestContext(new Headers({ cookie: actor.cookie }), root()));
     expect(result).toBeUndefined();
     expect(await snapshot()).toEqual(before);
   });

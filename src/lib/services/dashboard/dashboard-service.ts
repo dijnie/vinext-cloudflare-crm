@@ -1,3 +1,4 @@
+import { requirePermission } from "../permissions/permission-policy";
 import type { AppDatabase } from "@/lib/db/database";
 import { DEAL_STAGE_IDS } from "@/lib/services/deals/deal-contract";
 import { stageChangeMetadataSchema } from "@/lib/services/activities/activity-contract";
@@ -14,9 +15,9 @@ function brief(row: DashboardRow, prefix: string) { return row[`${prefix}_id`] =
 function monthly(row?: DashboardRow) { return { count: count(row?.count), valueMinor: amount(row).toString() }; }
 export class DashboardService {
   private readonly repository: DashboardRepository;
-  constructor(db: AppDatabase) { this.repository = new DashboardRepository(db); }
+  constructor(private readonly db: AppDatabase) { this.repository = new DashboardRepository(db); }
   async summary(context: RequestContext, input: DashboardInput, now = new Date()) {
-    if (!context.membershipId || !context.userId) throw new HttpError(403, "membership_required", "Active membership required");
+    await requirePermission(this.db, context);
     const result = await this.repository.snapshot(context.userId, input, now);
     const [settings, stageRows, months, closing, performanceRows, createdTrend, wonTrend, unconverted, biggest, tasks, activity] = result.rows;
     const setting = settings[0]; if (!setting) throw new HttpError(503, "internal_error", "Reporting settings are unavailable");

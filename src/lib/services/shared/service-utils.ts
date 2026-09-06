@@ -1,3 +1,4 @@
+import { permissionError } from "../permissions/permission-policy";
 import { HttpError } from "@/lib/http/http-errors";
 
 export function blankToNull(
@@ -67,5 +68,5 @@ export function relationError(error: unknown, fallback: string): never {
   ) {
     throw new HttpError(400, "validation_failed", "A relationship is invalid");
   }
-  throw error;
+  permissionError(error);
 }

@@ -19,6 +19,7 @@ const defaultGroups = [
   ["lists-and-sheets"],
   ["auth-and-members"],
   ["custom-fields-and-saved-views"],
+  ["access-settings"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();

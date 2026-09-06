@@ -1,3 +1,4 @@
+import { requirePermission } from "../permissions/permission-policy";
 import type { AppDatabase } from "@/lib/db/database";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
@@ -7,7 +8,7 @@ import {
 } from "@/lib/http/security-logging";
 
 import { MemberRepository } from "./member-repository";
-import { requireOwnerRole, resolveRemovalReplacement } from "./member-policy";
+import { resolveRemovalReplacement } from "./member-policy";
 
 function databaseMessage(error: unknown): string {
   const messages: string[] = [];
@@ -23,14 +24,14 @@ export class MemberService {
   private readonly repository: MemberRepository;
 
   constructor(
-    db: AppDatabase,
+    private readonly db: AppDatabase,
     private readonly securityLogger: SecurityLogger = defaultSecurityLogger,
   ) {
     this.repository = new MemberRepository(db);
   }
 
   async list(context: RequestContext) {
-    requireOwnerRole(context);
+    await requirePermission(this.db, context, [], true);
     const members = await this.repository.list();
     this.logSuccess(context, "membership.listed");
     return members;
@@ -41,7 +42,7 @@ export class MemberService {
     targetMembershipId: string,
     role: "owner" | "member",
   ): Promise<void> {
-    requireOwnerRole(context);
+    await requirePermission(this.db, context, [], true);
     try {
       if (
         !(await this.repository.changeRole(
@@ -71,7 +72,7 @@ export class MemberService {
     targetMembershipId: string,
     replacementMembershipId?: string | null,
   ): Promise<void> {
-    requireOwnerRole(context);
+    await requirePermission(this.db, context, [], true);
     const replacement = resolveRemovalReplacement(
       context,
       targetMembershipId,
@@ -128,7 +129,7 @@ export class MemberService {
     context: RequestContext,
     targetMembershipId: string,
   ): Promise<void> {
-    requireOwnerRole(context);
+    await requirePermission(this.db, context, [], true);
     if (
       !(await this.repository.restore(context.membershipId, targetMembershipId))
     ) {
