@@ -1,5 +1,5 @@
 import { expect, request, test, type APIRequestContext, type Page, type Locator } from "@playwright/test";
-import { FIELD_TYPES, type FieldDefinition } from "../../src/lib/services/custom-fields/field-contracts";
+import { type FieldDefinition } from "../../src/lib/services/custom-fields/field-contracts";
 import { getCrmDictionary } from "../../src/lib/i18n/crm-dictionary";
 
 test.use({ actionTimeout: 10_000 });
@@ -40,14 +40,15 @@ for (const locale of ["vi", "en"] as const) {
     for (const entity of ["company", "contact", "deal"] as const) {
       const record = entity === "company" ? company : await create(paths[entity], entity === "contact" ? { firstName: prefix, companyId: company.id } : { name: prefix, companyId: company.id, ownerMembershipId: ownerId });
       const definitions: FieldDefinition[] = [];
-      for (const type of FIELD_TYPES) definitions.push(await create("fields", { entity, type, label: `${prefix}-${entity}-${type}`, showOnTable: true, showOnFilter: ["select", "user"].includes(type), options: type === "select" ? [{ label: "Choice A" }, { label: "Choice B" }] : [] }));
+      for (const type of ["text", "long_text", "number", "date", "checkbox", "select", "url", "email", "phone", "user"] as const) definitions.push(await create("fields", { entity, type, label: `${prefix}-${entity}-${type}`, showOnTable: true, showOnFilter: ["select", "user"].includes(type), options: type === "select" ? [{ label: "Choice A" }, { label: "Choice B" }] : [] }));
       await page.goto(`/${locale}/crm/${paths[entity]}?recordType=${entity}&recordId=${record.id}&tab=fields`);
       const dialog = page.getByRole("dialog");
       const expected: Record<string, string | number | boolean> = {};
       for (const field of definitions) {
         const input = dialog.locator(`#custom-${field.id}`);
         const values = { text: "A real property", long_text: "First line\nSecond line", number: 0, date: "2030-01-02", checkbox: false, select: field.options[0]?.id ?? "", url: "https://example.invalid/property", email: "field@example.invalid", phone: "+84000000000", user: memberId };
-        const value = values[field.type]; expected[field.key] = value;
+        expect(field.type in values).toBe(true);
+        const value = values[field.type as keyof typeof values]; expected[field.key] = value;
         if (["select", "user", "checkbox"].includes(field.type)) {
           if (field.type === "user") await expect(input).toHaveAttribute("aria-busy", "false");
           await pick(page, input, String(value));

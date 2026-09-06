@@ -70,7 +70,7 @@ export class ContactRepository {
       listFacets(this.db, "contact", facetWhere),
     ]);
     const fields = await fieldListData(this.db, "contact", rows.map(row => row.id), facetWhere);
-    return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldUserLabels: fields.fieldUserLabels };
+    return { rows: rows.map(row => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
   }
 
   async byId(id: string) {

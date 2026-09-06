@@ -28,7 +28,7 @@ export class DealService {
       facets: result.facets,
       customFields: result.customFields,
       fieldFacets: result.fieldFacets,
-      fieldUserLabels: result.fieldUserLabels,
+      fieldCustomerLabels: result.fieldCustomerLabels, fieldUserLabels: result.fieldUserLabels,
       rows: result.rows.map((row) => this.serialize(row)),
     };
   }

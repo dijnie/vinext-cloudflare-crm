@@ -57,7 +57,6 @@ async function clearState() {
   ]);
 }
 
-import { FIELD_TYPES } from "@/lib/services/custom-fields/field-contracts";
 import { and } from "drizzle-orm";
 import { company as companyTable } from "@/lib/db/schema";
 import { fieldFilterConditions } from "@/lib/services/custom-fields/field-list-query";
@@ -167,7 +166,7 @@ describe.sequential("custom field API persistence",()=>{
     const actor=await session("types@example.com");
     for(const entity of ["company","contact","deal"]) {
       const row=await record(actor.cookie,entity,actor.id);
-      for(const type of FIELD_TYPES) {
+      for(const type of ["text", "long_text", "number", "date", "checkbox", "select", "url", "email", "phone", "user"] as const) {
         const field=await successful(await create(actor.cookie,{entity,label:type,type,options:type==="select"?[{label:"One"},{label:"Two"}]:[]}));
         const values:Record<string,unknown>={text:"  Text  ",long_text:"Long\ntext",number:12.75,date:"2026-09-04",checkbox:false,select:field.options[0]?.id,url:"https://example.com/a",email:"person@example.com",phone:"+84 123",user:actor.id};
         const value=values[type];
@@ -185,7 +184,7 @@ describe.sequential("custom field API persistence",()=>{
   it("validates types, options, required values, active members and atomic mixed writes",async()=>{
     const actor=await session("validation@example.com"), inactive=await session("inactive@example.com");
     const row=await record(actor.cookie,"company",actor.id);
-    for(const input of [{entity:"task",label:"Bad",type:"text"},{entity:"company",label:"Bad",type:"money"},{entity:"company",label:"Bad",type:"select"},{entity:"company",label:"Bad",type:"text",options:[{label:"No"}]},{entity:"company",label:"Bad",type:"select",options:[{label:"Same"},{label:"same"}]}]) expect((await create(actor.cookie,input)).status).toBe(400);
+    for(const input of [{entity:"task",label:"Bad",type:"text"},{entity:"company",label:"Bad",type:"unknown_type"},{entity:"company",label:"Bad",type:"select"},{entity:"company",label:"Bad",type:"text",options:[{label:"No"}]},{entity:"company",label:"Bad",type:"select",options:[{label:"Same"},{label:"same"}]}]) expect((await create(actor.cookie,input)).status).toBe(400);
     const fields:Record<string,any>={};
     for(const type of ["text","number","checkbox","date","email","url","user","select"]) fields[type]=await successful(await create(actor.cookie,{entity:"company",label:type,type,required:type==="text",options:type==="select"?[{label:"First"},{label:"Second"}]:[]}));
     await env.DB.prepare("UPDATE singleton_membership SET status='revoked' WHERE user_id=?").bind(inactive.id).run();

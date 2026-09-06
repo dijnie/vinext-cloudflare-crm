@@ -22,6 +22,7 @@ const defaultGroups = [
   ["access-settings"],
   ["business-settings"],
   ["default-saved-views"],
+  ["extended-fields"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();

@@ -32,6 +32,7 @@ describe("CRM baseline migration", () => {
       { name: "0006_branches_and_profiles.sql" },
       { name: "0007_business_calendar_settings.sql" },
       { name: "0008_personal_default_views.sql" },
+      { name: "0009_structured_custom_fields.sql" },
     ]);
   });
 

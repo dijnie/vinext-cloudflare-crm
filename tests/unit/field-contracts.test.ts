@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { FIELD_TYPES, fieldCreateInputSchema, fieldDeleteInputSchema, fieldKeyFromLabel, fieldReorderInputSchema, fieldValuesInputSchema } from "@/lib/services/custom-fields/field-contracts";
 
 describe("custom field contracts", () => {
-  it("accepts all ten field types on all three entities with stable defaults", () => {
-    expect(FIELD_TYPES).toHaveLength(10);
+  it("accepts all supported field types on all three entities with stable defaults", () => {
+    expect(FIELD_TYPES).toEqual(["text", "long_text", "number", "date", "checkbox", "select", "url", "email", "phone", "user", "money", "multiselect", "multivalue", "rating", "customer"]);
     for (const entity of ["company", "contact", "deal"]) for (const type of FIELD_TYPES) {
       expect(fieldCreateInputSchema.parse({ entity, type, label: "  Customer field  " })).toMatchObject({ entity, type, label: "Customer field", required: false, showOnSheet: true });
     }

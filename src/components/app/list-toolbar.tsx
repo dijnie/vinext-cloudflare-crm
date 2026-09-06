@@ -35,7 +35,7 @@ export function ListToolbar({ entity, labels, facets, columns, customFields = []
   const filterKeys = entity === "company" ? ["owner", "industry"] : entity === "contact" ? ["owner", "company", "title"] : ["owner", "company", "stage"];
   const selectedFields: Record<string, string[]> = JSON.parse(search.get("fields") ?? "{}");
   const availableColumns = [...entityColumns[entity], ...customFields.filter(field => !field.archivedAt).map(field => `field:${field.key}`)];
-  const filterFields = customFields.filter(field => !field.archivedAt && field.showOnFilter && ["select", "user"].includes(field.type));
+  const filterFields = customFields.filter(field => !field.archivedAt && field.showOnFilter && ["select", "user", "multiselect", "customer"].includes(field.type));
   const activeCount = filterKeys.filter(key => search.has(key)).length + Object.keys(selectedFields).length;
   return <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
     <form className="relative w-full sm:w-64" onSubmit={event => { event.preventDefault(); if (timer.current) clearTimeout(timer.current); change({ q: draft }); }}><Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input aria-label={labels.search} placeholder={`${labels.search} ${labels[entity].toLowerCase()}…`} name="q" value={draft} maxLength={200} autoComplete="off" className="pl-8" onChange={event => { const value = event.target.value; setDraft(value); if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => change({ q: value }), 250); }} /></form>

@@ -13,7 +13,7 @@ export interface CrmRecord {
   [key: string]: unknown;
 }
 export interface Facet { value: string; label?: string; count: number }
-export interface ListData { rows: CrmRecord[]; total: number; facets?: Record<string, Facet[]>; customFields?: FieldDefinition[]; fieldFacets?: Record<string, Facet[]>; fieldUserLabels?: Record<string, string> }
+export interface ListData { rows: CrmRecord[]; total: number; facets?: Record<string, Facet[]>; customFields?: FieldDefinition[]; fieldFacets?: Record<string, Facet[]>; fieldUserLabels?: Record<string, string>; fieldCustomerLabels?: Record<string, string> }
 export function recordName(row: CrmRecord) { return row.name || [row.firstName, row.lastName].filter(Boolean).join(" ") || row.id; }
 export function fieldLabel(key: string, labels: CrmDictionary) { return labels.labels[key as keyof CrmDictionary["labels"]] ?? key; }
 export function displayValue(row: CrmRecord, key: string, locale: string, labels: CrmDictionary): string {

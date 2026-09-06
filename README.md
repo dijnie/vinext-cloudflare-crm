@@ -291,10 +291,10 @@ for API validation. Record assignment uses [OwnerPicker](src/components/app/owne
 and the [ownership API entry point](src/app/api/crm/ownership/route.ts); assignment
 rules belong to [OwnershipService](src/lib/services/members/ownership-service.ts).
 
-All active members can manage custom fields from each list's field settings and
-edit values in record sheets. Start with [FieldsSheet](src/components/app/fields/fields-sheet.tsx)
+Members with `field.configure` can manage custom fields from each list's field settings;
+record value edits require the corresponding entity update permission. Start with [FieldsSheet](src/components/app/fields/fields-sheet.tsx)
 and [RecordFields](src/components/app/fields/record-fields.tsx); supported types
-belong to [the field contract](src/lib/services/custom-fields/field-contracts.ts), and SELECT/USER
+belong to [the field contract](src/lib/services/custom-fields/field-contracts.ts), and select/member/multiselect/customer
 list filters to [the field query owner](src/lib/services/custom-fields/field-list-query.ts).
 
 The field deletion dialog shows value coverage and requires the current password
@@ -355,3 +355,18 @@ not grant permission to edit that view. A bare list URL opens the preferred
 filters; explicit query parameters and direct record links take precedence.
 Deleting a view or making it private clears other users' affected defaults.
 The list reset link bypasses defaults so outdated field filters cannot trap a user.
+
+Structured custom fields retain typed values: money stores original currency and
+integer minor units using the existing supported currency catalog; multiselect
+stores stable option IDs; multivalue stores up to 100 unique trimmed text items;
+rating stores an integer from zero to its configured maximum (five by default,
+up to ten); customer references an existing active contact. Archived customer
+references and archived option labels remain readable, while new selections
+require active targets. A rating maximum cannot be lowered below retained values.
+Customer-linked records must be archived rather than hard-deleted while referenced.
+
+These values extend the existing field definition/value tables without replacing
+IDs, timestamps, tombstones, options, user references or saved views. Member and
+customer names are returned in separate label maps. Multiselect and customer
+filters share list/count/facet predicates. Formula, file, conversion previews,
+module lifecycle and configurable layouts remain work in the active rebuild plan.

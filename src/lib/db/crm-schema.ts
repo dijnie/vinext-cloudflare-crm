@@ -260,7 +260,7 @@ export const customFieldDefinition = sqliteTable(
         "url",
         "email",
         "phone",
-        "user",
+        "user", "money", "multiselect", "multivalue", "rating", "customer",
       ],
     }).notNull(),
     configJson: text("config_json"),
@@ -288,7 +288,7 @@ export const customFieldDefinition = sqliteTable(
     ),
     check(
       "custom_field_type_check",
-      sql`${table.type} in ('text', 'long_text', 'number', 'date', 'checkbox', 'select', 'url', 'email', 'phone', 'user')`,
+      sql`${table.type} in ('text', 'long_text', 'number', 'date', 'checkbox', 'select', 'url', 'email', 'phone', 'user', 'money', 'multiselect', 'multivalue', 'rating', 'customer')`,
     ),
     check(
       "custom_field_config_json_check",
@@ -325,6 +325,8 @@ export const customFieldValue = sqliteTable(
       onDelete: "cascade",
     }),
     dealId: text("deal_id").references(() => deal.id, { onDelete: "cascade" }),
+    jsonValue: text("json_value"),
+    customerReferenceId: text("customer_reference_id").references(() => contact.id, { onDelete: "restrict" }),
     textValue: text("text_value"),
     numberValue: integer("number_value"),
     dateValue: integer("date_value", { mode: "timestamp_ms" }),
@@ -346,6 +348,8 @@ export const customFieldValue = sqliteTable(
     index("custom_field_value_number_idx").on(table.fieldId, table.numberValue),
     index("custom_field_value_date_idx").on(table.fieldId, table.dateValue),
     index("custom_field_value_user_idx").on(table.userMembershipId),
+    index("custom_field_value_customer_idx").on(table.customerReferenceId),
+    check("custom_field_json_value_check", sql`${table.jsonValue} is null or json_valid(${table.jsonValue})`),
     check(
       "custom_field_value_one_record_check",
       sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null)) = 1`,
