@@ -5,11 +5,11 @@ import type { RequestContext } from "@/lib/http/request-context";
 import { HttpError } from "@/lib/http/http-errors";
 import {
   actionGuard,
-  permissionError,
   permissionPredicate,
   requirePermission,
 } from "../permissions/permission-policy";
 import { readUploadBody, uploadFileName } from "../files/file-upload-body";
+import { storageWriteError } from "../files/storage-write-policy";
 const meta = (x: typeof contractDocument.$inferSelect) => ({
   id: x.id,
   name: x.fileName,
@@ -81,7 +81,7 @@ export class ContractDocumentService {
         guard.end,
       ]);
     } catch (e) {
-      permissionError(e);
+      storageWriteError(e);
     }
     try {
       await this.bucket.put(objectKey, bytes, {

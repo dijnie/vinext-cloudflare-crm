@@ -23,6 +23,8 @@ member settings, and guarded lead, company, contact, deal, and catalog APIs.
 - 📝 Manual activities, tasks, deal stage history, and record ownership
 - 🧩 Custom fields and private/shared saved list views
 - 📊 Reconciled sales, customer, lead, task, and ticket reports with guarded Excel export
+- 🔌 Signed/public webforms, revocable API apps, retrying webhooks, templates, automations, and segments
+- 🗄️ Private R2 workspace logos with metadata-only D1 records and cancellable deletion requests
 - 🔗 Guarded lead, company, contact, deal, and catalog APIs with archive/restore workflows
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
@@ -51,6 +53,29 @@ cost coverage, receivables, repeat purchase, lead cohorts, and reopened work
 cycles retain their separate business dates. Missing costs are shown as missing
 instead of zero. Report viewing and exporting are separate profile permissions;
 owners can set workspace, member, or branch goals.
+
+Owners manage operational settings at
+`/{locale}/{workspaceSlug}/settings/operations`. Public webform submissions
+require an `Idempotency-Key`; signed-system forms also require the one-time
+bearer token, `X-Webform-Timestamp`, and `X-Webform-Signature` generated over
+`token.timestamp.rawBody`. API app tokens are shown only when created and can
+be revoked immediately. Their explicit grants authorize contact/lead reads and
+idempotent lead/ticket creation through `/api/integrations/*`; every write also
+rechecks the stored active member authority atomically. Webhook secrets are
+encrypted at rest, while delivery retries retain event IDs and attempt history.
+Email templates block previews with missing required variables. Automations can
+assign leads, update allowed lead fields, create tasks/internal notifications,
+or enqueue configured webhook events using stored authority; email execution
+stays blocked until a delivery channel exists. Rules can be enabled or disabled
+and stop at the configured loop depth. Transactional database triggers capture
+create/status events in a retrying outbox; the Worker cron emits stable task,
+ticket, appointment, and contract due events before dispatching the outbox and
+delivering claimed webhooks. AI remains
+disabled and makes no provider calls while no provider is selected and its
+budget is zero. Workspace deletion requires the exact workspace name and keeps
+a 30-day cancellation window. Execution atomically claims the due request and
+removes D1 references first; an operational ledger retries private R2 deletion
+without exposing object keys.
 
 Shared controls live in `src/components/ui`; source-derived styles live in
 `src/styles/globals.css`. Use the unified `radix-ui` package for modal, popover

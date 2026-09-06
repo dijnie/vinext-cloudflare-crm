@@ -43,7 +43,12 @@ it("preserves populated field history, conversion state and current triggers whi
     expect(retained, table).toEqual(expected);
   }
   const after = (await db.prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger'").all<{name: string; sql: string}>()).results;
-  const changed = new Set(["custom_field_type_with_values", "custom_field_value_validate_insert", "custom_field_value_validate_update", "membership_requires_reference_cleanup", "activity_compatible_anchors_insert", "activity_history_immutable"]);
+  const changed = new Set([
+    "custom_field_type_with_values", "custom_field_value_validate_insert", "custom_field_value_validate_update", "membership_requires_reference_cleanup", "activity_compatible_anchors_insert", "activity_history_immutable",
+    "membership_keep_last_owner_on_delete", "module_setting_preserve", "record_layout_delete", "deal_stage_keep_history", "lead_source_preserve", "lead_status_preserve", "crm_file_preserve_key", "lead_conversion_delete",
+    "product_category_delete", "product_delete", "product_variant_delete", "order_operation_immutable_delete", "order_payment_immutable_delete", "order_adjustment_immutable_delete", "inventory_movement_immutable_delete", "entitlement_movement_immutable_delete", "sales_order_delete", "entitlement_delete",
+    "appointment_operation_delete", "ticket_cycle_delete", "ticket_event_delete", "contract_version_delete", "contract_operation_delete",
+  ]);
   for (const old of triggers) {
     const restored = after.find(trigger => trigger.name === old.name);
     expect(restored, old.name).toBeDefined();

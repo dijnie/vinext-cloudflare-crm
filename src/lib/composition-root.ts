@@ -39,6 +39,9 @@ import { ContractDocumentService } from "@/lib/services/contracts/contract-docum
 import { ReviewService } from "@/lib/services/reviews/review-service";
 import { ReportService } from "@/lib/services/reports/report-service";
 import { ReportExportService } from "@/lib/services/exports/report-export-service";
+import { WebformService } from "@/lib/services/webforms/webform-service";
+import { IntegrationService } from "@/lib/services/integrations/integration-service";
+import { WorkspaceService } from "@/lib/services/settings/workspace-service";
 
 import { defaultSecurityLogger, type SecurityLogger } from "./http/security-logging";
 
@@ -77,6 +80,9 @@ export function createCompositionRoot(
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
   return {
+    workspace: new WorkspaceService(db, runtimeBindings.CRM_FILES),
+    integrations: new IntegrationService(db, runtimeBindings.BETTER_AUTH_SECRET),
+    webforms: new WebformService(db),
     reportExports: new ReportExportService(db),
     reports: new ReportService(db),
     reviews: new ReviewService(db),

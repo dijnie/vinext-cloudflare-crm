@@ -38,7 +38,7 @@ it("adds access profiles without rewriting existing identity, CRM, history or co
     { membership_id: "owner", profile_id: DEFAULT_PROFILE_ID },
     { membership_id: "revoked", profile_id: DEFAULT_PROFILE_ID },
   ]);
-  expect((await db.prepare("SELECT permission FROM access_grant ORDER BY permission").all<{ permission: string }>()).results.map(row => row.permission)).toEqual(PERMISSIONS.filter(permission => !permission.endsWith(".export") && !["lead","product","order","inventory","entitlement","appointment","task","ticket","contract","review","report"].some(prefix=>permission.startsWith(`${prefix}.`))).sort());
+  expect((await db.prepare("SELECT permission FROM access_grant ORDER BY permission").all<{ permission: string }>()).results.map(row => row.permission)).toEqual(PERMISSIONS.filter(permission => !permission.endsWith(".export") && !["lead","product","order","inventory","entitlement","appointment","task","ticket","contract","review","report","webform","integration","automation","segment","template","workspace","ai"].some(prefix=>permission.startsWith(`${prefix}.`))).sort());
   expect((await db.prepare("SELECT * FROM member_branch").all()).results).toEqual([]);
   expect(await db.prepare("SELECT default_branch_id FROM branch_setting WHERE id='settings'").first("default_branch_id")).toBe("default-branch");
   await db.batch([

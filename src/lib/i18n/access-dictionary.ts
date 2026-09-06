@@ -44,6 +44,7 @@ const permissions: Record<AppLocale, Record<Permission, string>> = {
     "contract.create": "Create contracts", "contract.update": "Edit contracts", "contract.archive": "Archive contracts", "contract.restore": "Restore contracts", "contract.assign": "Assign contracts", "contract.document": "Manage contract documents", "contract.export": "Export contracts",
     "review.create": "Create reviews", "review.update": "Edit reviews", "review.archive": "Archive reviews", "review.restore": "Restore reviews", "review.export": "Export reviews",
     "report.view": "View management reports", "report.export": "Export management reports",
+    "webform.manage": "Manage webforms", "integration.manage": "Manage integrations", "automation.manage": "Manage automations", "segment.manage": "Manage segments", "template.manage": "Manage email templates", "workspace.manage": "Manage workspace settings", "workspace.delete": "Schedule workspace deletion", "ai.use": "Use configured AI tools",
     "activity.create": "Create activities", "activity.update": "Edit activities", "field.configure": "Configure custom fields", "view.create": "Create saved views", "view.update": "Edit saved views", "view.delete": "Delete saved views",
   },
   vi: {
@@ -57,6 +58,7 @@ const permissions: Record<AppLocale, Record<Permission, string>> = {
     "contract.create": "Tạo hợp đồng", "contract.update": "Sửa hợp đồng", "contract.archive": "Lưu trữ hợp đồng", "contract.restore": "Khôi phục hợp đồng", "contract.assign": "Phân công hợp đồng", "contract.document": "Quản lý tài liệu hợp đồng", "contract.export": "Xuất hợp đồng",
     "review.create": "Tạo đánh giá", "review.update": "Sửa đánh giá", "review.archive": "Lưu trữ đánh giá", "review.restore": "Khôi phục đánh giá", "review.export": "Xuất đánh giá",
     "report.view": "Xem báo cáo quản trị", "report.export": "Xuất báo cáo quản trị",
+    "webform.manage": "Quản lý webform", "integration.manage": "Quản lý tích hợp", "automation.manage": "Quản lý tự động hóa", "segment.manage": "Quản lý phân khúc", "template.manage": "Quản lý mẫu email", "workspace.manage": "Quản lý cài đặt workspace", "workspace.delete": "Lên lịch xóa workspace", "ai.use": "Dùng công cụ AI đã cấu hình",
     "activity.create": "Tạo hoạt động", "activity.update": "Sửa hoạt động", "field.configure": "Cấu hình trường tùy chỉnh", "view.create": "Tạo chế độ xem", "view.update": "Sửa chế độ xem", "view.delete": "Xóa chế độ xem",
   },
 };

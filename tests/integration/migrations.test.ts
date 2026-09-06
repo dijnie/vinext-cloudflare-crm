@@ -21,6 +21,7 @@ const crmTables = [
   "exchange_rate",
   "review",
   "reporting_goal",
+  "webform_config", "webform_submission", "webform_rate_bucket", "integration_app", "integration_event", "integration_outbox", "webhook_endpoint", "email_template", "automation_rule", "automation_run", "customer_segment", "customer_segment_member", "ai_setting", "workspace_profile", "workspace_deletion_request", "workspace_deletion_object", "configuration_copy_audit", "workspace_deletion_guard",
   "saved_view",
 ];
 
@@ -52,6 +53,7 @@ describe("CRM baseline migration", () => {
       { name: "0019_scheduling_support.sql" },
       { name: "0020_contracts_reviews.sql" },
       { name: "0021_reporting_indexes.sql" },
+      { name: "0022_integration_operations.sql" },
     ]);
   });
 

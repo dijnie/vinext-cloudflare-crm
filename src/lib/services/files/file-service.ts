@@ -4,10 +4,11 @@ import type { AppDatabase } from "@/lib/db/database";
 import { crmFile } from "@/lib/db/schema";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
-import { actionGuard, permissionError, permissionPredicate, requirePermission } from "../permissions/permission-policy";
+import { actionGuard, permissionPredicate, requirePermission } from "../permissions/permission-policy";
 import { draftPredicate } from "../record-drafts/draft-service";
 import type { FileUploadInput } from "./file-contracts";
 import { readUploadBody, uploadFileName } from "./file-upload-body";
+import { storageWriteError } from "./storage-write-policy";
 
 function anchors(input: FileUploadInput, context?: RequestContext) {
   // Entity names are validated before this helper; SQL identifiers never come from request strings.
@@ -29,7 +30,7 @@ export class FileService {
     const valid = sql`(${anchors(input, context)}) AND EXISTS (SELECT 1 FROM field_configuration_revision WHERE entity=${input.entity} AND revision=${snapshot.revision})`;
     const pendingGuard = actionGuard(this.db, context, permissions, false, valid);
     try { await this.db.batch([pendingGuard.begin, this.db.insert(crmFile).values({ id, objectKey, entity: input.entity, recordId: input.recordId, fieldId: input.fieldId, uploaderId: context.userId, fileName, size: bytes.byteLength, status: "pending", createdAt }), pendingGuard.end]); }
-    catch (error) { permissionError(error); }
+    catch (error) { storageWriteError(error); }
     try {
       await this.bucket.put(objectKey, bytes, { httpMetadata: { contentType: "application/octet-stream" } });
       const guard = actionGuard(this.db, context, permissions, false, valid);
@@ -41,7 +42,7 @@ export class FileService {
       // response after committing ready must never destroy an available attachment.
       await this.db.update(crmFile).set({ status: "failed" }).where(and(eq(crmFile.id, id), eq(crmFile.status, "pending")));
       const state = await this.db.select({ status: crmFile.status }).from(crmFile).where(eq(crmFile.id, id)).get();
-      if (state && state.status !== "ready") { try { await this.bucket.delete(objectKey); } catch { /* The permanent ledger retains this key for owner cleanup. */ } }
+      if (!state || state.status !== "ready") { try { await this.bucket.delete(objectKey); } catch { /* The permanent ledger retains this key for owner cleanup. */ } }
       if (error instanceof HttpError) throw error;
       throw new HttpError(409, "conflict", "File upload could not be finalized");
     }

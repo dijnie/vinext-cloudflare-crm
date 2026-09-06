@@ -1,0 +1,10 @@
+import {env} from "cloudflare:workers";
+import {createCompositionRoot,type CompositionRoot,type RuntimeEnv} from "@/lib/composition-root";
+import {HttpError,isHttpError} from "@/lib/http/http-errors";
+import {requireRequestContext} from "@/lib/http/request-context";
+import {applySecurityHeaders} from "@/lib/http/security-headers";
+function secured(response:Response){const headers=new Headers(response.headers);headers.set("cache-control","private, no-store");applySecurityHeaders(headers);return new Response(response.body,{status:response.status,headers});}
+export const createWorkspaceLogoPutHandler=(root:CompositionRoot)=>async(request:Request)=>{const requestId=request.headers.get("cf-ray")??crypto.randomUUID();try{const context=await requireRequestContext(request.headers,root),origin=request.headers.get("origin");if(origin!==new URL(root["env"]["AUTH_BASE_URL"]).origin)throw new HttpError(403,"invalid_origin","Origin is invalid");const revision=Number(new URL(request.url).searchParams.get("revision"));if(!Number.isInteger(revision)||revision<0)throw new HttpError(400,"validation_failed","Revision is invalid");return secured(Response.json(await root.workspace.uploadLogo(context,request,revision)));}catch(error){const status=isHttpError(error)?error.status:500,code=isHttpError(error)?error.code:"internal_error";return secured(Response.json({error:{code,requestId}},{status}));}};
+export const createWorkspaceLogoGetHandler=(root:CompositionRoot)=>async(request:Request)=>{const requestId=request.headers.get("cf-ray")??crypto.randomUUID();try{return secured(await root.workspace.logo(await requireRequestContext(request.headers,root)));}catch(error){const status=isHttpError(error)?error.status:500,code=isHttpError(error)?error.code:"internal_error";return secured(Response.json({error:{code,requestId}},{status}));}};
+export function GET(request:Request){return createWorkspaceLogoGetHandler(createCompositionRoot(env as RuntimeEnv))(request);}
+export function PUT(request:Request){return createWorkspaceLogoPutHandler(createCompositionRoot(env as RuntimeEnv))(request);}

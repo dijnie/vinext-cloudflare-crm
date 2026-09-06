@@ -1,0 +1,23 @@
+import {expect,test,type APIResponse} from "@playwright/test";
+
+async function checked(response:Pick<APIResponse,"ok"|"text"|"json">){expect(response.ok(),await response.text()).toBe(true);return response.json();}
+
+test("owner operates webforms, app tokens, webhooks and private workspace settings",async({page,baseURL})=>{
+ const headers={origin:baseURL!},suffix=Date.now().toString(36),runtime=process["env"];
+ await checked(await page.request.post("/api/auth/sign-in/email",{headers,data:{email:runtime["E2E_OWNER_EMAIL"],password:runtime["E2E_OWNER_PASSWORD"]}}));
+ const owners=await checked(await page.request.get("/api/crm/owners")),ownerId=owners.rows.find((row:{email:string})=>row.email===runtime["E2E_OWNER_EMAIL"]).membershipId;
+ await page.goto("/vi/crm/settings/operations");
+ await expect(page.getByRole("heading",{name:"Tích hợp và vận hành",exact:true})).toBeVisible();
+ await page.getByPlaceholder("Tên form").fill(`Form ${suffix}`);await page.getByPlaceholder("website-leads").fill(`leads-${suffix}`);await page.getByRole("button",{name:"Tạo form",exact:true}).click();await expect(page.getByRole("status")).toContainText("Đã tạo webform.");
+ const invalid=await page.request.post(`/api/public/webforms/leads-${suffix}`,{headers:{"idempotency-key":`submission-${suffix}`,"cf-connecting-ip":"203.0.113.8"},data:{given:"Browser lead"}});expect(invalid.status()).toBe(400);
+ await page.getByPlaceholder("Tên ứng dụng").fill(`App ${suffix}`);await page.getByRole("button",{name:"Tạo",exact:true}).click();await expect(page.getByText("Chỉ hiển thị một lần",{exact:false})).toBeVisible();
+ const dashboard=await checked(await page.request.get("/api/crm/integrations")),app=dashboard.apps.find((item:{name:string})=>item.name===`App ${suffix}`);expect(app.status).toBe("active");await checked(await page.request.post("/api/crm/integrations",{headers,data:{action:"revoke-app",id:app.id,revision:app.revision}}));
+ const operational=await checked(await page.request.post("/api/crm/integrations",{headers,data:{action:"create-app",data:{name:`Operational ${suffix}`,grants:["contacts.read","leads.read","leads.create","tickets.create"]}}})),appHeaders={authorization:`Bearer ${operational.token}`};
+ expect((await page.request.get("/api/integrations/leads?limit=nope",{headers:appHeaders})).status()).toBe(400);expect((await page.request.post("/api/integrations/leads",{headers:{...appHeaders,"content-type":"application/json"},data:"{"})).status()).toBe(400);
+ const appLead=await checked(await page.request.post("/api/integrations/leads",{headers:appHeaders,data:{operationKey:`lead-${suffix}`,firstName:"API lead",sourceId:"manual"}}));expect((await checked(await page.request.get("/api/integrations/leads",{headers:appHeaders}))).rows.some((row:{id:string})=>row.id===appLead.id)).toBe(true);expect((await checked(await page.request.get("/api/integrations/contacts",{headers:appHeaders}))).rows).toEqual([]);await checked(await page.request.post("/api/integrations/tickets",{headers:appHeaders,data:{operationKey:`ticket-${suffix}`,subject:"API ticket",source:"api"}}));
+ const operationalRow=(await checked(await page.request.get("/api/crm/integrations"))).apps.find((item:{id:string})=>item.id===operational.id);await checked(await page.request.post("/api/crm/integrations",{headers,data:{action:"revoke-app",id:operational.id,revision:operationalRow.revision}}));expect((await page.request.get("/api/integrations/leads",{headers:appHeaders})).status()).toBe(401);
+ const endpoint=await checked(await page.request.post("/api/crm/integrations",{headers,data:{action:"create-endpoint",data:{name:`Hook ${suffix}`,url:"https://receiver.invalid/hooks",events:["lead.created"]}}}));const refreshed=await checked(await page.request.get("/api/crm/integrations")),endpointRow=refreshed.endpoints.find((item:{id:string})=>item.id===endpoint.id);await checked(await page.request.post("/api/crm/integrations",{headers,data:{action:"disable-endpoint",id:endpoint.id,revision:endpointRow.revision}}));
+ await checked(await page.request.post("/api/crm/integrations",{headers,data:{action:"create-automation",data:{name:`Assign ${suffix}`,eventType:"lead.received",condition:{field:"source",equals:"website"},action:{type:"set-lead-owner",leadIdField:"leadId",membershipId:ownerId},enabled:true,maxDepth:3}}}));
+ const workspace=await checked(await page.request.get("/api/crm/workspace"));expect(workspace.deletionImpact).toBeTruthy();expect(workspace.profile.hasLogo).toBe(false);
+ await page.setViewportSize({width:375,height:812});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

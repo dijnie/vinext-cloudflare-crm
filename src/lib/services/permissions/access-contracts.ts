@@ -15,6 +15,7 @@ export const PERMISSIONS = [
   "contract.create", "contract.update", "contract.archive", "contract.restore", "contract.assign", "contract.document", "contract.export",
   "review.create", "review.update", "review.archive", "review.restore", "review.export",
   "report.view", "report.export",
+  "webform.manage", "integration.manage", "automation.manage", "segment.manage", "template.manage", "workspace.manage", "workspace.delete", "ai.use",
   "activity.create", "activity.update", "field.configure", "view.create", "view.update", "view.delete",
 ] as const;
 export type Permission = typeof PERMISSIONS[number];
@@ -22,6 +23,7 @@ const OWNER_ONLY_OPERATION_PERMISSIONS = new Set<Permission>([
   "order.collect", "order.refund", "order.adjust", "order.backdate",
   "inventory.configure", "inventory.adjust", "inventory.return",
   "entitlement.use", "entitlement.restore",
+  "webform.manage", "integration.manage", "automation.manage", "segment.manage", "template.manage", "workspace.manage", "workspace.delete", "ai.use",
 ]);
 export const DEFAULT_MEMBER_GRANTS = PERMISSIONS.filter(permission =>
   !permission.endsWith(".export") && !OWNER_ONLY_OPERATION_PERMISSIONS.has(permission)

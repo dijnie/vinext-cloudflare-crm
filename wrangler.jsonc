@@ -28,6 +28,7 @@
     }
   },
   "upload_source_maps": true,
+  "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "AUTH_EMAIL_FROM": "noreply@dijnie.dev"
   },
