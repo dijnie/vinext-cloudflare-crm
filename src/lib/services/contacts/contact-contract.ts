@@ -40,6 +40,8 @@ export const contactCreateInputSchema = z
     email: z.union([z.email(), z.literal("")]).optional(),
     phone: z.string().trim().max(80).optional(),
     title: z.string().trim().max(160).optional(),
+    birthDate: z.union([z.iso.date(), z.literal("")]).optional(),
+    gender: z.enum(["female", "male", "nonbinary", "other", "undisclosed"]).optional(),
     companyId: stableIdSchema.nullable().optional(),
     ownerMembershipId: membershipIdSchema.nullable().optional(),
   })
@@ -56,6 +58,8 @@ export const contactUpdateInputSchema = z
         email: z.union([z.email(), z.literal(""), z.null()]).optional(),
         phone: nullableText.optional(),
         title: nullableText.optional(),
+        birthDate: z.iso.date().nullable().optional(),
+        gender: z.enum(["female", "male", "nonbinary", "other", "undisclosed"]).nullable().optional(),
         companyId: stableIdSchema.nullable().optional(),
         ownerMembershipId: membershipIdSchema.nullable().optional(),
       })
@@ -98,6 +102,8 @@ const contactListRowOutputSchema = z.object({
   email: z.string().nullable(),
   phone: z.string().nullable(),
   title: z.string().nullable(),
+  birthDate: z.iso.date().nullable(),
+  gender: z.enum(["female", "male", "nonbinary", "other", "undisclosed"]).nullable(),
   companyId: stableIdSchema.nullable(),
   company: companyReferenceSchema.nullable(),
   ownerMembershipId: membershipIdSchema.nullable(),

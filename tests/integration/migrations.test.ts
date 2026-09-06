@@ -20,6 +20,7 @@ const crmTables = [
   "deal_stage",
   "exchange_rate",
   "review",
+  "reporting_goal",
   "saved_view",
 ];
 
@@ -50,6 +51,7 @@ describe("CRM baseline migration", () => {
       { name: "0018_order_ledger.sql" },
       { name: "0019_scheduling_support.sql" },
       { name: "0020_contracts_reviews.sql" },
+      { name: "0021_reporting_indexes.sql" },
     ]);
   });
 

@@ -100,6 +100,8 @@ export class ContactService {
         phone: blankToNull(input.phone) ?? null,
         normalizedPhone: normalizeLeadPhone(input.phone),
         title: blankToNull(input.title) ?? null,
+        birthDate: blankToNull(input.birthDate) ?? null,
+        gender: input.gender ?? null,
         companyId: input.companyId ?? null,
         ownerMembershipId: input.ownerMembershipId ?? null,
         createdAt: now,
@@ -134,6 +136,8 @@ export class ContactService {
     if (input.email !== undefined) values.email = normalizeEmail(input.email);
     if (input.phone !== undefined) { values.phone = blankToNull(input.phone); values.normalizedPhone = normalizeLeadPhone(input.phone); }
     if (input.title !== undefined) values.title = blankToNull(input.title);
+    if (input.birthDate !== undefined) values.birthDate = input.birthDate;
+    if (input.gender !== undefined) values.gender = input.gender;
     if (input.companyId !== undefined) values.companyId = input.companyId;
     if (input.ownerMembershipId !== undefined)
       values.ownerMembershipId = input.ownerMembershipId;

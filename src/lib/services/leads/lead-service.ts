@@ -73,7 +73,7 @@ export class LeadService {
     if (!email && !phone) return { leads: [], contacts: [] };
     const leads = await this.db.select().from(lead).where(and(permissionPredicate(context), isNull(lead.archivedAt), input.excludeLeadId ? sql`${lead.id} != ${input.excludeLeadId}` : undefined, or(email ? eq(lead.normalizedEmail, email) : undefined, phone ? eq(lead.normalizedPhone, phone) : undefined))).orderBy(lead.id).limit(20);
     const contacts = await this.db.select().from(contact).where(and(permissionPredicate(context), isNull(contact.archivedAt), or(email ? eq(contact.email, email) : undefined, phone ? eq(contact.normalizedPhone, phone) : undefined))).orderBy(contact.id).limit(20);
-    const serialize = (row: typeof contacts[number]) => ({ id: row.id, firstName: row.firstName, lastName: row.lastName, email: row.email, phone: row.phone, reasons: [...(email && row.email === email ? ["email" as const] : []), ...(phone && row.normalizedPhone === phone ? ["phone" as const] : [])] });
+    const serialize = (row: { id: string; firstName: string; lastName: string | null; email: string | null; phone: string | null; normalizedPhone: string | null }) => ({ id: row.id, firstName: row.firstName, lastName: row.lastName, email: row.email, phone: row.phone, reasons: [...(email && row.email === email ? ["email" as const] : []), ...(phone && row.normalizedPhone === phone ? ["phone" as const] : [])] });
     return { leads: leads.map(serialize), contacts: contacts.map(serialize) };
   }
   private async validate(input: Partial<LeadCreateInput> | LeadUpdateData, existing?: typeof lead.$inferSelect) {

@@ -22,6 +22,7 @@ member settings, and guarded lead, company, contact, deal, and catalog APIs.
 - 🏢 Localized lead, company, contact, deal, and catalog lists with stable record sheets
 - 📝 Manual activities, tasks, deal stage history, and record ownership
 - 🧩 Custom fields and private/shared saved list views
+- 📊 Reconciled sales, customer, lead, task, and ticket reports with guarded Excel export
 - 🔗 Guarded lead, company, contact, deal, and catalog APIs with archive/restore workflows
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
@@ -41,6 +42,15 @@ and an actions menu for full editing and archive/restore. The dashboard includes
 charts and compact money labels with exact values available to assistive
 technology and through the label tooltip. Vietnamese/English, password auth,
 permissions and the existing D1 APIs remain the application contracts.
+
+The report workspace at `/{locale}/{workspaceSlug}/reports` uses the configured
+business timezone and reporting currency. Personal, company-wide, member, and
+branch scopes share the same filters and KPI definitions with Excel export.
+Completed-order value excludes tax; collections, refunds, adjustments, frozen
+cost coverage, receivables, repeat purchase, lead cohorts, and reopened work
+cycles retain their separate business dates. Missing costs are shown as missing
+instead of zero. Report viewing and exporting are separate profile permissions;
+owners can set workspace, member, or branch goals.
 
 Shared controls live in `src/components/ui`; source-derived styles live in
 `src/styles/globals.css`. Use the unified `radix-ui` package for modal, popover
@@ -252,7 +262,8 @@ shared UI primitives in `src/components/ui`.
 The shared layout follows the Cloudflare CRM reference: `src/lib/auth`, `db`,
 `email`, `http`, `i18n`, and `listing` hold infrastructure and list contracts.
 Business services live under `src/lib/services`, grouped into activities,
-catalog, companies, contacts, conversions, currencies, custom-fields, dashboard, deals, leads, members,
+catalog, companies, contacts, contracts, conversions, currencies, custom-fields,
+dashboard, deals, exports, leads, members, orders, reports, reviews, scheduling,
 saved-views, and shared helpers. `src/lib/composition-root.ts` wires the services.
 Vinext routing and runtime conventions remain unchanged.
 

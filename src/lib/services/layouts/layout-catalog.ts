@@ -24,9 +24,9 @@ export const DEFAULT_LAYOUT_KEYS: Record<FieldEntity, Record<LayoutSurface, read
     detail: ["description", "name", "domain", "website", "industry", "city", "countryCode", "phone", "email", "ownerMembershipId", "createdAt", "updatedAt"],
   },
   contact: {
-    create: ["firstName", "lastName", "email", "phone", "title", "companyId", "ownerMembershipId"],
-    edit: ["firstName", "lastName", "email", "phone", "title", "companyId", "ownerMembershipId"],
-    detail: ["companyId", "firstName", "lastName", "email", "phone", "title", "ownerMembershipId", "createdAt", "updatedAt"],
+    create: ["firstName", "lastName", "email", "phone", "title", "birthDate", "gender", "companyId", "ownerMembershipId"],
+    edit: ["firstName", "lastName", "email", "phone", "title", "birthDate", "gender", "companyId", "ownerMembershipId"],
+    detail: ["companyId", "firstName", "lastName", "email", "phone", "title", "birthDate", "gender", "ownerMembershipId", "createdAt", "updatedAt"],
   },
   deal: {
     create: ["name", "companyId", "ownerMembershipId", "stageId", "amountMinor", "currency", "expectedCloseAt"],

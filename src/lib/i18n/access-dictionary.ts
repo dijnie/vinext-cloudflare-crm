@@ -43,6 +43,7 @@ const permissions: Record<AppLocale, Record<Permission, string>> = {
     "deal.create": "Create deals", "deal.update": "Edit deals", "deal.archive": "Archive deals", "deal.restore": "Restore deals", "deal.assign": "Assign deals", "deal.export": "Export deals",
     "contract.create": "Create contracts", "contract.update": "Edit contracts", "contract.archive": "Archive contracts", "contract.restore": "Restore contracts", "contract.assign": "Assign contracts", "contract.document": "Manage contract documents", "contract.export": "Export contracts",
     "review.create": "Create reviews", "review.update": "Edit reviews", "review.archive": "Archive reviews", "review.restore": "Restore reviews", "review.export": "Export reviews",
+    "report.view": "View management reports", "report.export": "Export management reports",
     "activity.create": "Create activities", "activity.update": "Edit activities", "field.configure": "Configure custom fields", "view.create": "Create saved views", "view.update": "Edit saved views", "view.delete": "Delete saved views",
   },
   vi: {
@@ -55,6 +56,7 @@ const permissions: Record<AppLocale, Record<Permission, string>> = {
     "deal.create": "Tạo cơ hội", "deal.update": "Sửa cơ hội", "deal.archive": "Lưu trữ cơ hội", "deal.restore": "Khôi phục cơ hội", "deal.assign": "Phân công cơ hội", "deal.export": "Xuất cơ hội",
     "contract.create": "Tạo hợp đồng", "contract.update": "Sửa hợp đồng", "contract.archive": "Lưu trữ hợp đồng", "contract.restore": "Khôi phục hợp đồng", "contract.assign": "Phân công hợp đồng", "contract.document": "Quản lý tài liệu hợp đồng", "contract.export": "Xuất hợp đồng",
     "review.create": "Tạo đánh giá", "review.update": "Sửa đánh giá", "review.archive": "Lưu trữ đánh giá", "review.restore": "Khôi phục đánh giá", "review.export": "Xuất đánh giá",
+    "report.view": "Xem báo cáo quản trị", "report.export": "Xuất báo cáo quản trị",
     "activity.create": "Tạo hoạt động", "activity.update": "Sửa hoạt động", "field.configure": "Cấu hình trường tùy chỉnh", "view.create": "Tạo chế độ xem", "view.update": "Sửa chế độ xem", "view.delete": "Xóa chế độ xem",
   },
 };

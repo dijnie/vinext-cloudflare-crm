@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   "ticket.create", "ticket.update", "ticket.respond", "ticket.resolve", "ticket.reopen", "ticket.assign",
   "contract.create", "contract.update", "contract.archive", "contract.restore", "contract.assign", "contract.document", "contract.export",
   "review.create", "review.update", "review.archive", "review.restore", "review.export",
+  "report.view", "report.export",
   "activity.create", "activity.update", "field.configure", "view.create", "view.update", "view.delete",
 ] as const;
 export type Permission = typeof PERMISSIONS[number];

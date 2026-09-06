@@ -37,6 +37,8 @@ import { NotificationService } from "@/lib/services/notifications/notification-s
 import { ContractService } from "@/lib/services/contracts/contract-service";
 import { ContractDocumentService } from "@/lib/services/contracts/contract-document-service";
 import { ReviewService } from "@/lib/services/reviews/review-service";
+import { ReportService } from "@/lib/services/reports/report-service";
+import { ReportExportService } from "@/lib/services/exports/report-export-service";
 
 import { defaultSecurityLogger, type SecurityLogger } from "./http/security-logging";
 
@@ -75,6 +77,8 @@ export function createCompositionRoot(
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
   return {
+    reportExports: new ReportExportService(db),
+    reports: new ReportService(db),
     reviews: new ReviewService(db),
     contractDocuments: new ContractDocumentService(db, runtimeBindings.CRM_FILES),
     contracts: new ContractService(db),

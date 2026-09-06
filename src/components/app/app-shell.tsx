@@ -43,6 +43,8 @@ import { useModules } from "./module-provider";
 import { ShellLogo } from "./shell-logo";
 import { NotificationCenter } from "./scheduling/notification-center";
 import { Calendar, Task, Ticket, Document, Star } from "@carbon/icons-react";
+import Report from "@carbon/icons-react/es/Report";
+import { getReportDictionary } from "@/lib/i18n/report-dictionary";
 
 export function AppShell({ children, dictionary, locale, role, slug, user }: {
   children: ReactNode; dictionary: AppDictionary; locale: AppLocale; role: "owner" | "member"; slug: string;
@@ -71,6 +73,7 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
     { href: `${base}/deals`, label: `${crm.deal}${modules.isEnabled("deal") ? "" : ` · ${modules.labels.disabled}`}`,  icon: Partnership },
     { href: `${base}/contracts`, label: `${getB2bDictionary(locale).contracts}${modules.isEnabled("contract") ? "" : ` · ${modules.labels.disabled}`}`, icon: Document },
     { href: `${base}/reviews`, label: `${getB2bDictionary(locale).reviews}${modules.isEnabled("review") ? "" : ` · ${modules.labels.disabled}`}`, icon: Star },
+    { href: `${base}/reports`, label: getReportDictionary(locale).title, icon: Report },
     { href: settings[0].href, match: `${base}/settings`, label: copy.settings, icon: Settings },
   ];
   const inSettings = pathname.startsWith(`${base}/settings`);
