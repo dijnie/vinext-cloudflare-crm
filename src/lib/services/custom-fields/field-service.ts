@@ -11,6 +11,8 @@ import { formulaEvaluator, validateFormulaGraph } from "./field-formula";
 import { fieldConfig, storedFieldValue } from "./field-storage";
 import { moneyFieldValueSchema, fieldConfigSchema, type FieldConfig } from "./field-contracts";
 import { FieldRepository, recordColumn } from "./field-repository";
+import { FieldConversionService } from "./field-conversion-service";
+import type { FieldType } from "./field-contracts";
 
 function invalid(message: string): never { throw new HttpError(400, "validation_failed", message); }
 function conflict(message: string): never { throw new HttpError(409, "conflict", message); }
@@ -36,6 +38,8 @@ export class FieldService {
   private serialize(row: DefinitionRow, options: OptionRow[]): FieldDefinition { return { id: row.id, entity: row.entity, key: row.key, label: row.label, type: row.type, config: fieldConfig(row.configJson), required: row.required, showOnSheet: row.showOnSheet, showOnTable: row.showOnTable, showOnFilter: row.showOnFilter, position: row.position, archivedAt: row.archivedAt?.toISOString() ?? null, options: options.filter(item => item.fieldId === row.id).map(item => ({ id: item.id, label: item.label, position: item.position, archivedAt: item.archivedAt?.toISOString() ?? null })) }; }
   async list(context: RequestContext, input: { entity: FieldEntity; includeArchived?: boolean }) { await this.guard(context); const rows = await this.repository.list(input.entity, input.includeArchived); const options = await this.repository.options(rows.map(row => row.id)); return rows.map(row => this.serialize(row, options)); }
   async byId(context: RequestContext, id: string) { await this.guard(context); const row = await this.existing(id); return this.serialize(row, await this.repository.options([id])); }
+  previewConversion(context: RequestContext, id: string, type: FieldType, config: FieldConfig) { return new FieldConversionService(this.db).preview(context, id, type, config); }
+  async applyConversion(context: RequestContext, id: string, token: string) { await new FieldConversionService(this.db).apply(context, id, token); return this.byId(context, id); }
   private configurationGuard(entity: FieldEntity, revision: number) {
     const id = crypto.randomUUID();
     return {
@@ -74,6 +78,7 @@ export class FieldService {
     if (!row) throw new HttpError(404, "not_found", "Field not found");
     const existing = await this.repository.options([id]);
     const type = input.type ?? row.type;
+    if (row.type === "formula" && type !== row.type) conflict("Computed fields cannot be converted to stored inputs");
     const config = input.config ?? (type === row.type ? fieldConfig(row.configJson) : {});
     this.validateConfig(type, config);
     if (type === "formula" && (input.required ?? row.required)) invalid("Computed fields cannot be required inputs");

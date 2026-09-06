@@ -456,6 +456,29 @@ export const crmSetting = sqliteTable(
   ],
 );
 
+export const fieldValueRevision = sqliteTable("field_value_revision", {
+  fieldId: text("field_id").primaryKey().references(() => customFieldDefinition.id, { onDelete: "cascade" }),
+  revision: integer("revision").notNull().default(0),
+});
+
+export const fieldConversionPreview = sqliteTable("field_conversion_preview", {
+  id: text("id").primaryKey(),
+  fieldId: text("field_id").notNull().references(() => customFieldDefinition.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  sourceType: text("source_type").notNull(),
+  targetType: text("target_type").notNull(),
+  configJson: text("config_json").notNull(),
+  configurationRevision: integer("configuration_revision").notNull(),
+  valueRevision: integer("value_revision").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, table => [uniqueIndex("field_conversion_preview_owner_idx").on(table.fieldId, table.userId), index("field_conversion_preview_expiry_idx").on(table.expiresAt), check("field_conversion_preview_json_check", sql`json_valid(${table.configJson})`)]);
+
+export const fieldConversionGuard = sqliteTable("field_conversion_guard", {
+  fieldId: text("field_id").primaryKey().references(() => customFieldDefinition.id, { onDelete: "cascade" }),
+  sourceType: text("source_type").notNull(),
+  targetType: text("target_type").notNull(),
+});
+
 export const currencyJob = sqliteTable("currency_job", {
   id: text("id").primaryKey(),
   kind: text("kind", { enum: ["rerate", "fill_missing"] }).notNull(),

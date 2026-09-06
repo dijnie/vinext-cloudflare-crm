@@ -368,8 +368,8 @@ Customer-linked records must be archived rather than hard-deleted while referenc
 These values extend the existing field definition/value tables without replacing
 IDs, timestamps, tombstones, options, user references or saved views. Member and
 customer names are returned in separate label maps. Multiselect and customer
-filters share list/count/facet predicates. File, conversion previews,
-module lifecycle and configurable layouts remain work in the active rebuild plan.
+filters share list/count/facet predicates. File, module lifecycle and configurable
+layouts remain work in the active rebuild plan.
 
 Formula fields compute numeric results at read time and never accept direct value
 writes or required-input settings. Expressions support arithmetic, parentheses,
@@ -385,3 +385,17 @@ the dependency graph, so restoring a field cannot reactivate a latent cycle.
 The [SQL expression compiler](src/lib/services/custom-fields/formula-query.ts)
 uses the same parsed operators for computed-value coverage; field keys and user
 expressions never become raw SQL syntax.
+
+The field menu provides conversion previews for text-like types, number/rating,
+select/multiselect and text-like/multivalue. Conversion preserves exact values,
+record/value IDs, timestamps and historical option identities. It rejects lossy
+changes (including multiple values becoming one, empty-array collapse and invalid
+target formats), unsupported pairs and computed-value materialization. Archived
+definitions must be restored before conversion; archived records are included.
+
+`POST /api/crm/fields/{id}/conversion` accepts `{ action: "preview", type, config }`
+and returns counts, rejection reasons and an actor-bound token when safe. Apply
+with `{ action: "apply", token }` within fifteen minutes. Data, definition or option
+changes invalidate the preview; permissions are checked again inside the atomic
+application batch. A conflict requires a new preview. The supported transformations
+are owned by [conversion rules](src/lib/services/custom-fields/field-conversion-values.ts).
