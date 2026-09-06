@@ -2,12 +2,13 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
 
+import "@fontsource-variable/geist";
 import "@/styles/globals.css";
 
 const themeScript = `
   const getThemePreference = () => {
-    if (typeof localStorage !== "undefined" && localStorage.getItem("theme")) {
-      return localStorage.getItem("theme");
+    if (typeof localStorage !== "undefined" && localStorage.getItem("crm-theme")) {
+      return localStorage.getItem("crm-theme");
     }
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   };
@@ -17,7 +18,7 @@ const themeScript = `
   if (typeof localStorage !== "undefined") {
     const observer = new MutationObserver(() => {
       const isDark = document.documentElement.classList.contains("dark");
-      localStorage.setItem("theme", isDark ? "dark" : "light");
+      localStorage.setItem("crm-theme", isDark ? "dark" : "light");
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
   }

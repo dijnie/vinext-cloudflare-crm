@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import OverflowMenuHorizontal from "@carbon/icons-react/es/OverflowMenuHorizontal";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { AppDictionary } from "@/lib/i18n/dictionary";
 
 export interface MemberView {
@@ -43,15 +45,14 @@ export function MemberActions({ currentMembershipId, dictionary, member, members
     router.refresh();
   }
 
-  if (member.status === "revoked") return <div><Button disabled={pending} onClick={() => mutate("PATCH", { action: "restore" })} size="sm" type="button" variant="outline">{pending ? dictionary.common.loading : dictionary.members.restore}</Button>{message ? <p aria-live="polite" className="mt-2 text-xs">{message}</p> : null}</div>;
-
-  return <div className="flex min-w-max items-center gap-2">
-    <Button disabled={pending} onClick={() => mutate("PATCH", { action: "change-role", role: member.role === "owner" ? "member" : "owner" })} size="sm" type="button" variant="outline">{member.role === "owner" ? dictionary.members.makeMember : dictionary.members.makeOwner}</Button>
+  return <div className="flex items-center gap-2">
+    <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={pending} aria-label={`${dictionary.members.actions}: ${member.name}`}><OverflowMenuHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
+      {member.status === "revoked" ? <DropdownMenuItem onSelect={() => void mutate("PATCH", { action: "restore" })}>{dictionary.members.restore}</DropdownMenuItem> : <><DropdownMenuItem onSelect={() => void mutate("PATCH", { action: "change-role", role: member.role === "owner" ? "member" : "owner" })}>{member.role === "owner" ? dictionary.members.makeMember : dictionary.members.makeOwner}</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive" onSelect={() => { setMessage(null); setReplacement(""); setOpen(true); }}>{dictionary.members.remove}</DropdownMenuItem></>}
+    </DropdownMenuContent></DropdownMenu>
     <Dialog onOpenChange={(value) => { setOpen(value); if (value) { setMessage(null); setReplacement(""); } }} open={open}>
-      <DialogTrigger asChild><Button disabled={pending} size="sm" type="button" variant="destructive">{dictionary.members.remove}</Button></DialogTrigger>
       <DialogContent closeLabel={dictionary.common.close}>
         <DialogHeader><DialogTitle>{dictionary.members.removeTitle}</DialogTitle><DialogDescription>{dictionary.members.removeDescription}</DialogDescription></DialogHeader>
-        <div className="space-y-2"><label className="text-sm font-medium" htmlFor={`replacement-${member.membershipId}`}>{dictionary.members.replacement}</label><select className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" id={`replacement-${member.membershipId}`} onChange={(event) => setReplacement(event.target.value)} required value={replacement}><option disabled value="">—</option>{!selfRemoval ? <option value="__none">{dictionary.members.noReplacement}</option> : null}{candidates.map((candidate) => <option key={candidate.membershipId} value={candidate.membershipId}>{candidate.name} ({candidate.email})</option>)}</select></div>
+        <div className="space-y-2"><label className="text-sm font-medium" htmlFor={`replacement-${member.membershipId}`}>{dictionary.members.replacement}</label><select className="flex h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs" id={`replacement-${member.membershipId}`} onChange={(event) => setReplacement(event.target.value)} required value={replacement}><option disabled value="">—</option>{!selfRemoval ? <option value="__none">{dictionary.members.noReplacement}</option> : null}{candidates.map((candidate) => <option key={candidate.membershipId} value={candidate.membershipId}>{candidate.name} ({candidate.email})</option>)}</select></div>
         {message ? <p aria-live="assertive" className="text-sm text-destructive" role="alert">{message}</p> : null}
         {selfRemovalBlocked ? <p className="text-sm text-destructive" role="alert">{dictionary.members.lastOwner}</p> : null}
         <DialogFooter><DialogClose asChild><Button type="button" variant="outline">{dictionary.common.cancel}</Button></DialogClose><Button disabled={pending || !replacement || selfRemovalBlocked} onClick={() => mutate("DELETE", { replacementMembershipId: replacement === "__none" ? null : replacement })} type="button" variant="destructive">{pending ? dictionary.common.loading : dictionary.members.remove}</Button></DialogFooter>

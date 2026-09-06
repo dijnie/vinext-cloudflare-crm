@@ -3,6 +3,7 @@ import { formatMinor } from "../../src/lib/services/currencies/currency-catalog"
 import type { CurrencySettings } from "../../src/lib/services/currencies/currency-contracts";
 import type { DashboardSummaryData } from "../../src/lib/services/dashboard/dashboard-contracts";
 import { getCurrencyDictionary } from "../../src/lib/i18n/currency-dictionary";
+import { getShellInterfaceDictionary } from "../../src/lib/i18n/shell-interface-dictionary";
 import { getCrmDictionary } from "../../src/lib/i18n/crm-dictionary";
 
 test.use({ actionTimeout: 10_000 });
@@ -34,22 +35,24 @@ test.beforeEach(async ({ context }) => { await finish(); if ((await settings()).
 test.afterAll(async () => { await api?.dispose(); await member?.dispose(); });
 
 for (const locale of ["vi", "en"] as const) {
-  const labels = getCurrencyDictionary(locale); const crm = getCrmDictionary(locale);
+  const labels = getCurrencyDictionary(locale); const copy = getShellInterfaceDictionary(locale); const crm = getCrmDictionary(locale);
   test(`${locale}: dashboard scope exact money exclusions stable links and mobile`, async ({ page }) => {
     await page.goto(`/${locale}/crm`);
-    await expect(page.getByRole("heading", { name: labels.dashboard, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: copy.welcome, exact: true })).toBeVisible();
     await expect(page.locator("[aria-busy]").first()).toHaveAttribute("aria-busy", "false");
     const mine: DashboardSummaryData = await (await api.get("/api/crm/dashboard?scope=me")).json();
-    const pipeline = page.locator("section").filter({ has: page.getByRole("heading", { name: labels.pipeline, exact: true }) }).first();
-    await expect(pipeline).toContainText(formatMinor(mine.pipeline.totalMinor, "USD", locale));
+    const pipeline = page.locator("[data-slot=stat-card]").filter({ hasText: labels.pipeline });
+    await expect(pipeline.getByLabel(formatMinor(mine.pipeline.totalMinor, "USD", locale), { exact: true })).toBeVisible();
     await expect(page.getByText(labels.excluded, { exact: false })).toContainText("CHF");
     await expect(page.getByText("Currency overdue follow-up", { exact: true }).first()).toBeVisible();
-    await expect(page.getByRole("table").locator("tbody tr")).toHaveCount(6);
-    await page.getByLabel(labels.scope, { exact: true }).selectOption("everyone");
+    await page.getByText(copy.chartData, { exact: true }).click();
+    await expect(page.locator("details table tbody tr")).toHaveCount(6);
+    await page.getByRole("radiogroup", { name: labels.scope, exact: true }).getByRole("radio", { name: labels.everyone, exact: true }).click();
     await expect.poll(() => new URL(page.url()).searchParams.get("scope")).toBe("everyone");
     const everyone: DashboardSummaryData = await (await api.get("/api/crm/dashboard?scope=everyone")).json();
     expect(BigInt(everyone.pipeline.totalMinor) - BigInt(mine.pipeline.totalMinor)).toBe(8000n);
-    await expect(pipeline).toContainText(formatMinor(everyone.pipeline.totalMinor, "USD", locale));
+    await expect(pipeline.getByLabel(formatMinor(everyone.pipeline.totalMinor, "USD", locale), { exact: true })).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath(`${locale}-dashboard-desktop.png`), fullPage: true });
     await page.getByRole("link", { name: mainDealName, exact: true }).first().click();
     await expect(page.getByRole("dialog")).toBeVisible();
     expect(new URL(page.url()).searchParams.get("scope")).toBe("everyone");
@@ -57,15 +60,17 @@ for (const locale of ["vi", "en"] as const) {
     await page.reload(); await expect(page.getByRole("dialog")).toBeVisible(); await page.keyboard.press("Escape");
     await page.setViewportSize({ width: 375, height: 812 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await expect(page.getByRole("heading", { name: labels.dashboard, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: copy.welcome, exact: true })).toBeVisible();
   });
 
   test(`${locale}: manual rates bounded resume cancel and reporting change`, async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto(`/${locale}/crm/settings/currencies`);
-    await page.getByLabel(labels.base, { exact: true }).selectOption("EUR");
+    await page.getByRole("combobox", { name: labels.base, exact: true }).click();
+    await page.getByRole("option", { name: "EUR", exact: true }).click();
     await expect(page.locator("#main-content [aria-busy]")).toHaveAttribute("aria-busy", "false");
-    await page.getByLabel(labels.currency, { exact: true }).selectOption("USD");
+    await page.getByRole("combobox", { name: labels.currency, exact: true }).click();
+    await page.getByRole("option", { name: "USD", exact: true }).click();
     await page.getByLabel(labels.rate, { exact: true }).fill("0.9");
     await page.getByRole("button", { name: labels.addRate, exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: labels.saved })).toBeVisible();
@@ -78,14 +83,15 @@ for (const locale of ["vi", "en"] as const) {
     await expect(page.getByRole("button", { name: labels.resume, exact: true })).toBeVisible();
     await expect(page.getByText(labels.blocked, { exact: true })).toBeVisible();
     expect((await api.post("/api/crm/deals", { data: { name: "Blocked money write", companyId, ownerMembershipId: ownerId } })).status()).toBe(409);
-    page.once("dialog", dialog => dialog.accept());
     await page.getByRole("button", { name: labels.cancelJob, exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: labels.cancelJob, exact: true }).click();
     await expect(page.getByRole("button", { name: labels.cancelJob, exact: true })).toHaveCount(0);
     expect((await settings()).reportingCurrency).toBe("USD");
-    await page.getByLabel(labels.reporting, { exact: true }).selectOption("EUR");
-    page.once("dialog", dialog => dialog.accept());
+    await page.getByRole("combobox", { name: labels.reporting, exact: true }).click();
+    await page.getByRole("option", { name: "EUR", exact: true }).click();
     await page.getByRole("button", { name: labels.change, exact: true }).click();
-    await expect(page.getByRole("heading", { name: `${labels.current}: EUR`, exact: true })).toBeVisible();
+    await page.getByRole("dialog").getByRole("button", { name: labels.change, exact: true }).click();
+    await expect(page.getByText(labels.current, { exact: true }).locator("..").locator("p").last()).toHaveText("EUR");
     expect((await settings()).job).toBeNull();
     await page.setViewportSize({ width: 375, height: 812 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -99,8 +105,9 @@ for (const locale of ["vi", "en"] as const) {
     await expect(page.getByRole("button", { name: labels.change, exact: true })).toHaveCount(0);
     expect((await member.patch("/api/crm/currency", { data: { action: "set_manual_rate", baseCurrency: "USD", currency: "CHF", rate: "2" } })).status()).toBe(403);
     await page.goto(`/${locale}/crm?scope=everyone`);
-    await expect(page.getByRole("heading", { name: labels.dashboard, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: copy.welcome, exact: true })).toBeVisible();
     await page.getByRole("link", { name: mainDealName, exact: true }).first().click();
-    await expect(page.getByRole("dialog").getByRole("button", { name: crm.edit, exact: true })).toBeVisible();
+    await page.getByRole("dialog").getByRole("button", { name: locale === "vi" ? "Thao tác" : "More actions", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: crm.edit, exact: true })).toBeVisible();
   });
 }

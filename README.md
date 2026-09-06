@@ -28,6 +28,25 @@ member settings, and guarded company, contact, and deal APIs.
 - ✨ Clean, responsive interface
 - 🔍 Data validation with Zod
 
+## Interface
+
+The existing CRM screens use the original CRM's Geist typography, Carbon icons,
+design tokens and Radix controls. Desktop navigation uses a compact icon rail;
+Members and Currencies are inside Settings. The account menu contains theme
+switching and sign-out. Mobile navigation opens a labeled drawer.
+
+List search updates after typing; filters, sorting, columns and saved views use
+menus. Record sheets support inline property edits, related-record navigation,
+and an actions menu for full editing and archive/restore. The dashboard includes
+charts and compact money labels with exact values available to assistive
+technology and through the label tooltip. Vietnamese/English, password auth,
+permissions and the existing D1 APIs remain the application contracts.
+
+Shared controls live in `src/components/ui`; source-derived styles live in
+`src/styles/globals.css`. Use the unified `radix-ui` package for modal, popover
+and select controls so their focus scopes share one runtime. Source component
+attribution is in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+
 ## Tech Stack
 
 - Frontend: [Vinext](https://github.com/cloudflare/vinext)

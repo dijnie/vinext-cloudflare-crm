@@ -1,4 +1,4 @@
-import { expect, request, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, request, test, type APIRequestContext, type Page, type Locator } from "@playwright/test";
 import { FIELD_TYPES, type FieldDefinition } from "../../src/lib/services/custom-fields/field-contracts";
 import { getCrmDictionary } from "../../src/lib/i18n/crm-dictionary";
 
@@ -7,6 +7,9 @@ let api: APIRequestContext;
 let member: APIRequestContext;
 let ownerId: string;
 let memberId: string;
+async function pick(page: Page, trigger: Locator, value: string) { await trigger.click(); await page.locator(`[role="option"][data-value="${value}"]`).click(); }
+async function fieldAction(page: Page, row: Locator, action: string) { await row.getByRole("button").last().click(); await page.getByRole("menuitem", { name: action, exact: true }).click(); }
+
 const paths = { company: "companies", contact: "contacts", deal: "deals" } as const;
 test.beforeAll(async ({ baseURL }) => {
   async function signIn(role: "OWNER" | "MEMBER") {
@@ -47,7 +50,7 @@ for (const locale of ["vi", "en"] as const) {
         const value = values[field.type]; expected[field.key] = value;
         if (["select", "user", "checkbox"].includes(field.type)) {
           if (field.type === "user") await expect(input).toHaveAttribute("aria-busy", "false");
-          await input.selectOption(String(value));
+          await pick(page, input, String(value));
         } else await input.fill(String(value));
       }
       await dialog.getByRole("button", { name: labels.save, exact: true }).click();
@@ -55,7 +58,11 @@ for (const locale of ["vi", "en"] as const) {
       const stored = await (await api.get(`/api/crm/fields/values?entity=${entity}&recordId=${record.id}`)).json();
       expect(stored).toMatchObject(Object.fromEntries(definitions.map(field => [field.key, field.type === "date" ? `${expected[field.key]}T00:00:00.000Z` : expected[field.key]])));
       await page.reload();
-      for (const field of definitions) await expect(dialog.locator(`#custom-${field.id}`)).toHaveValue(String(expected[field.key]));
+      for (const field of definitions) {
+        const control = dialog.locator(`#custom-${field.id}`);
+        if (["select", "user", "checkbox"].includes(field.type)) { await control.click(); await expect(page.locator(`[role="option"][data-value="${String(expected[field.key])}"]`)).toHaveAttribute("aria-selected", "true"); await page.keyboard.press("Escape"); }
+        else await expect(control).toHaveValue(String(expected[field.key]));
+      }
       const number = definitions.find(field => field.type === "number")!;
       await dialog.locator(`#custom-${number.id}`).fill("12.75");
       await dialog.getByRole("button", { name: labels.save, exact: true }).click();
@@ -71,19 +78,25 @@ for (const locale of ["vi", "en"] as const) {
       await page.goto(`/${locale}/crm/${paths[entity]}?q=${prefix}`);
       await settled(page);
       await expect(page.getByRole("columnheader", { name: select.label, exact: true })).toBeVisible();
-      await page.locator("summary", { hasText: labels.filters }).click();
-      const selectFilter = page.getByRole("group", { name: select.label, exact: true }).getByRole("checkbox", { name: "Choice A", exact: false });
+      await page.getByRole("button", { name: labels.filters, exact: false }).last().click();
+      await page.getByRole("menuitem", { name: select.label, exact: true }).hover();
+      const selectFilter = page.getByRole("option", { name: /Choice A/ });
       await selectFilter.click();
-      await expect(selectFilter).toBeChecked();
+      await expect(selectFilter.locator('[role="checkbox"]')).toHaveAttribute("data-state", "checked");
       await settled(page);
-      const userFilter = page.getByRole("group", { name: user.label, exact: true }).getByRole("checkbox");
+      await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: labels.filters, exact: false }).last().click();
+      await page.getByRole("menuitem", { name: user.label, exact: true }).hover();
+      const userFilter = page.getByRole("option").filter({ hasText: "member" });
       await userFilter.click();
-      await expect(userFilter).toBeChecked();
+      await expect(userFilter.locator('[role="checkbox"]')).toHaveAttribute("data-state", "checked");
       await expect.poll(() => JSON.parse(new URL(page.url()).searchParams.get("fields")!)).toEqual({ [select.key]: [select.options[0]!.id], [user.key]: [memberId] });
-      await page.locator("summary", { hasText: labels.columns }).click();
-      const numberColumn = page.getByRole("checkbox", { name: number.label, exact: true });
+      await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: labels.columns, exact: false }).click();
+      const numberColumn = page.getByRole("option", { name: number.label, exact: true });
       await numberColumn.click();
-      await expect(numberColumn).not.toBeChecked();
+      await expect(numberColumn.locator('[role="checkbox"]')).toHaveAttribute("data-state", "unchecked");
+      await page.keyboard.press("Escape");
       await page.reload(); await settled(page);
       await expect(page.locator("tbody tr")).toHaveCount(1);
       await expect(page.getByRole("columnheader", { name: number.label, exact: true })).toHaveCount(0);
@@ -109,22 +122,23 @@ for (const locale of ["vi", "en"] as const) {
     await expect(sheet.getByRole("alert")).toHaveText(labels.invalid);
     await sheet.getByLabel(labels.custom.label, { exact: true }).fill(label);
     await sheet.getByRole("button", { name: labels.save, exact: true }).click();
-    const row = sheet.locator("li").filter({ has: page.getByRole("heading", { name: label, exact: true }) });
+    const row = sheet.locator("li").filter({ has: page.getByText(label, { exact: true }) });
     await expect(row).toBeVisible();
     const definitions: FieldDefinition[] = await (await api.get("/api/crm/fields?entity=company&includeArchived=true")).json();
     const field = definitions.find(value => value.label === label)!;
     const record = await create("companies", { name: label });
     expect((await api.patch("/api/crm/fields/values", { data: { entity: "company", recordId: record.id, values: { [field.key]: "Preserved value" } } })).ok()).toBe(true);
-    await row.getByRole("button", { name: `${labels.custom.up}: ${label}`, exact: true }).click();
+    await fieldAction(page, row, labels.custom.up);
     await expect.poll(async () => (await (await api.get("/api/crm/fields?entity=company&includeArchived=true")).json()).find((value: FieldDefinition) => value.id === field.id).position).toBe(field.position - 1);
-    await row.getByRole("button", { name: labels.edit, exact: true }).click();
+    await fieldAction(page, row, labels.edit);
     await sheet.getByLabel(labels.custom.label, { exact: true }).fill(`${label}-renamed`);
     await sheet.getByRole("button", { name: labels.save, exact: true }).click();
-    const renamed = sheet.locator("li").filter({ has: page.getByRole("heading", { name: `${label}-renamed`, exact: true }) });
-    await expect(renamed).toContainText(field.key);
-    await renamed.getByRole("button", { name: labels.archive, exact: true }).click();
-    await renamed.getByRole("button", { name: labels.restore, exact: true }).click();
-    await renamed.getByRole("button", { name: labels.custom.delete, exact: true }).click();
+    const renamed = sheet.locator("li").filter({ has: page.getByText(`${label}-renamed`, { exact: true }) });
+    await expect(renamed).toBeVisible();
+    expect((await (await api.get("/api/crm/fields?entity=company&includeArchived=true")).json()).find((value: FieldDefinition) => value.id === field.id).key).toBe(field.key);
+    await fieldAction(page, renamed, labels.archive);
+    await fieldAction(page, renamed, labels.restore);
+    await fieldAction(page, renamed, labels.custom.delete);
     const confirm = page.getByRole("dialog").last();
     await expect(confirm.getByRole("status")).toContainText("1 /");
     await confirm.getByLabel(labels.custom.password, { exact: true }).fill("incorrect-password");
@@ -154,9 +168,9 @@ for (const locale of ["vi", "en"] as const) {
     expect((await api.patch("/api/crm/fields/values", { data: { entity: "company", recordId: record.id, values: { [field.key]: field.options[0]!.id } } })).ok()).toBe(true);
     const query = new URLSearchParams({ q: prefix, columns: `name,field:${field.key}`, fields: JSON.stringify({ [field.key]: [field.options[0]!.id] }), sort: "name", dir: "asc" });
     await page.goto(`/${locale}/crm/companies?${query}`);
-    await page.locator("summary", { hasText: labels.views.title }).press("Enter");
     for (const shared of [false, true]) {
-      await page.getByRole("button", { name: labels.views.add, exact: true }).click();
+      await page.getByRole("button", { name: shared ? `${prefix}-private` : labels.views.title, exact: true }).click();
+      await page.getByRole("menuitem", { name: labels.views.add, exact: true }).click();
       const dialog = page.getByRole("dialog");
       await expect(dialog.getByRole("button", { name: labels.save, exact: true })).toBeDisabled();
       await dialog.getByLabel(labels.views.name, { exact: true }).fill(`${prefix}-${shared ? "shared" : "private"}`);
@@ -171,48 +185,59 @@ for (const locale of ["vi", "en"] as const) {
     try {
       const memberPage = await memberContext.newPage();
       await memberPage.goto(`/${locale}/crm/companies`);
-      await memberPage.locator("summary", { hasText: labels.views.title }).click();
-      await expect(memberPage.getByRole("button", { name: shared.name, exact: true })).toBeVisible();
-      await expect(memberPage.getByRole("button", { name: privateView.name, exact: true })).toHaveCount(0);
-      const sharedRow = memberPage.getByRole("button", { name: shared.name, exact: true }).locator("..");
-      await expect(sharedRow.getByRole("button", { name: labels.edit, exact: true })).toHaveCount(0);
+      await memberPage.getByRole("button", { name: labels.views.title, exact: true }).click();
+      await expect(memberPage.getByRole("menuitem", { name: shared.name, exact: true })).toBeVisible();
+      await expect(memberPage.getByRole("menuitem", { name: privateView.name, exact: true })).toHaveCount(0);
+      const sharedRow = memberPage.getByRole("menuitem", { name: shared.name, exact: true }).locator("..");
+      await expect(sharedRow.getByRole("menuitem", { name: `${labels.edit} ${shared.name}`, exact: true })).toHaveCount(0);
       expect((await member.patch(`/api/crm/saved-views/${shared.id}`, { data: { shared: false } })).ok()).toBe(false);
       expect((await member.delete(`/api/crm/saved-views/${shared.id}`, { headers: { "Content-Type": "application/json" } })).status()).toBe(404);
-      await memberPage.getByRole("button", { name: shared.name, exact: true }).click();
+      await memberPage.getByRole("menuitem", { name: shared.name, exact: true }).click();
       await expect.poll(() => new URL(memberPage.url()).searchParams.get("columns")).toBe(query.get("columns"));
       await expect.poll(() => new URL(memberPage.url()).searchParams.get("fields")).toBe(query.get("fields"));
       await memberPage.reload(); await settled(memberPage);
       await expect(memberPage.locator("tbody tr")).toHaveCount(1);
       await expect(memberPage.getByRole("columnheader", { name: field.label, exact: true })).toBeVisible();
-      await memberPage.locator("summary", { hasText: shared.name }).click();
-      await memberPage.getByRole("button", { name: labels.views.add, exact: true }).click();
+      await memberPage.getByRole("button", { name: shared.name, exact: true }).click();
+      await memberPage.getByRole("menuitem", { name: labels.views.add, exact: true }).click();
       await memberPage.getByLabel(labels.views.name, { exact: true }).fill(`${prefix}-member`);
       await memberPage.getByLabel(labels.views.shared, { exact: true }).check();
       await memberPage.getByRole("dialog").getByRole("button", { name: labels.save, exact: true }).click();
       await expect(memberPage.getByRole("dialog")).toHaveCount(0);
       const memberView = (await (await member.get("/api/crm/saved-views?entity=company")).json()).find((view: { name: string }) => view.name === `${prefix}-member`);
       expect((await api.delete(`/api/crm/saved-views/${memberView.id}`, { headers: { "Content-Type": "application/json" } })).status()).toBe(404);
-      const ownRow = memberPage.getByRole("button", { name: memberView.name, exact: true }).locator("..");
+      const ownRow = memberPage.getByRole("menuitem", { name: memberView.name, exact: true }).locator("..");
       await memberPage.getByRole("textbox", { name: labels.search, exact: true }).fill(`${prefix}-missing`);
-      await memberPage.getByRole("button", { name: labels.search, exact: true }).click();
+      await memberPage.getByRole("textbox", { name: labels.search, exact: true }).press("Enter");
       await expect.poll(() => new URL(memberPage.url()).searchParams.get("q")).toBe(`${prefix}-missing`);
-      await ownRow.getByRole("button", { name: labels.views.update, exact: true }).click();
+      await memberPage.getByRole("button", { name: memberView.name, exact: false }).click();
+      await memberPage.getByRole("menuitem", { name: `${labels.edit} ${memberView.name}`, exact: true }).hover();
+      await memberPage.getByRole("menuitem", { name: labels.views.update, exact: true }).click();
       await expect.poll(async () => (await (await member.get("/api/crm/saved-views?entity=company")).json()).find((view: { id: string }) => view.id === memberView.id).state.query).toContain(`q=${prefix}-missing`);
-      await ownRow.getByRole("button", { name: labels.edit, exact: true }).click();
+      await memberPage.getByRole("button", { name: memberView.name, exact: false }).click();
+      await memberPage.getByRole("menuitem", { name: `${labels.edit} ${memberView.name}`, exact: true }).hover();
+      await memberPage.getByRole("menuitem", { name: labels.edit, exact: true }).click();
       await memberPage.getByLabel(labels.views.shared, { exact: true }).uncheck();
       await memberPage.getByRole("dialog").getByRole("button", { name: labels.save, exact: true }).click();
       await expect(memberPage.getByRole("dialog")).toHaveCount(0);
       expect((await (await api.get("/api/crm/saved-views?entity=company")).json()).some((view: { id: string }) => view.id === memberView.id)).toBe(false);
-      await ownRow.getByRole("button", { name: labels.views.delete, exact: true }).click();
+      await memberPage.getByRole("button", { name: memberView.name, exact: false }).click();
+      await memberPage.getByRole("menuitem", { name: `${labels.edit} ${memberView.name}`, exact: true }).hover();
+      await memberPage.getByRole("menuitem", { name: labels.views.delete, exact: true }).click();
       await memberPage.getByRole("dialog").getByRole("button", { name: labels.views.delete, exact: true }).click();
+      await memberPage.getByRole("button", { name: labels.views.title, exact: true }).click();
       await expect(ownRow).toHaveCount(0);
+      await memberPage.keyboard.press("Escape");
     } finally { await memberContext.close(); }
     await page.getByRole("button", { name: labels.custom.manage, exact: true }).click();
-    const fieldRow = page.getByRole("dialog").locator("li").filter({ has: page.getByRole("heading", { name: field.label, exact: true }) });
-    await fieldRow.getByRole("button", { name: labels.archive, exact: true }).click();
-    await expect(fieldRow.getByRole("button", { name: labels.restore, exact: true })).toBeVisible();
+    const fieldRow = page.getByRole("dialog").locator("li").filter({ has: page.getByText(field.label, { exact: true }) });
+    await fieldAction(page, fieldRow, labels.archive);
+    await fieldRow.getByRole("button").last().click();
+    await expect(page.getByRole("menuitem", { name: labels.restore, exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
     await expect(page.getByRole("alert")).toContainText(labels.error);
     await expect(page.locator("tbody").getByRole("link", { name: prefix, exact: true })).toHaveCount(0);
     await expect(page.locator("tbody")).toHaveText(labels.empty);

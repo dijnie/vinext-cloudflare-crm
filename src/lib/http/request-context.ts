@@ -8,6 +8,7 @@ import { HttpError } from "./http-errors";
 export interface RequestContext {
   readonly [guardContext]: true;
   userId: string;
+  user: { name: string; email: string; image?: string | null };
   membershipId: string;
   role: "owner" | "member";
   requestId: string;
@@ -37,6 +38,7 @@ export async function requireRequestContext(
   return {
     [guardContext]: true,
     userId: authSession.user.id,
+    user: { name: authSession.user.name, email: authSession.user.email, image: authSession.user.image },
     membershipId: membership.userId,
     role: membership.role,
     requestId: requestHeaders.get("cf-ray") ?? crypto.randomUUID(),

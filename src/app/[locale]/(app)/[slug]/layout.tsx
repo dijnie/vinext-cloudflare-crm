@@ -29,5 +29,5 @@ export default async function ProtectedLayout({ children, params }: { children: 
     const suffix = `/${path.split("/").slice(3).join("/") || "companies"}`;
     redirect(canonicalWorkspacePath(locale, workspace.slug, requestHeaders.get("x-request-search") ?? "", suffix));
   }
-  return <AppShell dictionary={getDictionary(locale)} locale={locale} role={viewer.role} slug={workspace.slug}>{children}</AppShell>;
+  return <AppShell dictionary={getDictionary(locale)} locale={locale} role={viewer.role} user={viewer.user} slug={workspace.slug}>{children}</AppShell>;
 }

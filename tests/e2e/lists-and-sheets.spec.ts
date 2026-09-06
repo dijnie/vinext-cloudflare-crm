@@ -18,6 +18,7 @@ test.beforeAll(async ({ baseURL }) => {
 test.beforeEach(async ({ context }) => { await context.addCookies((await api.storageState()).cookies); });
 test.afterAll(async () => { await api?.dispose(); });
 
+
 async function create(path: string, data: object): Promise<{ id: string }> {
   const response = await api.post(`/api/crm/${path}`, { data });
   expect(response.ok(), await response.text()).toBe(true);
@@ -49,6 +50,9 @@ test("SSR list avoids a duplicate fetch and refreshes after mutation and query n
   const listRequests = requests.lists;
   await page.goto(`/en/crm/companies?q=${prefix}`);
   await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toBeVisible();
+  await expect(page.locator("header").first()).toHaveCSS("height", "48px");
+  await expect(page.getByRole("navigation", { name: labels.navigation, exact: true })).toHaveCSS("width", "56px");
+  await page.screenshot({ path: test.info().outputPath("desktop-company-list.png"), fullPage: true });
   // Opening a client-only control proves hydration completed before counting requests.
   await page.getByRole("button", { name: labels.add, exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -68,7 +72,6 @@ test("SSR list avoids a duplicate fetch and refreshes after mutation and query n
 
   const searched = page.waitForResponse(res => new URL(res.url()).pathname === "/api/crm/companies" && new URL(res.url()).searchParams.get("q") === `${prefix}-missing`);
   await page.getByRole("textbox", { name: labels.search, exact: true }).fill(`${prefix}-missing`);
-  await page.getByRole("button", { name: labels.search, exact: true }).click();
   await query(page, "q", `${prefix}-missing`);
   expect((await searched).ok()).toBe(true);
   await settled(page);
@@ -106,6 +109,8 @@ test("record sheets and tabs preserve the list without page requests or record p
   expect((await detail).ok()).toBe(true);
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByRole("heading", { name, exact: true })).toBeFocused();
+  await sheet.evaluate(async element => { await Promise.all(element.getAnimations().map(animation => animation.finished)); });
+  await page.screenshot({ path: test.info().outputPath("desktop-record-sheet.png"), fullPage: true });
   for (const tab of ["activities", "fields", "details"] as const) {
     const button = sheet.getByRole("navigation").getByRole("button", { name: labels[tab], exact: true });
     await button.click();
@@ -162,12 +167,12 @@ test("sidebar navigation announces pending while the destination response is hel
   try {
     await page.goto("/en/crm/companies");
     await settled(page);
-    await page.locator("aside").getByRole("link", { name: labels.contact, exact: true }).click();
+    await page.getByRole("navigation", { name: labels.navigation, exact: true }).getByRole("link", { name: labels.contact, exact: true }).click();
     await expect(page.locator("[data-navigation-pending]")).toBeVisible();
     await expect(page.locator("#main-content [data-navigation-pending]")).toBeVisible();
     await expect(page.locator("header + [data-navigation-pending]")).toHaveCount(0);
     await expect(page.locator("#main-content > div[hidden][inert]")).toHaveCount(1);
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.getByRole("navigation", { name: labels.navigation, exact: true })).toBeVisible();
     await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "true");
     release();
     await expect(page.locator("[data-list-heading]")).toHaveText(labels.contact);
@@ -182,10 +187,9 @@ test("Back refreshes a cached company list after invalidation on another page", 
   await page.goto(`/en/crm/companies?q=${prefix}`);
   await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: labels.search, exact: true }).fill(`${prefix}-`);
-  await page.getByRole("button", { name: labels.search, exact: true }).click();
   await query(page, "q", `${prefix}-`);
   await settled(page);
-  await page.locator("aside").getByRole("link", { name: labels.contact, exact: true }).click();
+  await page.getByRole("navigation", { name: labels.navigation, exact: true }).getByRole("link", { name: labels.contact, exact: true }).click();
   await expect(page.locator("[data-list-heading]")).toHaveText(labels.contact);
   await settled(page);
   const updated = await api.patch(`/api/crm/companies/${company.id}`, { data: { action: "update", data: { name: `${prefix}-after` } } });
@@ -198,22 +202,54 @@ test("Back refreshes a cached company list after invalidation on another page", 
   await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toHaveCount(0);
 });
 
+test("table headers stay pinned while the list body scrolls", async ({ page }) => {
+  const prefix = `sticky-${Date.now()}`;
+  for (let index = 0; index < 12; index++) await create("companies", { name: `${prefix}-${String(index).padStart(2, "0")}` });
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await page.goto(`/en/crm/companies?q=${prefix}&sort=name&dir=asc`);
+  await settled(page);
+  await expect(page.locator("tbody tr")).toHaveCount(12);
+  const scroller = page.locator('[data-slot="table-container"]').locator("..");
+  const header = page.locator("thead");
+  const firstRow = page.locator("tbody tr").first();
+  await expect.poll(() => scroller.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(100);
+  const headerBefore = await header.boundingBox();
+  const rowBefore = await firstRow.boundingBox();
+  await scroller.hover();
+  await page.mouse.wheel(0, 200);
+  await expect.poll(() => scroller.evaluate(element => element.scrollTop)).toBeGreaterThan(100);
+  await expect.poll(async () => Math.abs((await header.boundingBox())!.y - headerBefore!.y)).toBeLessThanOrEqual(2);
+  expect(rowBefore!.y - (await firstRow.boundingBox())!.y).toBeGreaterThan(100);
+  await expect(header).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("desktop-sticky-table-scroll.png"), fullPage: true });
+});
+
 for (const locale of ["vi", "en"] as const) {
   const labels = getCrmDictionary(locale);
   test(`${locale}: choosing a company survives searching other companies`, async ({ page }) => {
     const prefix = `choose-${locale}-${Date.now()}`;
-    const first = await create("companies", { name: `${prefix}-first` });
+    await create("companies", { name: `${prefix}-first` });
     const chosen = await create("companies", { name: `${prefix}-chosen` });
     await page.goto(`/${locale}/crm/contacts`);
     await page.getByRole("button", { name: labels.add, exact: true }).click();
     const sheet = page.getByRole("dialog");
     await sheet.locator("#record-firstName").fill(prefix);
-    await sheet.getByRole("textbox", { name: labels.chooseCompany, exact: true }).fill(`${prefix}-chosen`);
-    await expect(sheet.locator(`#record-companyId option[value="${chosen.id}"]`)).toHaveCount(1);
-    await sheet.locator("#record-companyId").selectOption(chosen.id);
-    await sheet.getByRole("textbox", { name: labels.chooseCompany, exact: true }).fill(`${prefix}-first`);
-    await expect(sheet.locator(`#record-companyId option[value="${first.id}"]`)).toHaveCount(1);
-    await expect(sheet.locator("#record-companyId")).toHaveValue(chosen.id);
+    await sheet.locator("#record-companyId").click();
+    await expect(page.getByPlaceholder(labels.chooseCompany, { exact: true })).toBeFocused();
+    await page.getByPlaceholder(labels.chooseCompany, { exact: true }).fill(`${prefix}-chosen`);
+    await expect(page.getByPlaceholder(labels.chooseCompany, { exact: true })).toHaveValue(`${prefix}-chosen`);
+    await page.getByRole("option", { name: `${prefix}-chosen`, exact: true }).click();
+    await expect(sheet.locator('input[name="companyId"]')).toHaveValue(chosen.id);
+    // Wait for the completed close lifecycle before exercising a new open.
+    await expect(page.getByPlaceholder(labels.chooseCompany, { exact: true })).toHaveCount(0);
+    await expect(sheet.locator("#record-companyId")).toBeFocused();
+    await sheet.locator("#record-companyId").click();
+    await expect(page.getByPlaceholder(labels.chooseCompany, { exact: true })).toBeFocused();
+    await page.getByPlaceholder(labels.chooseCompany, { exact: true }).fill(`${prefix}-first`);
+    await expect(page.getByPlaceholder(labels.chooseCompany, { exact: true })).toHaveValue(`${prefix}-first`);
+    await expect(page.getByRole("option", { name: `${prefix}-first`, exact: true })).toBeVisible();
+    await expect(sheet.locator('input[name="companyId"]')).toHaveValue(chosen.id);
+    await page.keyboard.press("Escape");
     await sheet.getByRole("button", { name: labels.save, exact: true }).click();
     await expect(sheet.getByRole("heading", { name: prefix, exact: true })).toBeVisible();
     const id = new URL(page.url()).searchParams.get("recordId");
@@ -231,33 +267,68 @@ for (const locale of ["vi", "en"] as const) {
       const sheet = page.getByRole("dialog");
       await sheet.locator(entity === "contacts" ? "#record-firstName" : "#record-name").fill(name);
       if (entity !== "companies") {
-        await expect(sheet.locator("#record-companyId option", { hasText: `${prefix}-parent` })).toHaveCount(1);
-        await sheet.locator("#record-companyId").selectOption(parent.id);
+        await sheet.locator("#record-companyId").click();
+        await expect(page.getByPlaceholder(labels.chooseCompany, { exact: true })).toBeFocused();
+    await page.getByPlaceholder(labels.chooseCompany, { exact: true }).fill(`${prefix}-parent`);
+    await expect(page.getByPlaceholder(labels.chooseCompany, { exact: true })).toHaveValue(`${prefix}-parent`);
+        await page.getByRole("option", { name: `${prefix}-parent`, exact: true }).click();
+        await expect(sheet.locator('input[name="companyId"]')).toHaveValue(parent.id);
       }
       if (entity === "deals") {
-        await expect(sheet.locator(`#record-ownerMembershipId option[value="${ownerId}"]`)).toHaveCount(1);
-        await sheet.locator("#record-ownerMembershipId").selectOption(ownerId);
+        await expect(sheet.locator("#record-ownerMembershipId")).toHaveAttribute("aria-busy", "false");
+        await sheet.locator("#record-ownerMembershipId").click();
+        await page.locator(`[role="option"][data-value="${ownerId}"]`).click();
         await sheet.locator("#record-amountMinor").fill("12345");
       }
       await sheet.getByRole("button", { name: labels.save, exact: true }).click();
       await expect(sheet.getByRole("heading", { name, exact: true })).toBeVisible();
       const id = new URL(page.url()).searchParams.get("recordId")!;
-      await sheet.getByRole("button", { name: labels.edit, exact: true }).click();
-      if (entity === "deals") await expect(sheet.locator("#record-ownerMembershipId")).toHaveValue(ownerId);
+      await sheet.getByRole("button", { name: locale === "vi" ? "Thao tác" : "More actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: labels.edit, exact: true }).click();
+      if (entity === "deals") await expect(sheet.locator('input[name="ownerMembershipId"]')).toHaveValue(ownerId);
       await sheet.locator(entity === "contacts" ? "#record-firstName" : "#record-name").fill(`${name}-edited`);
       await sheet.getByRole("button", { name: labels.save, exact: true }).click();
       await expect(sheet.getByRole("heading", { name: `${name}-edited`, exact: true })).toBeVisible();
+      if (entity === "companies") {
+        const website = `https://${prefix}.example`;
+        await sheet.getByRole("button", { name: `${labels.edit}: ${labels.labels.website}`, exact: true }).press("Enter");
+        const editor = sheet.getByRole("textbox", { name: labels.labels.website, exact: true });
+        await editor.fill(website);
+        await editor.press("Enter");
+        await expect.poll(async () => (await (await api.get(`/api/crm/companies/${id}`)).json()).website).toBe(website);
+        await expect(sheet.getByRole("button", { name: `${labels.edit}: ${labels.labels.website}`, exact: true })).toContainText(website);
+        await sheet.getByRole("button", { name: `${labels.edit}: ${labels.labels.website}`, exact: true }).press("Enter");
+        await editor.fill("https://cancelled.example");
+        await editor.press("Escape");
+        await expect(sheet.getByRole("heading", { name: `${name}-edited`, exact: true })).toBeVisible();
+        expect((await (await api.get(`/api/crm/companies/${id}`)).json()).website).toBe(website);
+      }
       for (const action of ["archive", "restore"] as const) {
-        await sheet.getByRole("button", { name: labels[action], exact: true }).click();
+        await sheet.getByRole("button", { name: locale === "vi" ? "Thao tác" : "More actions", exact: true }).click();
+        await page.getByRole("menuitem", { name: labels[action], exact: true }).click();
         await page.getByRole("button", { name: labels.confirm, exact: true }).click();
         await expect(page.getByRole("dialog")).toHaveCount(1);
         await expect.poll(async () => (await (await api.get(`/api/crm/${entity}/${id}`)).json()).archivedAt !== null).toBe(action === "archive");
-        await expect(sheet.getByRole("button", { name: labels[action === "archive" ? "restore" : "archive"], exact: true })).toBeVisible();
+        await sheet.getByRole("button", { name: locale === "vi" ? "Thao tác" : "More actions", exact: true }).click();
+        await expect(page.getByRole("menuitem", { name: labels[action === "archive" ? "restore" : "archive"], exact: true })).toBeVisible();
+        await page.keyboard.press("Escape");
       }
       await sheet.getByRole("button", { name: labels.close, exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
       await settled(page);
       await expect(page.getByRole("link", { name: `${name}-edited`, exact: true })).toBeVisible();
+      if (entity === "deals") {
+        const row = page.getByRole("row").filter({ has: page.getByRole("link", { name: `${name}-edited`, exact: true }) });
+        await row.getByRole("button", { name: `${labels.labels.stageId}: ${labels.stages["demo-booked"]}`, exact: true }).press("Enter");
+        const changed = page.waitForResponse(response => new URL(response.url()).pathname === `/api/crm/deals/${id}` && response.request().method() === "PATCH");
+        await page.getByRole("menuitemradio", { name: labels.stages["closed-won"], exact: true }).focus();
+        await page.keyboard.press("Enter");
+        expect((await changed).ok()).toBe(true);
+        await settled(page);
+        await expect(row.getByRole("button", { name: `${labels.labels.stageId}: ${labels.stages["closed-won"]}`, exact: true })).toBeVisible();
+        expect((await (await api.get(`/api/crm/deals/${id}`)).json()).stageId).toBe("closed-won");
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+      }
       await page.goBack();
       await expect(page.getByRole("dialog").getByRole("heading", { name: `${name}-edited`, exact: true })).toBeVisible();
       await page.goForward();
@@ -286,7 +357,7 @@ for (const locale of ["vi", "en"] as const) {
     expect((await bulkRequest).postDataJSON()).toEqual({ action: "bulk-archive", ids: [ids[4]] });
     await expect(page.getByRole("dialog")).toHaveCount(0);
     for (const [index, id] of ids.entries()) expect((await (await api.get(`/api/crm/companies/${id}`)).json()).archivedAt !== null).toBe(index === 4);
-    await page.getByRole("combobox", { name: labels.archived, exact: true }).selectOption("true");
+    await page.getByRole("button", { name: labels.archived, exact: true }).click();
     await query(page, "page", null);
     await settled(page);
     await page.getByRole("checkbox", { name: `${labels.select} ${prefix}-4`, exact: true }).check();
@@ -296,32 +367,40 @@ for (const locale of ["vi", "en"] as const) {
     await expect.poll(async () => (await (await api.get(`/api/crm/companies/${ids[4]}`)).json()).archivedAt).toBeNull();
     await page.goto(`/${locale}/crm/companies?q=${prefix}&pageSize=2&page=2`);
     await page.getByRole("textbox", { name: labels.search, exact: true }).fill(`${prefix}-0`);
-    await page.getByRole("button", { name: labels.search, exact: true }).click();
-    await query(page, "page", null);
+      await query(page, "page", null);
     await query(page, "q", `${prefix}-0`);
     await settled(page);
     await expect(page.locator("tbody tr")).toHaveCount(1);
     await page.goto(`/${locale}/crm/companies?q=${prefix}&pageSize=2&page=2`);
-    await page.getByRole("combobox", { name: labels.sort, exact: true }).selectOption("name");
+    await page.getByRole("button", { name: labels.sort, exact: true }).click();
+    await page.getByRole("menuitemradio", { name: labels.labels.name, exact: true }).click();
     await query(page, "page", null);
     await query(page, "sort", "name");
-    await page.locator("summary", { hasText: labels.columns }).click();
-    const domainColumn = page.getByRole("checkbox", { name: labels.labels.domain, exact: true });
-    await expect(domainColumn).toBeChecked();
+    await page.getByRole("button", { name: new RegExp(labels.columns) }).click();
+    const domainColumn = page.getByRole("option", { name: labels.labels.domain, exact: true });
+    const domainCheck = domainColumn.locator('[role="checkbox"]');
+    await expect(domainCheck).toBeChecked();
     await domainColumn.click();
     await query(page, "columns", "name,industry,owner,createdAt");
-    await expect(domainColumn).not.toBeChecked();
+    await expect(domainCheck).not.toBeChecked();
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0);
     await expect(page.getByRole("columnheader", { name: labels.labels.domain, exact: true })).toHaveCount(0);
     await page.reload();
     await expect(page.getByRole("columnheader", { name: labels.labels.domain, exact: true })).toHaveCount(0);
     await page.goto(`/${locale}/crm/companies?q=${prefix}&pageSize=2&page=2`);
     await settled(page);
-    await page.locator("summary", { hasText: labels.filters }).click();
-    const industryFilter = page.getByRole("checkbox", { name: new RegExp(`${prefix}-industry`) });
+    await page.getByRole("button", { name: labels.filters, exact: true }).click();
+    await page.getByRole("menuitem", { name: labels.labels.industry, exact: true }).hover();
+    const industryFilter = page.getByRole("option", { name: new RegExp(`${prefix}-industry`) });
     await industryFilter.click();
     await query(page, "page", null);
     await query(page, "industry", `${prefix}-industry`);
-    await expect(industryFilter).toBeChecked();
+    await expect(industryFilter.locator('[role="checkbox"]')).toBeChecked();
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[data-slot="dropdown-menu-sub-content"]')).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0);
     await settled(page);
     await expect(page.locator("tbody tr")).toHaveCount(1);
     await expect(page.getByRole("link", { name: `${prefix}-0`, exact: true })).toBeVisible();
@@ -337,6 +416,7 @@ for (const locale of ["vi", "en"] as const) {
     await page.goto(`/${locale}/crm/companies?q=${prefix}&sort=name&dir=asc&columns=name,domain`);
     await settled(page);
     const trigger = page.getByRole("link", { name: prefix, exact: true });
+    await page.screenshot({ path: test.info().outputPath(`${locale}-mobile-list.png`), fullPage: true });
     await trigger.press("Enter");
     const sheet = page.getByRole("dialog");
     await expect(sheet.getByRole("heading", { name: prefix, exact: true })).toBeFocused();
@@ -358,6 +438,7 @@ for (const locale of ["vi", "en"] as const) {
     const box = await sheet.boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+    await page.screenshot({ path: test.info().outputPath(`${locale}-mobile-sheet.png`), fullPage: true });
     await page.keyboard.press("Escape");
     await expect(sheet).toHaveCount(0);
     await expect(page.locator("[data-list-heading]")).toBeFocused();

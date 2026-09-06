@@ -11,6 +11,7 @@ test("localized auth routes preserve locale state", async ({ page }) => {
   await page.goto("/vi/sign-in?source=e2e");
   await expect(page.locator("html")).toHaveAttribute("lang", "vi");
   await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("auth-desktop.png") });
   await page.getByRole("button", { name: "Ngôn ngữ: EN" }).click();
   await expect(page).toHaveURL(/\/en\/sign-in\?source=e2e$/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -46,6 +47,7 @@ for (const locale of ["vi", "en"] as const) {
     const vi = locale === "vi";
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto(`/${locale}/sign-in`);
+    await page.screenshot({ path: test.info().outputPath(`${locale}-auth-mobile.png`) });
     await page.getByLabel("Email", { exact: true }).focus();
     await page.keyboard.type(requiredEnvironment("E2E_OWNER_EMAIL"));
     await page.keyboard.press("Tab");
@@ -59,24 +61,26 @@ for (const locale of ["vi", "en"] as const) {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.locator(":focus")).toHaveCount(1);
-    const membersLink = dialog.getByRole("link", { name: vi ? "Thành viên" : "Members", exact: true });
+    const settingsLink = dialog.getByRole("link", { name: vi ? "Cài đặt" : "Settings", exact: true });
     for (let step = 0; step < 5; step++) {
       await page.keyboard.press("Tab");
       await expect(dialog.locator(":focus")).toHaveCount(1);
-      if (await membersLink.evaluate((element) => element === document.activeElement)) break;
+      if (await settingsLink.evaluate((element) => element === document.activeElement)) break;
     }
-    await expect(membersLink).toBeFocused();
+    await expect(settingsLink).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(menu).toBeFocused();
     await menu.press("Enter");
-    await dialog.getByRole("link", { name: vi ? "Thành viên" : "Members", exact: true }).press("Enter");
+    await settingsLink.press("Enter");
+    await page.getByRole("link", { name: vi ? "Thành viên" : "Members", exact: true }).click();
     await expect(page.getByRole("heading", { name: vi ? "Thành viên" : "Members", exact: true })).toBeVisible();
     await expect(dialog).toBeHidden();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     const main = await page.locator("main").boundingBox();
     expect(main!.x + main!.width).toBeLessThanOrEqual(375);
-    await page.getByRole("button", { name: vi ? "Đăng xuất" : "Sign out", exact: true }).press("Enter");
+    await page.getByRole("button", { name: vi ? "Menu tài khoản" : "Account menu", exact: true }).click();
+    await page.getByRole("menuitem", { name: vi ? "Đăng xuất" : "Sign out", exact: true }).press("Enter");
     await expect(page).toHaveURL(new RegExp(`/${locale}/sign-in$`));
     await page.goto(`/${locale}/crm/settings/members`);
     await expect(page).toHaveURL(new RegExp(`/${locale}/sign-in$`));
@@ -106,6 +110,14 @@ test("owner sees localized members and canonical stale slugs", async ({ browser,
   await expect(page).toHaveURL(/\/en\/crm\/settings\/members\?status=active&record=e2e-record$/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByRole("heading", { name: "Members" })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("members-desktop.png") });
+  await page.getByRole("button", { name: "Account menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Dark mode", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.screenshot({ path: test.info().outputPath("members-dark-desktop.png") });
   await context.close();
   await api.dispose();
 });

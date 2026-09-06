@@ -1,4 +1,4 @@
-import { expect, request, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, request, test, type APIRequestContext, type Page, type Locator } from "@playwright/test";
 import { getCrmDictionary } from "../../src/lib/i18n/crm-dictionary";
 
 test.use({ actionTimeout: 10_000 });
@@ -6,6 +6,8 @@ let api: APIRequestContext;
 let ownerId: string;
 let memberId: string;
 let disposableId: string;
+async function pick(page: Page, trigger: Locator, value: string) { await trigger.click(); await page.locator(`[role="option"][data-value="${value}"]`).click(); }
+async function editRecord(page: Page, locale: string, labels: ReturnType<typeof getCrmDictionary>) { await page.getByRole("button", { name: locale === "vi" ? "Thao tác" : "More actions", exact: true }).click(); await page.getByRole("menuitem", { name: labels.edit, exact: true }).click(); }
 test.beforeAll(async ({ baseURL }) => {
   api = await request.newContext({ baseURL, ignoreHTTPSErrors: true, extraHTTPHeaders: { origin: baseURL! } });
   expect((await api.post("/api/auth/sign-in/email", { data: { email: process.env["E2E_OWNER_EMAIL"], password: process.env["E2E_OWNER_PASSWORD"] } })).ok()).toBe(true);
@@ -51,7 +53,8 @@ for (const locale of ["vi", "en"] as const) {
       const sheet = page.getByRole("dialog");
       for (const type of ["note", "call", "meeting", "task"] as const) {
         const subject = `${prefix}-${entity}-${type}`;
-        await sheet.getByLabel(copy.type, { exact: true }).selectOption(type);
+        await sheet.getByRole("group", { name: copy.type, exact: true }).getByRole("button", { name: copy.types[type], exact: true }).click();
+        if (await sheet.locator("details").getAttribute("open") === null) await sheet.locator("summary").click();
         if (type === "task") {
           await sheet.getByRole("button", { name: labels.save, exact: true }).click();
           await expect(sheet.locator("#activity-subject")).toBeFocused();
@@ -70,25 +73,25 @@ for (const locale of ["vi", "en"] as const) {
         await expect(sheet.getByText(`Body ${subject}`, { exact: true })).toBeVisible();
       }
       const taskName = `${prefix}-${entity}-task`;
-      await sheet.getByLabel(copy.filter, { exact: true }).selectOption("upcoming");
+      await pick(page, sheet.getByLabel(copy.filter, { exact: true }), "upcoming");
       const taskRow = sheet.locator("li").filter({ has: page.getByRole("heading", { name: taskName, exact: true }) });
       await expect(taskRow).toBeVisible();
       await expect(sheet.locator("ol > li")).toHaveCount(1);
       await expect(taskRow.locator("time[datetime='2030-01-02T10:00:00.000Z']")).toBeVisible();
       await taskRow.getByRole("button", { name: copy.complete, exact: true }).click();
       await expect(taskRow).toHaveCount(0);
-      await sheet.getByLabel(copy.filter, { exact: true }).selectOption("done");
+      await pick(page, sheet.getByLabel(copy.filter, { exact: true }), "done");
       await expect(taskRow.getByRole("button", { name: copy.reopen, exact: true })).toBeVisible();
       const completed = (await timeline(entity, records[entity].id)).find(entry => entry.subject === taskName)!;
       expect(completed.completedAt).not.toBeNull();
       expect(completed.dueAt).toBe("2030-01-02T10:00:00.000Z");
       await taskRow.getByRole("button", { name: copy.reopen, exact: true }).click();
       await expect(taskRow).toHaveCount(0);
-      await sheet.getByLabel(copy.filter, { exact: true }).selectOption("history");
+      await pick(page, sheet.getByLabel(copy.filter, { exact: true }), "history");
       await expect(sheet.locator("ol > li")).toHaveCount(3);
       await expect(sheet.getByRole("heading", { name: taskName, exact: true })).toHaveCount(0);
       for (const [filter, type] of [["notes", "note"], ["calls", "call"], ["meetings", "meeting"]]) {
-        await sheet.getByLabel(copy.filter, { exact: true }).selectOption(filter!);
+        await pick(page, sheet.getByLabel(copy.filter, { exact: true }), filter!);
         await expect(sheet.locator("ol > li")).toHaveCount(1);
         await expect(sheet.getByRole("heading", { name: `${prefix}-${entity}-${type}`, exact: true })).toBeVisible();
       }
@@ -104,11 +107,11 @@ for (const locale of ["vi", "en"] as const) {
     await expect(page.getByRole("dialog").getByRole("heading", { name: `${prefix}-deal-call`, exact: true })).toBeVisible();
     await page.getByRole("dialog").getByRole("button", { name: labels.details, exact: true }).click();
     await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe("details");
-    await expect(page.getByRole("dialog").locator("#activity-type")).toHaveCount(0);
+    await expect(page.getByRole("dialog").getByRole("group", { name: copy.type, exact: true })).toHaveCount(0);
     await page.goBack();
     await expect(page.getByRole("dialog").locator("ol > li")).toHaveCount(12);
     await page.goForward();
-    await expect(page.getByRole("dialog").locator("#activity-type")).toHaveCount(0);
+    await expect(page.getByRole("dialog").getByRole("group", { name: copy.type, exact: true })).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(page.locator("[data-list-heading]")).toBeFocused();
   });
@@ -117,8 +120,17 @@ for (const locale of ["vi", "en"] as const) {
     const records = await fixture(`stage-${locale}-${Date.now()}`);
     await open(page, locale, "deal", records.deal.id, "details");
     const sheet = page.getByRole("dialog");
-    await sheet.getByRole("button", { name: labels.edit, exact: true }).click();
-    await sheet.locator("#record-stageId").selectOption("qualified-to-buy");
+    for (const field of ["owner", "stage"] as const) {
+      const edit = sheet.getByRole("button", { name: `${labels.edit}: ${labels.labels[field]}`, exact: true });
+      await edit.click();
+      const trigger = sheet.locator(`#inline-${field}-${records.deal.id}`);
+      await trigger.focus();
+      await trigger.press("Escape");
+      await expect(edit).toBeVisible();
+      await expect(sheet).toBeVisible();
+    }
+    await editRecord(page, locale, labels);
+    await pick(page, sheet.locator("#record-stageId"), "qualified-to-buy");
     await sheet.getByRole("button", { name: labels.save, exact: true }).click();
     await sheet.getByRole("button", { name: labels.activities, exact: true }).click();
     await expect(sheet.locator("ol > li")).toHaveCount(1);
@@ -127,8 +139,8 @@ for (const locale of ["vi", "en"] as const) {
     expect(entries).toHaveLength(1);
     expect(entries[0]!.type).toBe("stage_change");
     expect((await api.patch(`/api/crm/activities/${entries[0]!.id}`, { data: { completed: true } })).status()).toBe(400);
-    await sheet.getByRole("button", { name: labels.edit, exact: true }).click();
-    await expect(sheet.locator("#record-stageId")).toHaveValue("qualified-to-buy");
+    await editRecord(page, locale, labels);
+    await expect(sheet.locator("#record-stageId")).toContainText(labels.stages["qualified-to-buy"]);
     await sheet.getByRole("button", { name: labels.save, exact: true }).click();
     await expect(sheet.locator("ol > li")).toHaveCount(1);
     expect(await timeline("deal", records.deal.id)).toHaveLength(1);
@@ -143,9 +155,9 @@ for (const locale of ["vi", "en"] as const) {
     for (const entity of ["company", "contact", "deal"] as const) {
       await open(page, locale, entity, first[entity].id, "details");
       const sheet = page.getByRole("dialog");
-      await sheet.getByRole("button", { name: labels.edit, exact: true }).click();
+      await editRecord(page, locale, labels);
       await expect(sheet.locator("#record-ownerMembershipId")).toHaveAttribute("aria-busy", "false");
-      await sheet.locator("#record-ownerMembershipId").selectOption(memberId);
+      await pick(page, sheet.locator("#record-ownerMembershipId"), memberId);
       await sheet.getByRole("button", { name: labels.save, exact: true }).click();
       await expect.poll(async () => (await (await api.get(`/api/crm/${paths[entity]}/${first[entity].id}`)).json()).ownerMembershipId).toBe(memberId);
       await sheet.getByRole("button", { name: labels.close, exact: true }).click();
@@ -159,8 +171,8 @@ for (const locale of ["vi", "en"] as const) {
       if (entity === "deal") {
         await dialog.getByRole("button", { name: labels.confirm, exact: true }).click();
         await expect(dialog.locator("#bulk-owner")).toBeFocused();
-        expect(await dialog.locator("#bulk-owner").evaluate(select => select instanceof HTMLSelectElement && select.validity.valueMissing)).toBe(true);
-        await dialog.locator("#bulk-owner").selectOption(ownerId);
+        expect(await dialog.locator("#bulk-owner").evaluate(trigger => trigger.parentElement?.querySelector("select")?.validity.valueMissing)).toBe(true);
+        await pick(page, dialog.locator("#bulk-owner"), ownerId);
       }
       const mutation = page.waitForRequest(req => req.method() === "PATCH" && new URL(req.url()).pathname === "/api/crm/ownership");
       await dialog.getByRole("button", { name: labels.confirm, exact: true }).click();
@@ -189,7 +201,7 @@ test("revoked owner races show localized errors and fresh pickers exclude inacti
       await expect(recordSelection).toBeChecked();
       await page.getByRole("button", { name: labels.activity.reassign, exact: true }).click();
       await expect(page.locator("#bulk-owner")).toHaveAttribute("aria-busy", "false");
-      await page.locator("#bulk-owner").selectOption(disposableId);
+      await pick(page, page.locator("#bulk-owner"), disposableId);
     }
     const revoke = await api.delete(`/api/crm/members/${disposableId}`, { data: { replacementMembershipId: ownerId } });
     expect(revoke.ok(), await revoke.text()).toBe(true);
@@ -198,11 +210,98 @@ test("revoked owner races show localized errors and fresh pickers exclude inacti
       await expect(page.getByRole("alert")).toContainText(labels.invalid);
       await page.getByRole("button", { name: labels.cancel, exact: true }).click();
       await open(page, locale, "company", company.id, "details");
-      await page.getByRole("button", { name: labels.edit, exact: true }).click();
+      await editRecord(page, locale, labels);
       await expect(page.locator("#record-ownerMembershipId")).toHaveAttribute("aria-busy", "false");
-      await expect(page.locator(`#record-ownerMembershipId option[value="${disposableId}"]`)).toHaveCount(0);
-      await expect(page.locator(`#record-ownerMembershipId option[value="${ownerId}"]`)).toHaveCount(1);
+      await page.locator("#record-ownerMembershipId").click();
+      await expect(page.locator(`[role="option"][data-value="${disposableId}"]`)).toHaveCount(0);
+      await expect(page.locator(`[role="option"][data-value="${ownerId}"]`)).toHaveCount(1);
+      await page.keyboard.press("Escape");
       expect((await (await api.get(`/api/crm/companies/${company.id}`)).json()).ownerMembershipId).toBe(ownerId);
     }
   } finally { for (const { page } of cases) await page.close(); }
+});
+
+test("related sheet back reconciles browser history and keeps forward records and list state", async ({ page }) => {
+  const labels = getCrmDictionary("en");
+  const prefix = `record-history-${Date.now()}`;
+  const { company, contact, deal } = await fixture(prefix);
+  await create(`deals/${deal.id}/contacts`, { contactId: contact.id });
+  await page.goto(`/en/crm/companies?q=${prefix}&sort=name&dir=asc`);
+  await page.locator(`tbody [data-record-link="${company.id}"]`).click();
+  const sheet = page.getByRole("dialog");
+  const recordIs = async (id: string) => {
+    await expect.poll(() => new URL(page.url()).searchParams.get("recordId")).toBe(id);
+    await expect(sheet.getByRole("heading", { name: id === company.id ? prefix : id === deal.id ? `${prefix}-deal` : `${prefix}-contact`, exact: true })).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("q")).toBe(prefix);
+    expect(new URL(page.url()).searchParams.get("sort")).toBe("name");
+    expect(new URL(page.url()).searchParams.get("dir")).toBe("asc");
+  };
+  await sheet.locator(`[data-record-link="${deal.id}"]`).click();
+  await recordIs(deal.id);
+  await page.goBack();
+  await recordIs(company.id);
+  await expect(sheet.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
+  await page.goForward();
+  await recordIs(deal.id);
+  await sheet.locator(`[data-record-link="${contact.id}"]`).click();
+  await recordIs(contact.id);
+  await page.goBack();
+  await recordIs(deal.id);
+  await sheet.getByRole("button", { name: "Back", exact: true }).click();
+  await recordIs(company.id);
+  await expect(sheet.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
+  await page.goForward();
+  await recordIs(deal.id);
+  await page.goForward();
+  await recordIs(contact.id);
+  await sheet.getByRole("navigation").getByRole("button", { name: labels.activities, exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe("activities");
+  await sheet.getByRole("button", { name: "Back", exact: true }).click();
+  await recordIs(deal.id);
+  await page.goForward();
+  await recordIs(contact.id);
+  await page.goForward();
+  await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe("activities");
+  await sheet.getByRole("button", { name: labels.close, exact: true }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(new URL(page.url()).searchParams.get("q")).toBe(prefix);
+  expect(new URL(page.url()).searchParams.get("recordId")).toBeNull();
+});
+
+test("activity shortcut respects required fields and ignores a repeated submission while pending", async ({ page }) => {
+  const labels = getCrmDictionary("en");
+  const prefix = `shortcut-${Date.now()}`;
+  const company = await create("companies", { name: prefix });
+  await open(page, "en", "company", company.id);
+  const sheet = page.getByRole("dialog");
+  const form = sheet.locator("form");
+  let posts = 0;
+  let release!: () => void;
+  const responseGate = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/crm/activities", async route => {
+    if (route.request().method() !== "POST") return route.continue();
+    posts++;
+    const response = await route.fetch();
+    await responseGate;
+    await route.fulfill({ response });
+  });
+  try {
+    await form.getByRole("button", { name: labels.activity.types.task, exact: true }).click();
+    await form.locator("#activity-subject").press("Control+Enter");
+    await expect(form.locator("#activity-subject")).toBeFocused();
+    expect(await form.locator("#activity-subject").evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
+    expect(posts).toBe(0);
+    await form.getByRole("button", { name: labels.activity.types.note, exact: true }).click();
+    await form.locator("#activity-content").fill(prefix);
+    await form.locator("#activity-content").press("Control+Enter");
+    await expect.poll(() => posts).toBe(1);
+    await expect(form.locator("#activity-content")).toBeDisabled();
+    await form.locator("summary").press("Control+Enter");
+    await form.locator("summary").press("Meta+Enter");
+    release();
+    await expect(sheet.locator("ol").getByText(prefix, { exact: true })).toBeVisible();
+    await expect(form.locator("#activity-content")).toBeEnabled();
+    expect(posts).toBe(1);
+    expect(await timeline("company", company.id)).toHaveLength(1);
+  } finally { release(); await page.unroute("**/api/crm/activities"); }
 });

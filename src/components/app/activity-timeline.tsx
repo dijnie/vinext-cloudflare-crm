@@ -7,7 +7,8 @@ import type { EntityType } from "@/lib/listing/list-state";
 import type { AppLocale } from "@/lib/i18n/config";
 import type { CrmDictionary } from "@/lib/i18n/crm-dictionary";
 import { ActivityComposer } from "./activity-composer";
-import { selectClass } from "./list-toolbar";
+import { FormSelect } from "./record-sheet/form-select";
+import { Document, Phone, Events, Checkbox, ArrowsHorizontal, Checkmark } from "@carbon/icons-react";
 import { crmRequest, requestError } from "./record-types";
 
 export function ActivityTimeline({ entity, recordId, locale, labels }: { entity: EntityType; recordId: string; locale: AppLocale; labels: CrmDictionary }) {
@@ -32,18 +33,18 @@ export function ActivityTimeline({ entity, recordId, locale, labels }: { entity:
   const time = (value: string) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
   return <section className="space-y-5" aria-label={labels.activities}>
     <ActivityComposer entity={entity} recordId={recordId} labels={labels} />
-    <div className="space-y-1"><label htmlFor="activity-filter" className="text-sm font-medium">{copy.filter}</label><select id="activity-filter" className={`${selectClass} w-full`} value={filter} onChange={event => { setCursor(undefined); setFilter(event.target.value as TimelineInput["filter"]); }}>{Object.entries(copy.filters).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></div>
+    <div className="flex items-center justify-between gap-3 border-b pb-2"><label htmlFor="activity-filter" className="text-xs font-medium text-muted-foreground">{copy.filter}</label><div className="w-44"><FormSelect id="activity-filter" value={filter} onValueChange={value => { setCursor(undefined); setFilter(value as TimelineInput["filter"]); }} options={Object.entries(copy.filters).map(([value, label]) => ({ value, label }))} /></div></div>
     {error && <div role="alert" className="text-sm text-destructive">{error}<Button variant="ghost" onClick={() => { setCursor(undefined); setRevision(value => value + 1); }}>{labels.retry}</Button></div>}
-    <ol className="space-y-3" aria-busy={loading}>{entries.map(entry => <li key={entry.id} className="space-y-2 rounded-lg border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-medium">{entry.subject || copy.types[entry.type]}</h3><span className="text-xs text-muted-foreground">{copy.types[entry.type]}</span></div>
+    <ol aria-busy={loading}>{entries.map(entry => { const Icon = entry.type === "call" ? Phone : entry.type === "meeting" ? Events : entry.type === "task" ? entry.completedAt ? Checkmark : Checkbox : entry.metadata ? ArrowsHorizontal : Document; return <li key={entry.id} className="relative ml-3 space-y-2 border-l pb-6 pl-7"><span className="absolute -left-3 top-0 flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground" aria-hidden="true"><Icon size={14} /></span>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-xs font-medium">{entry.subject || copy.types[entry.type]}</h3><span className="text-xs text-muted-foreground">{copy.types[entry.type]}</span></div>
       <p className="text-xs text-muted-foreground">{copy.author}: {entry.author.name || entry.author.email} · <time dateTime={entry.occurredAt ?? entry.createdAt}>{time(entry.occurredAt ?? entry.createdAt)}</time></p>
-      {entry.metadata && <p className="text-sm">{copy.stageChange}: {labels.stages[entry.metadata.fromStageId]} → {labels.stages[entry.metadata.toStageId]}</p>}
-      {entry.content && <p className="whitespace-pre-wrap break-words text-sm">{entry.content}</p>}
-      {entry.dueAt && <p className="text-sm">{copy.dueAt}: <time dateTime={entry.dueAt}>{time(entry.dueAt)}</time></p>}
-      {entry.completedAt && <p className="text-sm">{copy.completedAt}: <time dateTime={entry.completedAt}>{time(entry.completedAt)}</time></p>}
-      {entry.type === "task" && <Button variant="outline" className="min-h-11" disabled={Boolean(busyId)} onClick={() => void complete(entry)}>{busyId === entry.id ? labels.loading : entry.completedAt ? copy.reopen : copy.complete}</Button>}
-    </li>)}</ol>
-    {loading && <p role="status" className="text-sm">{labels.loading}</p>}{!loading && !error && !entries.length && <p className="text-sm text-muted-foreground">{copy.empty}</p>}
+      {entry.metadata && <p className="text-xs">{copy.stageChange}: {labels.stages[entry.metadata.fromStageId]} → {labels.stages[entry.metadata.toStageId]}</p>}
+      {entry.content && <p className="whitespace-pre-wrap break-words text-xs leading-5">{entry.content}</p>}
+      {entry.dueAt && <p className="text-xs">{copy.dueAt}: <time dateTime={entry.dueAt}>{time(entry.dueAt)}</time></p>}
+      {entry.completedAt && <p className="text-xs">{copy.completedAt}: <time dateTime={entry.completedAt}>{time(entry.completedAt)}</time></p>}
+      {entry.type === "task" && <Button variant="outline" size="sm" disabled={Boolean(busyId)} onClick={() => void complete(entry)}>{busyId === entry.id ? labels.loading : entry.completedAt ? copy.reopen : copy.complete}</Button>}
+    </li>; })}</ol>
+    {loading && <p role="status" className="text-xs">{labels.loading}</p>}{!loading && !error && !entries.length && <p className="text-sm text-muted-foreground">{copy.empty}</p>}
     {data.key === key && data.nextCursor && <Button variant="outline" disabled={loading} onClick={() => setCursor(data.nextCursor ?? undefined)}>{copy.more}</Button>}
   </section>;
 }

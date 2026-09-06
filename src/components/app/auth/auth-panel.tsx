@@ -6,7 +6,8 @@ import { FormEvent, useState } from "react";
 
 import { authClient } from "@/lib/auth/auth-client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ShellLogo } from "../shell-logo";
+import { getShellInterfaceDictionary } from "@/lib/i18n/shell-interface-dictionary";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { AppLocale } from "@/lib/i18n/config";
@@ -76,25 +77,26 @@ export function AuthPanel({ dictionary, locale, mode, workspaceSlug }: AuthPanel
   const submitLabel = mode === "sign-in" ? auth.signIn : mode === "sign-up" ? auth.signUp : mode === "forgot-password" ? auth.sendResetLink : mode === "reset-password" ? auth.resetPassword : auth.resendVerification;
 
   return (
-    <Card className="w-full max-w-md border-border/80 shadow-xl shadow-emerald-950/5">
-      <CardHeader>
-        <CardTitle><h1 className="text-2xl">{title}</h1></CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <form onSubmit={submit}>
-        <CardContent className="space-y-4">
+    <div className="flex w-full flex-col gap-8">
+      <div className="flex flex-col gap-3 text-left">
+        <Link href={`/${locale}/sign-in`} aria-label={getShellInterfaceDictionary(locale).home}><ShellLogo className="size-6" /></Link>
+        <h2 className="text-balance text-2xl font-semibold leading-8 tracking-tight">{title}</h2>
+        <p className="max-w-[32ch] text-pretty text-sm leading-5 text-muted-foreground">{description}</p>
+      </div>
+      <form className="flex flex-col gap-6" onSubmit={submit}>
+        <div className="space-y-4">
           {showName ? <div className="space-y-2"><Label htmlFor="name">{dictionary.common.name}</Label><Input autoComplete="name" id="name" name="name" required /></div> : null}
           {showEmail ? <div className="space-y-2"><Label htmlFor="email">{dictionary.common.email}</Label><Input autoComplete="email" defaultValue={emailFromUrl} id="email" name="email" required type="email" /></div> : null}
           {showPassword ? <div className="space-y-2"><Label htmlFor="password">{mode === "reset-password" ? auth.newPassword : dictionary.common.password}</Label><Input autoComplete={mode === "sign-in" ? "current-password" : "new-password"} id="password" minLength={8} name="password" required type="password" /></div> : null}
-          {message ? <p aria-live="polite" className={failed ? "text-sm text-destructive" : "text-sm text-emerald-700"} role={failed ? "alert" : "status"}>{message}</p> : null}
-          {mode === "sign-in" ? <Link className="text-sm text-primary underline-offset-4 hover:underline" href={`/${locale}/forgot-password`}>{auth.forgotPassword}</Link> : null}
-        </CardContent>
-        <CardFooter className="flex-col items-stretch gap-4">
+          {message ? <p aria-live="polite" className={failed ? "text-sm text-destructive" : "text-sm text-success"} role={failed ? "alert" : "status"}>{message}</p> : null}
+          {mode === "sign-in" ? <Link className="text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground" href={`/${locale}/forgot-password`}>{auth.forgotPassword}</Link> : null}
+        </div>
+        <div className="flex flex-col items-stretch gap-4">
           <Button disabled={pending || (mode === "reset-password" && !token)} type="submit">{pending ? dictionary.common.loading : submitLabel}</Button>
           {mode === "sign-in" ? <p className="text-center text-sm text-muted-foreground">{auth.needAccount} <Link className="text-foreground underline" href={`/${locale}/sign-up`}>{auth.signUp}</Link></p> : null}
           {mode !== "sign-in" ? <p className="text-center text-sm text-muted-foreground">{auth.haveAccount} <Link className="text-foreground underline" href={`/${locale}/sign-in`}>{auth.signIn}</Link></p> : null}
-        </CardFooter>
+        </div>
       </form>
-    </Card>
+    </div>
   );
 }

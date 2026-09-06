@@ -12,5 +12,5 @@ export default async function MembersPage({ params }: { params: Promise<{ locale
   if (context.role !== "owner") notFound();
   const members = (await root.members.list(context)).map((member) => ({ ...member, createdAt: member.createdAt.toISOString() }));
   const dictionary = getDictionary(locale);
-  return <div className="mx-auto max-w-6xl space-y-6"><div><h1 className="text-2xl font-semibold tracking-tight">{dictionary.members.title}</h1><p className="mt-1 text-sm text-muted-foreground">{dictionary.members.description}</p></div><MembersTable currentMembershipId={context.membershipId} dictionary={dictionary} members={members} /></div>;
+  return <div className="mx-auto w-full max-w-7xl space-y-6"><div><h1 className="text-2xl font-medium tracking-tight md:text-3xl">{dictionary.members.title}</h1><p className="mt-1 text-sm text-muted-foreground">{dictionary.members.description}</p></div><MembersTable currentMembershipId={context.membershipId} dictionary={dictionary} members={members} /></div>;
 }

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { CrmDictionary } from "@/lib/i18n/crm-dictionary";
-import { selectClass } from "./list-toolbar";
+import { FormSelect } from "./record-sheet/form-select";
 import { crmRequest } from "./record-types";
 
 export interface OwnerOption { membershipId: string; name: string | null; email: string | null }
@@ -18,11 +18,11 @@ export function OwnerPicker({ id, name = "ownerMembershipId", value, onChange, l
   const retained = value && !owners.some(owner => owner.membershipId === value.membershipId) ? value : null;
   return <div className="space-y-1">
     <input type="hidden" name={name} value={value?.membershipId ?? ""} />
-    <select id={id} className={`${selectClass} w-full`} required={required} disabled={disabled} value={value?.membershipId ?? ""} onChange={event => onChange(owners.find(owner => owner.membershipId === event.target.value) ?? null)} aria-busy={status === "loading"} aria-describedby={status === "error" ? `${id}-error` : undefined}>
-      <option value="" disabled={required}>{required ? labels.chooseOwner : labels.none}</option>
-      {retained && <option value={retained.membershipId} disabled={status === "ready"}>{retained.name || retained.email || retained.membershipId}{status === "ready" ? ` · ${labels.activity.unavailableOwner}` : ""}</option>}
-      {owners.map(owner => <option key={owner.membershipId} value={owner.membershipId}>{owner.name || owner.email || owner.membershipId}</option>)}
-    </select>
+    <FormSelect id={id} required={required} disabled={disabled} value={value?.membershipId ?? ""} onValueChange={next => onChange(owners.find(owner => owner.membershipId === next) ?? (retained?.membershipId === next ? retained : null))} busy={status === "loading"} describedBy={status === "error" ? `${id}-error` : undefined} options={[
+      { value: "", label: required ? labels.chooseOwner : labels.none, disabled: required },
+      ...(retained ? [{ value: retained.membershipId, label: `${retained.name || retained.email || retained.membershipId}${status === "ready" ? ` · ${labels.activity.unavailableOwner}` : ""}`, disabled: status === "ready" }] : []),
+      ...owners.map(owner => ({ value: owner.membershipId, label: owner.name || owner.email || owner.membershipId })),
+    ]} />
     {status === "error" && <div id={`${id}-error`} role="alert" className="text-sm text-destructive">{labels.error}<Button type="button" variant="ghost" onClick={() => setRevision(v => v + 1)}>{labels.retry}</Button></div>}
   </div>;
 }

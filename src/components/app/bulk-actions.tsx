@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Archive, UserFollow } from "@carbon/icons-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { entityPaths, type EntityType } from "@/lib/listing/list-state";
@@ -33,11 +34,11 @@ export function BulkActions({ entity, ids, archived, labels, onSuccess, onPartia
     } catch (reason) { setError(requestError(reason, labels)); } finally { setBusy(false); }
   }
   const title = action === "ownership" ? labels.activity.reassign : archived ? labels.restore : labels.archive;
-  return <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-background p-3">
-    <span role="status" className="text-sm">{ids.length} {labels.selected}</span>
-    <Button variant="outline" disabled={!validSelection} onClick={() => { setError(""); setAction("archive"); }}>{archived ? labels.restore : labels.archive}</Button>
-    <Button variant="outline" disabled={!validSelection} onClick={() => { setError(""); setOwner(null); setAction("ownership"); }}>{labels.activity.reassign}</Button>
-    <Button variant="ghost" onClick={onSuccess}>{labels.clear}</Button>
+  return <div className="flex min-h-8 flex-wrap items-center gap-2">
+    <span role="status" className="mr-auto text-xs text-muted-foreground">{ids.length} {labels.selected}</span>
+    <Button size="sm" variant="outline" disabled={!validSelection} onClick={() => { setError(""); setAction("archive"); }}><Archive />{archived ? labels.restore : labels.archive}</Button>
+    <Button size="sm" variant="outline" disabled={!validSelection} onClick={() => { setError(""); setOwner(null); setAction("ownership"); }}><UserFollow />{labels.activity.reassign}</Button>
+    <Button size="sm" variant="ghost" onClick={onSuccess}>{labels.clear}</Button>
     <Dialog open={action !== null} onOpenChange={value => { if (!busy && !value) setAction(null); }}>
       <DialogContent closeLabel={labels.close}>
         <DialogTitle>{title}</DialogTitle>
