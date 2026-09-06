@@ -106,6 +106,7 @@ export const companyListOutputSchema = z.object({
   customFields: z.array(fieldDefinitionSchema),
   fieldFacets: facetOutputSchema,
   fieldUserLabels: z.record(z.string(), z.string()),
+  fieldFileLabels: z.record(z.string(), z.string()),
   fieldCustomerLabels: z.record(z.string(), z.string()),
   facets: facetOutputSchema,
   total: z.number().int().nonnegative(),

@@ -28,6 +28,7 @@ const defaultGroups = [
   ["field-sorting"],
   ["field-conditions"],
   ["field-datetime"],
+  ["file-fields"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();

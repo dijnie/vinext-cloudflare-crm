@@ -16,6 +16,7 @@ export default defineConfig({
       miniflare: {
         compatibilityDate: "2025-10-08",
         compatibilityFlags: ["nodejs_compat"],
+        r2Buckets: ["CRM_FILES"],
         d1Databases: ["DB", "UPGRADE_DB"],
         bindings: {
           TEST_MIGRATIONS: await readD1Migrations(

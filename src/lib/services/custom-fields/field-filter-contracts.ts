@@ -21,7 +21,7 @@ export const fieldCriteriaQuerySchema = z.preprocess(value => {
 export function fieldFilterOperators(type: FieldType): readonly FieldFilterOperator[] {
   const empty = ["empty", "not_empty"] as const;
   if (["number", "rating", "formula", "date", "money"].includes(type)) return ["eq", "neq", "gt", "gte", "lt", "lte", ...empty];
-  if (type === "multiselect" || type === "multivalue") return ["contains", ...empty];
+  if (type === "multiselect" || type === "multivalue" || type === "file") return ["contains", ...empty];
   if (["text", "long_text", "email", "url", "phone"].includes(type)) return ["eq", "neq", "contains", ...empty];
   return ["eq", "neq", ...empty];
 }

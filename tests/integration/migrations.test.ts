@@ -7,6 +7,7 @@ const crmTables = [
   "company",
   "contact",
   "crm_setting",
+  "crm_file",
   "custom_field_definition",
   "custom_field_option",
   "custom_field_value",
@@ -35,6 +36,7 @@ describe("CRM baseline migration", () => {
       { name: "0009_structured_custom_fields.sql" },
       { name: "0010_computed_custom_fields.sql" },
       { name: "0011_custom_field_conversion.sql" },
+      { name: "0012_private_file_fields.sql" },
     ]);
   });
 

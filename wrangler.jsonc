@@ -45,6 +45,7 @@
       ]
     }
   ],
+  "r2_buckets": [{ "binding": "CRM_FILES", "bucket_name": "vinext-crm-private-files" }],
   "d1_databases": [
     {
       "binding": "DB",

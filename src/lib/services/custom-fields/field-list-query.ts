@@ -2,7 +2,7 @@ import { FieldRepository } from "./field-repository";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
-import { company, contact, deal, customFieldDefinition as definition, customFieldOption as option, customFieldValue as value, user, singletonMembership } from "@/lib/db/schema";
+import { crmFile, company, contact, deal, customFieldDefinition as definition, customFieldOption as option, customFieldValue as value, user, singletonMembership } from "@/lib/db/schema";
 import type { EntityType } from "@/lib/listing/list-state";
 import { inJsonArray } from "@/lib/db/sql-filters";
 import { alias } from "drizzle-orm/sqlite-core";
@@ -76,6 +76,10 @@ export async function fieldListData(db: AppDatabase, entity: EntityType, ids: st
   ]);
   const calendar = await new FieldRepository(db).calendar(definitions);
   const customFields = definitions.map(field => ({ id: field.id, entity: field.entity, key: field.key, label: field.label, type: field.type, config: fieldConfig(field.configJson), ...(field.type === "date" && fieldConfig(field.configJson).dateTime ? { calendar } : {}), required: field.required, showOnSheet: field.showOnSheet, showOnTable: field.showOnTable, showOnFilter: field.showOnFilter, position: field.position, archivedAt: null, options: options.filter(item => item.fieldId === field.id).map(item => ({ id: item.id, label: item.label, position: item.position, archivedAt: item.archivedAt?.toISOString() ?? null })) }));
+  const fileFieldIds = new Set(definitions.filter(field => field.type === "file").map(field => field.id));
+  const attachmentIds = [...new Set(values.flatMap(row => fileFieldIds.has(row.fieldId) && row.jsonValue ? JSON.parse(row.jsonValue) as string[] : []))];
+  const attachments = attachmentIds.length ? await db.select({ id: crmFile.id, name: crmFile.fileName }).from(crmFile).where(and(inJsonArray(crmFile.id, attachmentIds), eq(crmFile.status, "ready"))) : [];
+  const fieldFileLabels = Object.fromEntries(attachments.map(item => [item.id, item.name]));
   const byId = new Map(definitions.map(field => [field.id, field]));
   const memberIds = [...new Set(values.flatMap(row => row.userMembershipId ? [row.userMembershipId] : []))];
   const members = memberIds.length ? await db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(inJsonArray(user.id, memberIds)) : [];
@@ -94,5 +98,5 @@ export async function fieldListData(db: AppDatabase, entity: EntityType, ids: st
   for (const id of ids) { const values = fieldsByRecord[id] ?? {}; fieldsByRecord[id] = { ...values, ...compute(values) }; }
   const fieldFacets: Record<string, { value: string; label: string; count: number }[]> = {};
   for (const row of facetRows) { const key = byId.get(row.fieldId)!.key; (fieldFacets[key] ??= []).push({ value: row.choiceId, label: row.label, count: row.count }); }
-  return { customFields, fieldsByRecord, fieldFacets, fieldUserLabels, fieldCustomerLabels };
+  return { customFields, fieldsByRecord, fieldFacets, fieldFileLabels, fieldUserLabels, fieldCustomerLabels };
 }

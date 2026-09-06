@@ -17,7 +17,7 @@ export function fieldValueExpression(fields: StoredFieldDefinition[], field: Sto
   else if (field.type === "select") stored = displayReferences ? sql`(select o.label from custom_field_option o where o.id=v.option_id and o.field_id=v.field_id)` : sql`v.option_id`;
   else if (field.type === "user") stored = displayReferences ? sql`(select coalesce(nullif(u.name,''),u.email) from user u where u.id=v.user_membership_id)` : sql`v.user_membership_id`;
   else if (field.type === "customer") stored = displayReferences ? sql`(select trim(coalesce(c.first_name,'') || ' ' || coalesce(c.last_name,'')) from contact c where c.id=v.customer_reference_id)` : sql`v.customer_reference_id`;
-  else if (["money", "multiselect", "multivalue"].includes(field.type)) stored = sql`v.json_value`;
+  else if (["money", "multiselect", "multivalue", "file"].includes(field.type)) stored = sql`v.json_value`;
   else stored = sql`nullif(v.text_value,'')`;
   return sql`(select ${stored} from custom_field_value v where v.field_id=${field.id} and v.${anchor}=${recordId})`;
 }

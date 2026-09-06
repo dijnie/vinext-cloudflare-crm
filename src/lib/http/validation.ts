@@ -29,10 +29,10 @@ function assertValueLimits(value: unknown, depth = 0): void {
   }
 }
 
-export async function assertSafeMutationRequest(
+export function assertSafeMutationOrigin(
   request: Request,
   canonicalOrigin: string,
-): Promise<void> {
+): void {
   let origin = request.headers.get("origin");
   const incoming = new URL(request.url);
   const canonical = new URL(canonicalOrigin);
@@ -48,6 +48,10 @@ export async function assertSafeMutationRequest(
   if (origin !== canonicalOrigin || (fetchSite && !acceptedSites.includes(fetchSite))) {
     throw new HttpError(403, "invalid_origin", "The request origin is not allowed");
   }
+}
+
+export async function assertSafeMutationRequest(request: Request, canonicalOrigin: string): Promise<void> {
+  assertSafeMutationOrigin(request, canonicalOrigin);
   if (request.headers.get("content-type") !== "application/json") {
     throw new HttpError(415, "invalid_content_type", "Content-Type must be application/json");
   }

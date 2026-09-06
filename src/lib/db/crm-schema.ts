@@ -265,7 +265,7 @@ export const customFieldDefinition = sqliteTable(
         "url",
         "email",
         "phone",
-        "user", "money", "multiselect", "multivalue", "rating", "customer", "formula",
+        "user", "money", "multiselect", "multivalue", "rating", "customer", "formula", "file",
       ],
     }).notNull(),
     configJson: text("config_json"),
@@ -293,7 +293,7 @@ export const customFieldDefinition = sqliteTable(
     ),
     check(
       "custom_field_type_check",
-      sql`${table.type} in ('text', 'long_text', 'number', 'date', 'checkbox', 'select', 'url', 'email', 'phone', 'user', 'money', 'multiselect', 'multivalue', 'rating', 'customer', 'formula')`,
+      sql`${table.type} in ('text', 'long_text', 'number', 'date', 'checkbox', 'select', 'url', 'email', 'phone', 'user', 'money', 'multiselect', 'multivalue', 'rating', 'customer', 'formula', 'file')`,
     ),
     check(
       "custom_field_config_json_check",
@@ -507,3 +507,28 @@ export const dealConversion = sqliteTable("deal_conversion", {
   fxRateAt: integer("fx_rate_at", { mode: "timestamp_ms" }),
   rateSource: text("rate_source", { enum: ["identity", "manual", "fetched"] }),
 }, table => [primaryKey({ columns: [table.version, table.dealId] }), index("deal_conversion_amount_idx").on(table.version, table.baseAmountMinor, table.dealId)]);
+
+// Metadata deliberately has no foreign keys: object keys survive record and account deletion.
+export const crmFile = sqliteTable("crm_file", {
+  id: text("id").primaryKey(),
+  objectKey: text("object_key").notNull(),
+  entity: text("entity", { enum: ["company", "contact", "deal"] }).notNull(),
+  recordId: text("record_id").notNull(),
+  fieldId: text("field_id").notNull(),
+  uploaderId: text("uploader_id").notNull(),
+  fileName: text("file_name").notNull(),
+  size: integer("size").notNull(),
+  status: text("status", { enum: ["pending", "ready", "failed", "cleaning"] }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  readyAt: integer("ready_at", { mode: "timestamp_ms" }),
+  cleanupAttemptedAt: integer("cleanup_attempted_at", { mode: "timestamp_ms" }),
+}, table => [
+  uniqueIndex("crm_file_object_key_unique").on(table.objectKey),
+  index("crm_file_anchor_idx").on(table.entity, table.recordId, table.fieldId),
+  index("crm_file_cleanup_idx").on(table.status, table.createdAt),
+  check("crm_file_entity_check", sql`${table.entity} in ('company','contact','deal')`),
+  check("crm_file_status_check", sql`${table.status} in ('pending','ready','failed','cleaning')`),
+  check("crm_file_name_check", sql`length(${table.fileName}) between 1 and 255`),
+  check("crm_file_size_check", sql`typeof(${table.size}) = 'integer' and ${table.size} between 0 and 10485760`),
+  check("crm_file_ready_check", sql`(${table.status} = 'ready' and ${table.readyAt} is not null) or (${table.status} != 'ready' and ${table.readyAt} is null)`),
+]);

@@ -16,10 +16,10 @@ export async function fieldConditionQuery(db: AppDatabase, entity: FieldEntity, 
     const expression = fieldValueExpression(fields, field, entity);
     const { operator, value } = criterion;
     if (operator === "empty" || operator === "not_empty") {
-      if (field.type === "multiselect" || field.type === "multivalue") return operator === "empty" ? sql`coalesce(json_array_length(${expression}),0)=0` : sql`json_array_length(${expression})>0`;
+      if (field.type === "multiselect" || field.type === "multivalue" || field.type === "file") return operator === "empty" ? sql`coalesce(json_array_length(${expression}),0)=0` : sql`json_array_length(${expression})>0`;
       return operator === "empty" ? sql`${expression} is null` : sql`${expression} is not null`;
     }
-    if (operator === "contains") return field.type === "multiselect" || field.type === "multivalue"
+    if (operator === "contains") return field.type === "multiselect" || field.type === "multivalue" || field.type === "file"
       ? sql`exists(select 1 from json_each(${expression}) item where item.value=${value})`
       : sql`instr(${expression},${value})>0`;
     if (field.type === "date" && typeof value === "string" && value.includes("T")) return sql`${expression} ${sql.raw(comparison[operator])} ${Date.parse(value)}`;

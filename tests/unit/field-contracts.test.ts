@@ -3,7 +3,7 @@ import { FIELD_TYPES, fieldCreateInputSchema, fieldDeleteInputSchema, fieldKeyFr
 
 describe("custom field contracts", () => {
   it("accepts all supported field types on all three entities with stable defaults", () => {
-    expect(FIELD_TYPES).toEqual(["text", "long_text", "number", "date", "checkbox", "select", "url", "email", "phone", "user", "money", "multiselect", "multivalue", "rating", "customer", "formula"]);
+    expect(FIELD_TYPES).toEqual(["text", "long_text", "number", "date", "checkbox", "select", "url", "email", "phone", "user", "money", "multiselect", "multivalue", "rating", "customer", "formula", "file"]);
     for (const entity of ["company", "contact", "deal"]) for (const type of FIELD_TYPES) {
       expect(fieldCreateInputSchema.parse({ entity, type, label: "  Customer field  " })).toMatchObject({ entity, type, label: "Customer field", required: false, showOnSheet: true });
     }

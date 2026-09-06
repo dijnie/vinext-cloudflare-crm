@@ -6,7 +6,7 @@ import { changeListState, parseListState } from "@/lib/listing/list-state";
 describe("typed condition contracts",()=>{
  it("exposes only applicable operators for all sixteen field types",()=>{
   for(const type of FIELD_TYPES){
-   const expected=["number","rating","formula","date","money"].includes(type)?["eq","neq","gt","gte","lt","lte","empty","not_empty"]:["multiselect","multivalue"].includes(type)?["contains","empty","not_empty"]:["text","long_text","email","url","phone"].includes(type)?["eq","neq","contains","empty","not_empty"]:["eq","neq","empty","not_empty"];
+   const expected=["number","rating","formula","date","money"].includes(type)?["eq","neq","gt","gte","lt","lte","empty","not_empty"]:["multiselect","multivalue","file"].includes(type)?["contains","empty","not_empty"]:["text","long_text","email","url","phone"].includes(type)?["eq","neq","contains","empty","not_empty"]:["eq","neq","empty","not_empty"];
    expect(fieldFilterOperators(type),type).toEqual(expected);
    const value=type==="money"?{amountMinor:0,currency:"USD" as const}:type==="date"?"2026-09-06":type==="checkbox"?false:["number","rating","formula"].includes(type)?0:"reference";
    for(const operator of ["eq","neq","gt","gte","lt","lte","contains","empty","not_empty"] as const) expect(isValidFieldCriterion(type,{key:"field",operator,...(["empty","not_empty"].includes(operator)?{}:{value})}),type+operator).toBe(expected.includes(operator));

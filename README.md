@@ -437,3 +437,33 @@ reject date-only writes. UI requests include `calendarRevision`; a settings chan
 before the atomic write returns a conflict so the editor can reload. Direct API
 clients that already own an absolute instant can omit that optional revision.
 Saved UTC-day conditions retain their meaning when date display settings change.
+
+
+File fields store up to ten ordered attachment IDs. Bytes live in the private
+`CRM_FILES` R2 binding; D1 stores filenames, sizes, immutable record/field anchors
+and an upload-state ledger. Each upload is limited to 10 MiB by counting actual
+request bytes. Uploads require the record's update permission; normal Save attaches
+them. Only the uploader can attach an unsaved upload. Other editors may retain
+files already attached to that same field and record. Removing a file selection
+and saving detaches it without physically deleting bytes.
+
+`POST /api/crm/files?entity=...&recordId=...&fieldId=...` takes raw
+`application/octet-stream` and a percent-encoded UTF-8 `x-file-name` header.
+`GET /api/crm/files/{id}` returns safe metadata; `/download` streams an attachment
+with private/no-store and nosniff headers. Both require active membership, an
+existing record, an active field, and either current attachment or uploader
+ownership. Archived/deleted definitions deny these reads until restored. No public
+bucket URL or object key is returned. File conditions support exact attachment-ID
+membership and empty/not-empty; scalar sorting and type conversion are unavailable.
+
+Owner-only `POST /api/crm/files/cleanup` with JSON `{}` processes a bounded batch
+of pending/failed uploads older than one day and retries retained cleanup entries.
+It claims a terminal state before deleting R2 objects, retaining their keys even
+after success so an interrupted late upload can be deleted on a later run. Ready
+detached files are retained; this command does not implement a retention purge.
+Cleanup must be invoked again when failures remain; no scheduled job is installed.
+
+Wrangler config declares the intended private bucket name; local tests emulate
+R2 and do not create that bucket remotely. Before an authorized release, provision
+or select the intended bucket and verify the binding with public access disabled.
+Changing source configuration alone is not proof of a production bucket or upload.

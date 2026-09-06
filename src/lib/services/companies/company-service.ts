@@ -32,7 +32,7 @@ export class CompanyService {
       facets: result.facets,
       customFields: result.customFields,
       fieldFacets: result.fieldFacets,
-      fieldCustomerLabels: result.fieldCustomerLabels, fieldUserLabels: result.fieldUserLabels,
+      fieldFileLabels: result.fieldFileLabels, fieldCustomerLabels: result.fieldCustomerLabels, fieldUserLabels: result.fieldUserLabels,
       rows: result.rows.map((row) => ({
         ...row,
         owner: row.ownerMembershipId

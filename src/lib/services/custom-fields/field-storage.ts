@@ -8,7 +8,7 @@ export function fieldConfig(raw: string | null): FieldConfig {
 }
 export function storedFieldValue(type: FieldType, row: typeof customFieldValue.$inferSelect | undefined): FieldValue {
   if (!row) return null;
-  if (["money", "multiselect", "multivalue"].includes(type)) return row.jsonValue === null ? null : JSON.parse(row.jsonValue) as FieldValue;
+  if (["money", "multiselect", "multivalue", "file"].includes(type)) return row.jsonValue === null ? null : JSON.parse(row.jsonValue) as FieldValue;
   if (type === "customer") return row.customerReferenceId;
   if (type === "number" || type === "rating") return row.numberValue;
   if (type === "date") return row.dateValue?.toISOString() ?? null;

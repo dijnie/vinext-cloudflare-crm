@@ -1,3 +1,4 @@
+import { MAX_FIELD_FILES } from "../files/file-contracts";
 import { authorizedBatch, authorizedWrite, requirePermission } from "../permissions/permission-policy";
 import { and, count, eq, isNull, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
@@ -24,7 +25,7 @@ function translateWriteError(error: unknown, message: string): never {
     current = "cause" in current ? current.cause : null;
   }
   const detail = messages.join(" ");
-  const conflicts = ["operation_conflict", "field_unavailable", "field_type_has_values", "field_option_unavailable", "field_option_mismatch", "field_entity_mismatch", "field_value_type_mismatch", "field_member_inactive", "field_rating_invalid", "field_rating_has_values", "field_json_value_invalid", "field_money_invalid", "field_customer_unavailable"];
+  const conflicts = ["operation_conflict", "field_unavailable", "field_file_invalid", "field_type_has_values", "field_option_unavailable", "field_option_mismatch", "field_entity_mismatch", "field_value_type_mismatch", "field_member_inactive", "field_rating_invalid", "field_rating_has_values", "field_json_value_invalid", "field_money_invalid", "field_customer_unavailable"];
   if (conflicts.some(code => detail.includes(code)) || detail.includes("check constraint failed") && /authorized\W*=\W*1/.test(detail)) conflict(message);
   relationError(error, message);
 }
@@ -115,10 +116,14 @@ export class FieldService {
       const field = fields.find(item => item.key === key); if (!field) invalid("Unknown or archived field");
       if (field.type === "formula") invalid("Computed fields are read-only");
       const data = { jsonValue: null as string | null, customerReferenceId: null as string | null, textValue: null as string | null, numberValue: null as number | null, dateValue: null as Date | null, booleanValue: null as boolean | null, optionId: null as string | null, userMembershipId: null as string | null, updatedAt: new Date() };
-      const blank = raw === null || ["multiselect", "multivalue"].includes(field.type) && Array.isArray(raw) && raw.length === 0 || typeof raw === "string" && raw.trim() === "";
+      const blank = raw === null || ["multiselect", "multivalue", "file"].includes(field.type) && Array.isArray(raw) && raw.length === 0 || typeof raw === "string" && raw.trim() === "";
       if (blank && field.required) invalid("Required field cannot be empty");
       if (!blank) {
-        if (field.type === "money") {
+        if (field.type === "file") {
+          if (!Array.isArray(raw) || raw.length > MAX_FIELD_FILES || raw.some(id => typeof id !== "string" || !id || id.length > 100) || new Set(raw).size !== raw.length) invalid("Expected up to ten unique attachment IDs");
+          data.jsonValue = JSON.stringify(raw);
+        }
+        else if (field.type === "money") {
           const parsed = moneyFieldValueSchema.safeParse(raw); if (!parsed.success) invalid("Expected currency and integer minor units");
           data.jsonValue = JSON.stringify(parsed.data);
         }
@@ -153,8 +158,20 @@ export class FieldService {
       const operationId = crypto.randomUUID();
       const expected = Object.keys(input.values).map(key => {
         const field = fields.find(item => item.key === key)!;
-        return { id: field.id, type: field.type, required: field.required ? 1 : 0, config: field.configJson };
+        return { id: field.id, type: field.type, required: field.required ? 1 : 0, config: field.configJson, files: field.type === "file" && Array.isArray(input.values[key]) ? input.values[key] : [] };
       });
+      const fileReferences = expected.filter(item => item.files.length);
+      const fileGuard = fileReferences.length ? sql`not exists (
+            select 1 from json_each(${JSON.stringify(fileReferences)}) wanted, json_each(json_extract(wanted.value,'$.files')) chosen
+            where not exists (select 1 from crm_file attachment
+              where attachment.id=chosen.value and attachment.status='ready'
+                and attachment.field_id=json_extract(wanted.value,'$.id') and attachment.entity=${input.entity} and attachment.record_id=${input.recordId}
+                and (attachment.uploader_id=${context.userId} or exists (
+                  select 1 from custom_field_value existing_value, json_each(existing_value.json_value) existing
+                  where existing_value.field_id=attachment.field_id and existing_value.${sql.raw(recordColumn(input.entity).replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`))}=${input.recordId} and existing.value=attachment.id
+                ))
+            )
+          )` : sql`1=1`;
       try {
         await authorizedBatch(this.db, context, [`${input.entity}.update`], [
           this.db.insert(operationConditionGuard).values({ id: operationId, authorized: sql<number>`case when not exists (
@@ -162,7 +179,7 @@ export class FieldService {
             where not exists (select 1 from custom_field_definition as f
               where f.id=json_extract(wanted.value,'$.id') and f.type=json_extract(wanted.value,'$.type')
                 and f.required=json_extract(wanted.value,'$.required') and f.config_json is json_extract(wanted.value,'$.config') and f.archived_at is null and f.deleted_at is null)
-          ) and ${input.calendarRevision === undefined ? sql`1=1` : sql`exists (select 1 from crm_setting where id='settings' and calendar_revision=${input.calendarRevision})`} and exists (select 1 from singleton_membership where user_id=${context.membershipId} and status='active') then 1 else 0 end` }),
+          ) and ${fileGuard} and ${input.calendarRevision === undefined ? sql`1=1` : sql`exists (select 1 from crm_setting where id='settings' and calendar_revision=${input.calendarRevision})`} and exists (select 1 from singleton_membership where user_id=${context.membershipId} and status='active') then 1 else 0 end` }),
           ...writes,
           this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, operationId)),
         ]);
