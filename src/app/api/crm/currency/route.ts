@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
-import { currencyCodeSchema, currencyMutationSchema, currencySettingsSchema } from "@/modules/currency/currency-contracts";
-import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
-import { HttpError } from "@/server/http-errors";
-import { createRouteHandler } from "@/server/route-handler";
+import { currencyCodeSchema, currencyMutationSchema, currencySettingsSchema } from "@/lib/services/currencies/currency-contracts";
+import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
+import { HttpError } from "@/lib/http/http-errors";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 export function createCurrencyGetHandler(root: CompositionRoot) { return createRouteHandler(root,{ output:currencySettingsSchema,handle:({context,request})=>{
   const raw=new URL(request.url).searchParams.get("baseCurrency");

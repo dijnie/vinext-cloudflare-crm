@@ -1,8 +1,8 @@
 import { and } from "drizzle-orm";
 import { SQLiteSyncDialect } from "drizzle-orm/sqlite-core";
 import { describe, expect, it } from "vitest";
-import { company } from "@/db/schema";
-import { inJsonArray } from "@/modules/crm/sql-filters";
+import { company } from "@/lib/db/schema";
+import { inJsonArray } from "@/lib/db/sql-filters";
 
 const dialect = new SQLiteSyncDialect();
 describe("JSON array SQL filters", () => {

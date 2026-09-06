@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
-import { fieldCreateInputSchema, fieldDefinitionSchema, fieldListInputSchema, fieldReorderInputSchema } from "@/modules/fields/field-contracts";
-import { parseSearchParams } from "@/modules/crm/contracts/list-contract";
-import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
-import { createRouteHandler } from "@/server/route-handler";
+import { fieldCreateInputSchema, fieldDefinitionSchema, fieldListInputSchema, fieldReorderInputSchema } from "@/lib/services/custom-fields/field-contracts";
+import { parseSearchParams } from "@/lib/listing/list-contract";
+import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 export function createFieldsGetHandler(root: CompositionRoot) { return createRouteHandler(root, { output: fieldDefinitionSchema.array(), handle: ({ context, request }) => root.fields.list(context, parseSearchParams(request, fieldListInputSchema)) }); }
 export function createFieldsPostHandler(root: CompositionRoot) { return createRouteHandler(root, { input: fieldCreateInputSchema, output: fieldDefinitionSchema, unsafe: true, handle: ({ context, input }) => root.fields.create(context, input) }); }

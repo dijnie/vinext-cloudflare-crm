@@ -7,14 +7,14 @@ import {
   companyListInputSchema,
   companyListOutputSchema,
   companyWriteOutputSchema,
-} from "@/modules/crm/contracts/company-contract";
-import { parseSearchParams } from "@/modules/crm/contracts/list-contract";
+} from "@/lib/services/companies/company-contract";
+import { parseSearchParams } from "@/lib/listing/list-contract";
 import {
   createCompositionRoot,
   type CompositionRoot,
   type RuntimeEnv,
-} from "@/server/composition-root";
-import { createRouteHandler } from "@/server/route-handler";
+} from "@/lib/composition-root";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 export function createCompaniesGetHandler(root: CompositionRoot) {
   return createRouteHandler(root, {

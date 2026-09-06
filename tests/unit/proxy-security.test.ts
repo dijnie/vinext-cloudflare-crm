@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applySecurityHeaders } from "@/server/security-headers";
+import { applySecurityHeaders } from "@/lib/http/security-headers";
 
 describe("global proxy security", () => {
   it("adds document security headers", () => {

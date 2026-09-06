@@ -1,9 +1,9 @@
 import { expect, request, test, type APIRequestContext } from "@playwright/test";
-import { formatMinor } from "../../src/modules/currency/currency-catalog";
-import type { CurrencySettings } from "../../src/modules/currency/currency-contracts";
-import type { DashboardSummaryData } from "../../src/modules/dashboard/dashboard-contracts";
-import { getCurrencyDictionary } from "../../src/i18n/currency-dictionary";
-import { getCrmDictionary } from "../../src/i18n/crm-dictionary";
+import { formatMinor } from "../../src/lib/services/currencies/currency-catalog";
+import type { CurrencySettings } from "../../src/lib/services/currencies/currency-contracts";
+import type { DashboardSummaryData } from "../../src/lib/services/dashboard/dashboard-contracts";
+import { getCurrencyDictionary } from "../../src/lib/i18n/currency-dictionary";
+import { getCrmDictionary } from "../../src/lib/i18n/crm-dictionary";
 
 test.use({ actionTimeout: 10_000 });
 test.describe.configure({ mode: "serial" });

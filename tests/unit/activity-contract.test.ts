@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activityCreateInputSchema, activityCompleteInputSchema, timelineInputSchema, ownershipInputSchema } from "@/modules/crm/contracts/activity-contract";
+import { activityCreateInputSchema, activityCompleteInputSchema, timelineInputSchema, ownershipInputSchema } from "@/lib/services/activities/activity-contract";
 
 const id = "11111111-1111-4111-8111-111111111111";
 describe("activity and ownership contracts", () => {

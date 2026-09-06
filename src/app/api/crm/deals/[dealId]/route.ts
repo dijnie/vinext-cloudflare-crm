@@ -5,14 +5,14 @@ import {
   dealIdSchema,
   dealMutationInputSchema,
   dealMutationOutputSchema,
-} from "@/modules/crm/contracts/deal-contract";
+} from "@/lib/services/deals/deal-contract";
 import {
   createCompositionRoot,
   type CompositionRoot,
   type RuntimeEnv,
-} from "@/server/composition-root";
-import { HttpError } from "@/server/http-errors";
-import { createRouteHandler } from "@/server/route-handler";
+} from "@/lib/composition-root";
+import { HttpError } from "@/lib/http/http-errors";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 type RouteParams = Promise<{ dealId: string }>;
 

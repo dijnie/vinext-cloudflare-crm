@@ -34,15 +34,15 @@ import {
   createDealContactPatchHandler,
   createDealContactPostHandler,
 } from "../../src/app/api/crm/deals/[dealId]/contacts/route";
-import { handleAuthRequest } from "@/modules/auth/auth";
+import { handleAuthRequest } from "@/lib/auth/auth";
 import { createOwnersGetHandler } from "../../src/app/api/crm/owners/route";
-import type { AuthEmailAdapter, AuthEmailMessage } from "@/modules/auth/email-adapter";
-import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
-import { singletonMembership } from "@/db/schema";
+import type { AuthEmailAdapter, AuthEmailMessage } from "@/lib/email/email-adapter";
+import { SINGLETON_WORKSPACE_ID } from "@/lib/services/members/singleton-workspace";
+import { singletonMembership } from "@/lib/db/schema";
 import {
   createCompositionRoot,
   type RuntimeEnv,
-} from "@/server/composition-root";
+} from "@/lib/composition-root";
 
 class RecordingEmailAdapter implements AuthEmailAdapter {
   verificationMessages: AuthEmailMessage[] = [];

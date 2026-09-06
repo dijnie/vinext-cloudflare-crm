@@ -7,14 +7,14 @@ import {
   dealCreateOutputSchema,
   dealListInputSchema,
   dealListOutputSchema,
-} from "@/modules/crm/contracts/deal-contract";
-import { parseSearchParams } from "@/modules/crm/contracts/list-contract";
+} from "@/lib/services/deals/deal-contract";
+import { parseSearchParams } from "@/lib/listing/list-contract";
 import {
   createCompositionRoot,
   type CompositionRoot,
   type RuntimeEnv,
-} from "@/server/composition-root";
-import { createRouteHandler } from "@/server/route-handler";
+} from "@/lib/composition-root";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 export function createDealsGetHandler(root: CompositionRoot) {
   return createRouteHandler(root, {

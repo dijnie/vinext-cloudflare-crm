@@ -1,6 +1,6 @@
 import { expect, request, test, type APIRequestContext, type Page } from "@playwright/test";
-import { FIELD_TYPES, type FieldDefinition } from "../../src/modules/fields/field-contracts";
-import { getCrmDictionary } from "../../src/i18n/crm-dictionary";
+import { FIELD_TYPES, type FieldDefinition } from "../../src/lib/services/custom-fields/field-contracts";
+import { getCrmDictionary } from "../../src/lib/i18n/crm-dictionary";
 
 test.use({ actionTimeout: 10_000 });
 let api: APIRequestContext;

@@ -195,10 +195,16 @@ before a restore; there is no automatic reset or zero-loss database rollback.
 
 ## Usage
 
-Pages and API entry points live in `src/app`, reusable UI in `src/components`,
-and business modules in `src/modules` (auth, CRM, currency, dashboard, fields,
-members, and views). Shared database, server, localization, utilities, and styles
-remain in their existing `src` directories.
+Pages and API entry points live in `src/app`; the Worker entry remains in
+`worker/index.ts`. Application components live in `src/components/app`, with
+shared UI primitives in `src/components/ui`.
+
+The shared layout follows the Cloudflare CRM reference: `src/lib/auth`, `db`,
+`email`, `http`, `i18n`, and `listing` hold infrastructure and list contracts.
+Business services live under `src/lib/services`, grouped into activities,
+companies, contacts, currencies, custom-fields, dashboard, deals, members,
+saved-views, and shared helpers. `src/lib/composition-root.ts` wires the services.
+Vinext routing and runtime conventions remain unchanged.
 
 Public auth is available under `/{locale}/sign-up`, `/{locale}/sign-in`,
 `/{locale}/verify-email`, `/{locale}/forgot-password`, and
@@ -213,55 +219,56 @@ responses.
 Authenticated active members can access the core CRM API under
 `/api/crm/companies`, `/api/crm/contacts`, and `/api/crm/deals`. The route files
 under [src/app/api/crm](src/app/api/crm) are the HTTP entry points; request validation
-and list contracts are owned by [src/modules/crm/contracts](src/modules/crm/contracts).
+is owned by [lib/http](src/lib/http), with shared list contracts in
+[lib/listing](src/lib/listing) and entity contracts beside their services.
 
 For shareable list state and stable record-sheet links, start with
-[parseListState](src/modules/crm/list-state.ts) and the
-[list contract](src/modules/crm/contracts/list-contract.ts). Direct record entry points
-are owned by [DirectRecordPage](src/components/crm/entity-list-page.tsx), and
-sheet navigation by [the record-sheet components](src/components/crm/record-sheet).
+[parseListState](src/lib/listing/list-state.ts) and the
+[list contract](src/lib/listing/list-contract.ts). Direct record entry points
+are owned by [DirectRecordPage](src/components/app/entity-list-page.tsx), and
+sheet navigation by [the record-sheet components](src/components/app/record-sheet).
 Same-page filters, pagination, saved views, and record-sheet URL changes use
-[client history navigation](src/components/crm/list-navigation.ts). List and
+[client history navigation](src/components/app/list-navigation.ts). List and
 record data still come from the existing guarded APIs; initial server rendering
 and cross-path Vinext navigation remain in place. Record links retain deep URLs
 and modified-click behavior without speculative prefetch. This behavior does
 not establish a production latency improvement.
 
 Open a record sheet's Activities tab for manual activity logging, tasks, and
-deal stage history. Start with [ActivityTimeline](src/components/crm/activity-timeline.tsx)
-for the UI and [the activity contract](src/modules/crm/contracts/activity-contract.ts)
-for API validation. Record assignment uses [OwnerPicker](src/components/crm/owner-picker.tsx)
+deal stage history. Start with [ActivityTimeline](src/components/app/activity-timeline.tsx)
+for the UI and [the activity contract](src/lib/services/activities/activity-contract.ts)
+for API validation. Record assignment uses [OwnerPicker](src/components/app/owner-picker.tsx)
 and the [ownership API entry point](src/app/api/crm/ownership/route.ts); assignment
-rules belong to [OwnershipService](src/modules/crm/ownership/ownership-service.ts).
+rules belong to [OwnershipService](src/lib/services/members/ownership-service.ts).
 
 All active members can manage custom fields from each list's field settings and
-edit values in record sheets. Start with [FieldsSheet](src/components/crm/fields/fields-sheet.tsx)
-and [RecordFields](src/components/crm/fields/record-fields.tsx); supported types
-belong to [the field contract](src/modules/fields/field-contracts.ts), and SELECT/USER
-list filters to [the field query owner](src/modules/fields/field-list-query.ts).
+edit values in record sheets. Start with [FieldsSheet](src/components/app/fields/fields-sheet.tsx)
+and [RecordFields](src/components/app/fields/record-fields.tsx); supported types
+belong to [the field contract](src/lib/services/custom-fields/field-contracts.ts), and SELECT/USER
+list filters to [the field query owner](src/lib/services/custom-fields/field-list-query.ts).
 
 The field deletion dialog shows value coverage and requires the current password
 and typed stable field key. Deletion retains the normalized definition, options,
 values, and reserved key as a recoverable tombstone; there is no automatic purge.
 Keep the displayed recovery ID for explicit recovery in field settings. Lifecycle
-rules belong to [FieldService](src/modules/fields/field-service.ts), and password checking
-to [verifyCurrentPassword](src/modules/auth/verify-current-password.ts).
+rules belong to [FieldService](src/lib/services/custom-fields/field-service.ts), and password checking
+to [verifyCurrentPassword](src/lib/auth/verify-current-password.ts).
 
-Use [SavedViewsMenu](src/components/crm/saved-views-menu.tsx) to save and apply
+Use [SavedViewsMenu](src/components/app/saved-views-menu.tsx) to save and apply
 private or shared list state. Every active member may create views; private views
 remain creator-only, while shared views are readable by all members. Only the
 original creator may edit, change sharing, or delete a view; membership removal
 or record reassignment does not transfer that authority. See
-[SavedViewService](src/modules/views/saved-view-service.ts) and
-[the saved-state contract](src/modules/views/saved-view-contracts.ts).
+[SavedViewService](src/lib/services/saved-views/saved-view-service.ts) and
+[the saved-state contract](src/lib/services/saved-views/saved-view-contracts.ts).
 
 ### Currency and dashboard
 
 Open the dashboard at `/{locale}/{workspaceSlug}` and currency settings at
 `/{locale}/{workspaceSlug}/settings/currencies`. Start with
-[DashboardSummary](src/components/dashboard/dashboard-summary.tsx) for the
+[DashboardSummary](src/components/app/dashboard/dashboard-summary.tsx) for the
 shareable personal/everyone scope and
-[CurrencySettings](src/components/settings/currency-settings.tsx) for owner-managed
+[CurrencySettings](src/components/app/settings/currency-settings.tsx) for owner-managed
 rates and reporting currency.
 
 VND is supported for deals and reporting currency. Enter VND amounts in whole
@@ -273,8 +280,8 @@ precedence over any stored fetched rates. Frozen deal conversions keep reports
 from drifting when rates change: updating a rate can fill missing conversions,
 but does not revalue already converted deals. Original amounts and currencies,
 including legacy unconverted records, are retained. See
-[CurrencyService](src/modules/currency/currency-service.ts) for these rules and
-[the conversion owner](src/modules/currency/conversion-service.ts) for exact money arithmetic.
+[CurrencyService](src/lib/services/currencies/currency-service.ts) for these rules and
+[the conversion owner](src/lib/services/currencies/conversion-service.ts) for exact money arithmetic.
 
 Changing reporting currency is an explicit, resumable operation. The old reporting
 currency and conversion version remain active until the whole operation finishes,
@@ -287,6 +294,6 @@ Dashboard money totals exclude archived and unconverted deals; missing conversio
 are disclosed by count and currency instead of being presented as zero-valued
 deals. Exact totals cross the API as decimal strings representing integer minor
 units, avoiding JavaScript number precision loss. Query ownership is in
-[DashboardRepository](src/modules/dashboard/dashboard-repository.ts), with the response
-contract in [dashboard-contracts](src/modules/dashboard/dashboard-contracts.ts).
+[DashboardRepository](src/lib/services/dashboard/dashboard-repository.ts), with the response
+contract in [dashboard-contracts](src/lib/services/dashboard/dashboard-contracts.ts).
 s

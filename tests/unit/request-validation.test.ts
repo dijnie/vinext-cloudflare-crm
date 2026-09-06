@@ -5,7 +5,7 @@ import {
   assertSafeMutationRequest,
   INPUT_LIMITS,
   parseJsonInput,
-} from "@/server/validation";
+} from "@/lib/http/validation";
 
 function request(body: string, headers: HeadersInit = {}) {
   return new Request("https://crm.test/api/crm", {

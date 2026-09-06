@@ -4,8 +4,8 @@ import {
   createCompositionRoot,
   type CompositionRoot,
   type RuntimeEnv,
-} from "@/server/composition-root";
-import { createRouteHandler } from "@/server/route-handler";
+} from "@/lib/composition-root";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 export function createMembersGetHandler(root: CompositionRoot) {
   return createRouteHandler(root, {

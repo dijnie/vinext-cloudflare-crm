@@ -3,19 +3,19 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createAuth, handleAuthRequest } from "@/modules/auth/auth";
-import * as schema from "@/db/schema";
-import { requireRequestContext } from "@/server/request-context";
+import { createAuth, handleAuthRequest } from "@/lib/auth/auth";
+import * as schema from "@/lib/db/schema";
+import { requireRequestContext } from "@/lib/http/request-context";
 import type {
   AuthEmailAdapter,
   AuthEmailMessage,
-} from "@/modules/auth/email-adapter";
+} from "@/lib/email/email-adapter";
 import {
   changeSingletonRole,
   reconcileSingletonMembership,
   revokeSingletonMembership,
   SINGLETON_WORKSPACE_ID,
-} from "@/modules/auth/singleton-workspace";
+} from "@/lib/services/members/singleton-workspace";
 import {
   account,
   company,
@@ -25,11 +25,11 @@ import {
   singletonWorkspace,
   user,
   verification,
-} from "@/db/schema";
+} from "@/lib/db/schema";
 import {
   createCompositionRoot,
   type RuntimeEnv,
-} from "@/server/composition-root";
+} from "@/lib/composition-root";
 
 class RecordingEmailAdapter implements AuthEmailAdapter {
   readonly verificationMessages: AuthEmailMessage[] = [];

@@ -7,14 +7,14 @@ import {
   contactListInputSchema,
   contactListOutputSchema,
   contactWriteOutputSchema,
-} from "@/modules/crm/contracts/contact-contract";
-import { parseSearchParams } from "@/modules/crm/contracts/list-contract";
+} from "@/lib/services/contacts/contact-contract";
+import { parseSearchParams } from "@/lib/listing/list-contract";
 import {
   createCompositionRoot,
   type CompositionRoot,
   type RuntimeEnv,
-} from "@/server/composition-root";
-import { createRouteHandler } from "@/server/route-handler";
+} from "@/lib/composition-root";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 export function createContactsGetHandler(root: CompositionRoot) {
   return createRouteHandler(root, {

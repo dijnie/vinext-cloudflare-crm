@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { CurrencySettings } from "@/components/settings/currency-settings";
-import { isAppLocale } from "@/i18n/config";
-import { getPageContext } from "@/server/page-context";
+import { CurrencySettings } from "@/components/app/settings/currency-settings";
+import { isAppLocale } from "@/lib/i18n/config";
+import { getPageContext } from "@/lib/http/page-context";
 
 export default async function CurrenciesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

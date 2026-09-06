@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalWorkspacePath, localeFromPath, localizedPath, savedLocale } from "@/i18n/config";
-import { getDictionary } from "@/i18n/get-dictionary";
+import { canonicalWorkspacePath, localeFromPath, localizedPath, savedLocale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
 
 describe("localized routes", () => {
   it("uses Vietnamese when a saved locale is missing or invalid", () => {

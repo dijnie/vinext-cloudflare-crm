@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CloudflareEmailAdapter } from "@/modules/auth/cloudflare-email-adapter";
+import { CloudflareEmailAdapter } from "@/lib/email/cloudflare-email-adapter";
 
 describe("CloudflareEmailAdapter", () => {
   it("sends verification and reset links through the Worker binding", async () => {

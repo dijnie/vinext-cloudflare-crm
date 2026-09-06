@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
-import { activityCompleteInputSchema, activityEntryOutputSchema } from "@/modules/crm/contracts/activity-contract";
-import { stableIdSchema } from "@/modules/crm/contracts/list-contract";
-import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
-import { HttpError } from "@/server/http-errors";
-import { createRouteHandler } from "@/server/route-handler";
+import { activityCompleteInputSchema, activityEntryOutputSchema } from "@/lib/services/activities/activity-contract";
+import { stableIdSchema } from "@/lib/listing/list-contract";
+import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
+import { HttpError } from "@/lib/http/http-errors";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 export function createActivityPatchHandler(root: CompositionRoot, id: string) {
   return createRouteHandler(root, {

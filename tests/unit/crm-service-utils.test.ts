@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { relationError } from "@/modules/crm/service-utils";
-import { HttpError } from "@/server/http-errors";
+import { relationError } from "@/lib/services/shared/service-utils";
+import { HttpError } from "@/lib/http/http-errors";
 
 describe("CRM service database errors", () => {
   it.each([

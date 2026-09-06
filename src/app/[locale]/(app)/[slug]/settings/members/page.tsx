@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 
-import { MembersTable } from "@/components/members/members-table";
-import { isAppLocale } from "@/i18n/config";
-import { getDictionary } from "@/i18n/get-dictionary";
-import { getPageContext } from "@/server/page-context";
+import { MembersTable } from "@/components/app/members/members-table";
+import { isAppLocale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { getPageContext } from "@/lib/http/page-context";
 
 export default async function MembersPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

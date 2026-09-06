@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeListState, listApiSearch, parseListState } from "@/modules/crm/list-state";
+import { changeListState, listApiSearch, parseListState } from "@/lib/listing/list-state";
 describe("canonical list navigation", () => {
   it("rejects unknown, malformed and duplicate parameters", () => {
     for (const query of ["secret=x", "page=0", "pageSize=101", "recordType=deal", "recordId=bad", "columns=password", "sort=nope", "q=a&q=b", "tab=unknown"]) expect(() => parseListState("company", new URLSearchParams(query))).toThrow();

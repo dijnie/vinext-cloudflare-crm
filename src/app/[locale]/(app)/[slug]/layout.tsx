@@ -2,13 +2,13 @@ import { eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
-import { AppShell } from "@/components/crm/app-shell";
-import { singletonWorkspace } from "@/db/schema";
-import { canonicalWorkspacePath, isAppLocale } from "@/i18n/config";
-import { getDictionary } from "@/i18n/get-dictionary";
-import { isHttpError } from "@/server/http-errors";
-import { getPageContext } from "@/server/page-context";
+import { SINGLETON_WORKSPACE_ID } from "@/lib/services/members/singleton-workspace";
+import { AppShell } from "@/components/app/app-shell";
+import { singletonWorkspace } from "@/lib/db/schema";
+import { canonicalWorkspacePath, isAppLocale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
+import { isHttpError } from "@/lib/http/http-errors";
+import { getPageContext } from "@/lib/http/page-context";
 
 export default async function ProtectedLayout({ children, params }: { children: ReactNode; params: Promise<{ locale: string; slug: string }> }) {
   const { locale, slug } = await params;

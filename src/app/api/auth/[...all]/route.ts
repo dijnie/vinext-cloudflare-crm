@@ -1,10 +1,10 @@
 import { env } from "cloudflare:workers";
 
-import { handleAuthRequest } from "@/modules/auth/auth";
+import { handleAuthRequest } from "@/lib/auth/auth";
 import {
   createCompositionRoot,
   type RuntimeEnv,
-} from "@/server/composition-root";
+} from "@/lib/composition-root";
 
 async function handler(request: Request) {
   const root = createCompositionRoot(env as RuntimeEnv);

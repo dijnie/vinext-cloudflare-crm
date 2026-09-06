@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DashboardSummary } from "@/components/dashboard/dashboard-summary";
-import { dashboardInputSchema } from "@/modules/dashboard/dashboard-contracts";
-import { isAppLocale } from "@/i18n/config";
-import { getCrmDictionary } from "@/i18n/crm-dictionary";
-import { getPageContext } from "@/server/page-context";
+import { DashboardSummary } from "@/components/app/dashboard/dashboard-summary";
+import { dashboardInputSchema } from "@/lib/services/dashboard/dashboard-contracts";
+import { isAppLocale } from "@/lib/i18n/config";
+import { getCrmDictionary } from "@/lib/i18n/crm-dictionary";
+import { getPageContext } from "@/lib/http/page-context";
 
 export const dynamic = "force-dynamic";
 

@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   requireOwnerRole,
   resolveRemovalReplacement,
-} from "@/modules/members/member-policy";
-import type { RequestContext } from "@/server/request-context";
+} from "@/lib/services/members/member-policy";
+import type { RequestContext } from "@/lib/http/request-context";
 
 function context(role: "owner" | "member", membershipId = "actor") {
   return { userId: membershipId, membershipId, role } as RequestContext;

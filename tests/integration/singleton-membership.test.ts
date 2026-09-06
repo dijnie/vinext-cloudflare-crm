@@ -2,8 +2,8 @@ import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { reconcileSingletonMembership } from "@/modules/auth/singleton-workspace";
-import { createDatabase } from "@/db/client";
+import { reconcileSingletonMembership } from "@/lib/services/members/singleton-workspace";
+import { createDatabase } from "@/lib/db/database";
 import {
   activity,
   activityVisibility,
@@ -17,9 +17,9 @@ import {
   singletonMembership,
   singletonWorkspace,
   user,
-} from "@/db/schema";
-import { MemberService } from "@/modules/members/member-service";
-import type { RequestContext } from "@/server/request-context";
+} from "@/lib/db/schema";
+import { MemberService } from "@/lib/services/members/member-service";
+import type { RequestContext } from "@/lib/http/request-context";
 
 const db = createDatabase(env.DB);
 const service = new MemberService(db);

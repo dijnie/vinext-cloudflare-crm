@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { CompositionRoot } from "@/server/composition-root";
-import { requireRequestContext } from "@/server/request-context";
+import type { CompositionRoot } from "@/lib/composition-root";
+import { requireRequestContext } from "@/lib/http/request-context";
 
 function rootWith(sessionValue: unknown, membershipValue: unknown) {
   return {

@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-import { applySecurityHeaders } from "./server/security-headers";
-import { LOCALE_COOKIE, localeFromPath } from "./i18n/config";
+import { applySecurityHeaders } from "./lib/http/security-headers";
+import { LOCALE_COOKIE, localeFromPath } from "./lib/i18n/config";
 
 const QUARANTINED_PREFIXES = [
   "/admin",

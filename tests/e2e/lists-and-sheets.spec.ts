@@ -1,5 +1,5 @@
 import { expect, request, test, type APIRequestContext, type Page } from "@playwright/test";
-import { getCrmDictionary } from "../../src/i18n/crm-dictionary";
+import { getCrmDictionary } from "../../src/lib/i18n/crm-dictionary";
 
 test.use({ actionTimeout: 10_000 });
 

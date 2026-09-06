@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
-import { verifyCurrentPassword } from "@/modules/auth/verify-current-password";
-import { fieldDefinitionSchema, fieldDeleteInputSchema, fieldPatchInputSchema } from "@/modules/fields/field-contracts";
-import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
-import { HttpError } from "@/server/http-errors";
-import { createRouteHandler } from "@/server/route-handler";
+import { verifyCurrentPassword } from "@/lib/auth/verify-current-password";
+import { fieldDefinitionSchema, fieldDeleteInputSchema, fieldPatchInputSchema } from "@/lib/services/custom-fields/field-contracts";
+import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
+import { HttpError } from "@/lib/http/http-errors";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 function validateId(id: string) { if (!id || id.length > 100) throw new HttpError(400, "validation_failed", "Invalid field ID"); }
 export function createFieldGetHandler(root: CompositionRoot, id: string) { return createRouteHandler(root, { handle: async ({ context, request }) => { validateId(id); return new URL(request.url).searchParams.get("coverage") === "true" ? await root.fields.coverage(context, id) : await root.fields.byId(context, id); } }); }

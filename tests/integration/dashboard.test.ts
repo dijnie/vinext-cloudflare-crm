@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import { handleAuthRequest } from "@/modules/auth/auth";
-import type { AuthEmailAdapter, AuthEmailMessage } from "@/modules/auth/email-adapter";
-import { SINGLETON_WORKSPACE_ID } from "@/modules/auth/singleton-workspace";
-import { createCompositionRoot, type RuntimeEnv } from "@/server/composition-root";
+import { handleAuthRequest } from "@/lib/auth/auth";
+import type { AuthEmailAdapter, AuthEmailMessage } from "@/lib/email/email-adapter";
+import { SINGLETON_WORKSPACE_ID } from "@/lib/services/members/singleton-workspace";
+import { createCompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
 class RecordingEmailAdapter implements AuthEmailAdapter {
   verificationMessages: AuthEmailMessage[] = [];
   async sendVerification(message: AuthEmailMessage) { this.verificationMessages.push(message); }
@@ -59,11 +59,11 @@ async function clearState() {
 }
 
 
-import { requireRequestContext } from "@/server/request-context";
-import { DashboardRepository } from "@/modules/dashboard/dashboard-repository";
+import { requireRequestContext } from "@/lib/http/request-context";
+import { DashboardRepository } from "@/lib/services/dashboard/dashboard-repository";
 import { createDashboardGetHandler } from "../../src/app/api/crm/dashboard/route";
-import { DealRepository } from "@/modules/crm/deals/deal-repository";
-import { dealListInputSchema } from "@/modules/crm/contracts/deal-contract";
+import { DealRepository } from "@/lib/services/deals/deal-repository";
+import { dealListInputSchema } from "@/lib/services/deals/deal-contract";
 const NOW=new Date("2026-09-04T12:00:00.000Z");
 async function context(cookie:string) {return requireRequestContext(new Headers({cookie}),root());}
 async function fixture() {

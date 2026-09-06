@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
-import { activityCreateInputSchema, activityEntryOutputSchema, timelineInputSchema, timelineOutputSchema } from "@/modules/crm/contracts/activity-contract";
-import { parseSearchParams } from "@/modules/crm/contracts/list-contract";
-import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/server/composition-root";
-import { createRouteHandler } from "@/server/route-handler";
+import { activityCreateInputSchema, activityEntryOutputSchema, timelineInputSchema, timelineOutputSchema } from "@/lib/services/activities/activity-contract";
+import { parseSearchParams } from "@/lib/listing/list-contract";
+import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
+import { createRouteHandler } from "@/lib/http/route-handler";
 
 export function createActivitiesGetHandler(root: CompositionRoot) {
   return createRouteHandler(root, { output: timelineOutputSchema, handle: ({ context, request }) => root.activities.timeline(context, parseSearchParams(request, timelineInputSchema)) });

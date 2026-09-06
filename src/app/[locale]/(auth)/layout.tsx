@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { LocaleSwitcher } from "@/components/crm/locale-switcher";
-import { isAppLocale } from "@/i18n/config";
-import { getDictionary } from "@/i18n/get-dictionary";
+import { LocaleSwitcher } from "@/components/app/locale-switcher";
+import { isAppLocale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/get-dictionary";
 
 export default async function AuthLayout({ children, params }: { children: ReactNode; params: Promise<{ locale: string }> }) {
   const { locale } = await params;
