@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { env } from "cloudflare:workers";
 
 import {
@@ -31,11 +32,13 @@ export function createCompaniesGetHandler(root: CompositionRoot) {
 
 export function createCompaniesPostHandler(root: CompositionRoot) {
   return createRouteHandler(root, {
-    input: companyCreateInputSchema,
+    input: companyCreateInputSchema.extend({ draftId: z.string().uuid().optional() }),
     output: companyWriteOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.companies.create(context, input);
+      const { draftId, ...data } = input;
+      const creation = draftId ? await root.drafts.prepareConsumption(context, "company", draftId) : undefined;
+      return root.companies.create(context, data, creation);
     },
   });
 }

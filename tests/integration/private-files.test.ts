@@ -76,6 +76,8 @@ import { createFilesPostHandler } from "../../src/app/api/crm/files/route";
 import { createFileGetHandler } from "../../src/app/api/crm/files/[fileId]/route";
 import { createFileDownloadHandler } from "../../src/app/api/crm/files/[fileId]/download/route";
 import { FileService } from "@/lib/services/files/file-service";
+import { DraftService } from "@/lib/services/record-drafts/draft-service";
+import { createRecordDraftsPostHandler } from "../../src/app/api/crm/record-drafts/route";
 import { requireRequestContext } from "@/lib/http/request-context";
 function uploadRequest(cookie: string, recordId: string, fieldId: string, body: Uint8Array = new Uint8Array([0,1,2,255]), name = "hợp đồng.txt", origin = "https://auth.test") {
   return new Request(`https://auth.test/api/crm/files?${new URLSearchParams({ entity:"company", recordId, fieldId })}`, { method:"POST", headers:{cookie, origin,"content-type":"application/octet-stream","x-file-name":encodeURIComponent(name)}, body:body as BodyInit });
@@ -88,6 +90,77 @@ async function setup() {
 }
 describe.sequential("private file storage", () => {
   beforeEach(clearState);
+  it("consumes a reservation only with its atomic record and attachment writes", async () => {
+    const { actor, field } = await setup(); const composition = root();
+    const context = await requireRequestContext(new Headers({ cookie: actor.cookie }), composition);
+    const drafts = new DraftService(composition.db); const draft = await drafts.create(context, { entity: "company" });
+    const file = await composition.files.upload(context, { entity: "company", recordId: draft.id, draftId: draft.id, fieldId: field.id }, uploadRequest(actor.cookie, draft.id, field.id));
+    const prepare = async () => {
+      const reservation = await drafts.prepareConsumption(context, "company", draft.id);
+      return reservation;
+    };
+    const first = await prepare(), simultaneous = await prepare();
+    const item = await composition.companies.create(context, { name: "Reserved company", customFields: { [field.key]: [file.id] } }, first);
+    expect(item.id).toBe(draft.id);
+    await expect(composition.companies.create(context, { name: "Duplicate" }, simultaneous)).rejects.toMatchObject({ status: 409 });
+    await expect(prepare()).rejects.toMatchObject({ status: 409 });
+    expect((await env.DB.prepare("SELECT COUNT(*) AS count FROM company WHERE id=?").bind(draft.id).first<any>()).count).toBe(1);
+    expect((await env.DB.prepare("SELECT consumed_at FROM record_draft WHERE id=?").bind(draft.id).first<any>()).consumed_at).toBeGreaterThan(0);
+    const failed = await drafts.create(context, { entity: "company" });
+    const reservation = await drafts.prepareConsumption(context, "company", failed.id);
+    await expect(composition.companies.create(context, { name: "Invalid files", customFields: { [field.key]: [file.id] } }, reservation)).rejects.toBeDefined();
+    expect(await env.DB.prepare("SELECT id FROM company WHERE id=?").bind(failed.id).first()).toBeNull();
+    expect((await env.DB.prepare("SELECT consumed_at FROM record_draft WHERE id=?").bind(failed.id).first<any>()).consumed_at).toBeNull();
+  });
+  it("reserves a private future record without placeholders and denies consumed or expired access", async () => {
+    const { actor, field } = await setup();
+    const other = await session(`draft-reader-${crypto.randomUUID()}@example.com`);
+    const composition = root();
+    const draft = await successful(await createRecordDraftsPostHandler(composition)(request("/api/crm/record-drafts", actor.cookie, "POST", { entity: "company" })));
+    expect(await env.DB.prepare("SELECT id FROM company WHERE id=?").bind(draft.id).first()).toBeNull();
+    const upload = (cookie: string) => {
+      const original = uploadRequest(cookie, draft.id, field.id);
+      const url = new URL(original.url); url.searchParams.set("draftId", draft.id);
+      return new Request(url, original);
+    };
+    expect((await createFilesPostHandler(composition)(upload(other.cookie))).status).toBe(404);
+    const file = await successful(await createFilesPostHandler(composition)(upload(actor.cookie)));
+    expect((await createFileGetHandler(composition, file.id)(request("/file", other.cookie))).status).toBe(404);
+    const downloaded = await createFileDownloadHandler(composition, file.id)(request("/download", actor.cookie));
+    expect([...new Uint8Array(await downloaded.arrayBuffer())]).toEqual([0, 1, 2, 255]);
+    await env.DB.prepare("UPDATE record_draft SET consumed_at=1 WHERE id=?").bind(draft.id).run();
+    expect((await createFileGetHandler(composition, file.id)(request("/file", actor.cookie))).status).toBe(404);
+    expect((await createFilesPostHandler(composition)(upload(actor.cookie))).status).toBe(404);
+    const context = await requireRequestContext(new Headers({ cookie: actor.cookie }), composition);
+    await expect(new DraftService(composition.db).prepareConsumption(context, "company", draft.id)).rejects.toMatchObject({ status: 409 });
+    const expiredId = crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO record_draft(id,entity,user_id,expires_at,created_at) VALUES (?,'company',?,1,0)").bind(expiredId, actor.id).run();
+    await expect(new DraftService(composition.db).prepareConsumption(context, "company", expiredId)).rejects.toMatchObject({ status: 409 });
+    expect((await createFilesPostHandler(composition)(new Request(`https://auth.test/api/crm/files?entity=company&recordId=${expiredId}&draftId=${expiredId}&fieldId=${field.id}`, uploadRequest(actor.cookie, expiredId, field.id)))).status).toBe(404);
+  });
+  it("rejects draft finalization races for consumption, revocation, module and field changes", async () => {
+    const { actor, field } = await setup(); const composition = root();
+    const context = await requireRequestContext(new Headers({ cookie: actor.cookie }), composition);
+    const drafts = new DraftService(composition.db);
+    for (const race of ["consumption", "revoke", "module", "configuration"] as const) {
+      const draft = await drafts.create(context, { entity: "company" }); let key = "";
+      const bucket = new Proxy(bindings.CRM_FILES, { get(target, prop) {
+        if (prop === "put") return async (k: string, bytes: Uint8Array) => {
+          key = k; const result = await target.put(k, bytes);
+          if (race === "consumption") await env.DB.prepare("UPDATE record_draft SET consumed_at=1 WHERE id=?").bind(draft.id).run();
+          if (race === "revoke") await env.DB.prepare("UPDATE singleton_membership SET status='revoked' WHERE user_id=?").bind(actor.id).run();
+          if (race === "module") await env.DB.prepare("UPDATE module_setting SET enabled=0 WHERE entity='company'").run();
+          if (race === "configuration") await env.DB.prepare("UPDATE field_configuration_revision SET revision=revision+1 WHERE entity='company'").run();
+          return result;
+        };
+        const value = Reflect.get(target, prop); return typeof value === "function" ? value.bind(target) : value;
+      } });
+      await expect(new FileService(composition.db, bucket).upload(context, { entity: "company", recordId: draft.id, draftId: draft.id, fieldId: field.id }, uploadRequest(actor.cookie, draft.id, field.id))).rejects.toMatchObject({ status: 409 });
+      expect(await bindings.CRM_FILES.get(key)).toBeNull();
+      await env.DB.prepare("UPDATE singleton_membership SET status='active' WHERE user_id=?").bind(actor.id).run();
+      await env.DB.prepare("UPDATE module_setting SET enabled=1 WHERE entity='company'").run();
+    }
+  });
   it("round trips private bytes, safe names, ownership, attachment and archive access", async () => {
     const {actor,field,item} = await setup();
     const second = await session(`reader-${crypto.randomUUID()}@example.com`);

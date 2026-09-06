@@ -1,3 +1,5 @@
+import { LayoutService } from "@/lib/services/layouts/layout-service";
+import { DraftService } from "@/lib/services/record-drafts/draft-service";
 import { ModuleService } from "@/lib/services/modules/module-service";
 import { FileService } from "@/lib/services/files/file-service";
 import { createAuth } from "@/lib/auth/auth";
@@ -57,6 +59,8 @@ export function createCompositionRoot(
     access: new AccessService(db, securityLogger),
     settings: new BusinessSettingsService(db, securityLogger),
     modules: new ModuleService(db),
+    layouts: new LayoutService(db),
+    drafts: new DraftService(db),
     files: new FileService(db, runtimeBindings.CRM_FILES),
     currency,
     dashboard,

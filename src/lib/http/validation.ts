@@ -9,15 +9,15 @@ export const INPUT_LIMITS = {
   depth: 12,
 } as const;
 
-function assertValueLimits(value: unknown, depth = 0): void {
+function assertValueLimits(value: unknown, depth = 0, arrayItems: number = INPUT_LIMITS.arrayItems): void {
   if (depth > INPUT_LIMITS.depth) {
     throw new HttpError(413, "input_limit_exceeded", "Input nesting is too deep");
   }
   if (Array.isArray(value)) {
-    if (value.length > INPUT_LIMITS.arrayItems) {
+    if (value.length > arrayItems) {
       throw new HttpError(413, "input_limit_exceeded", "Input has too many items");
     }
-    for (const item of value) assertValueLimits(item, depth + 1);
+    for (const item of value) assertValueLimits(item, depth + 1, arrayItems);
     return;
   }
   if (value && typeof value === "object") {
@@ -25,7 +25,7 @@ function assertValueLimits(value: unknown, depth = 0): void {
     if (entries.length > INPUT_LIMITS.objectKeys) {
       throw new HttpError(413, "input_limit_exceeded", "Input has too many fields");
     }
-    for (const [, item] of entries) assertValueLimits(item, depth + 1);
+    for (const [, item] of entries) assertValueLimits(item, depth + 1, arrayItems);
   }
 }
 
@@ -68,6 +68,7 @@ export async function assertSafeMutationRequest(request: Request, canonicalOrigi
 export async function parseJsonInput<T>(
   request: Request,
   schema: ZodType<T>,
+  arrayItems: number = INPUT_LIMITS.arrayItems,
 ): Promise<T> {
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (bytes.byteLength > INPUT_LIMITS.bodyBytes) {
@@ -80,7 +81,7 @@ export async function parseJsonInput<T>(
   } catch {
     throw new HttpError(400, "invalid_json", "Request body must contain valid JSON");
   }
-  assertValueLimits(value);
+  assertValueLimits(value, 0, arrayItems);
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
     throw new HttpError(400, "validation_failed", "Request input is invalid");

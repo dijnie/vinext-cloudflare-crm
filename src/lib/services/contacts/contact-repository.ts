@@ -1,8 +1,10 @@
+import type { PreparedRecordFields, PreparedRecordCreation } from "../shared/record-fields-contract";
+import { operationConditionGuard } from "@/lib/db/schema";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { fieldConditionQuery } from "../custom-fields/field-condition-query";
 import { customFieldSort } from "../custom-fields/field-sort";
 import type { RequestContext } from "@/lib/http/request-context";
-import { authorizedWrite } from "../permissions/permission-policy";
+import { actionGuard, authorizedWrite, permissionError } from "../permissions/permission-policy";
 import { inJsonArray } from "@/lib/db/sql-filters";
 import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/lib/services/custom-fields/field-list-query";
 import {
@@ -123,13 +125,22 @@ export class ContactRepository {
     return { ...record, deals };
   }
 
-  async create(values: typeof contact.$inferInsert, context: RequestContext) {
-    const rows = await authorizedWrite(this.db, context, ["contact.create", ...(values.ownerMembershipId ? ["contact.assign" as const] : [])], this.db.insert(contact).values(values).returning());
-    return rows[0]!;
+  async create(values: typeof contact.$inferInsert, context: RequestContext, fields?: PreparedRecordFields, creation?: PreparedRecordCreation) {
+    const op = actionGuard(this.db, context, ["contact.create", ...(values.ownerMembershipId ? ["contact.assign" as const] : [])]);
+    const before = creation?.before ?? [];
+    try {
+      const results = await this.db.batch([op.begin, ...before, this.db.insert(contact).values(values).returning(), ...(fields?.statements ?? []), ...(creation?.after ?? []), op.end]);
+      return (results[1 + before.length] as (typeof contact.$inferSelect)[])[0]!;
+    } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
   }
-  async update(id: string, values: Partial<typeof contact.$inferInsert>, context: RequestContext) {
-    const rows = await authorizedWrite(this.db, context, ["contact.update", ...(values.ownerMembershipId !== undefined ? ["contact.assign" as const] : [])], this.db.update(contact).set(values).where(eq(contact.id, id)).returning());
-    return rows[0]!;
+  async update(id: string, values: Partial<typeof contact.$inferInsert>, context: RequestContext, fields?: PreparedRecordFields) {
+    const op = actionGuard(this.db, context, ["contact.update", ...(values.ownerMembershipId !== undefined ? ["contact.assign" as const] : [])]);
+    const guardId = crypto.randomUUID();
+    try {
+      const results = await this.db.batch([op.begin, this.db.update(contact).set(values).where(eq(contact.id, id)).returning(),
+        ...(fields ? [this.db.insert(operationConditionGuard).values({ id: guardId, authorized: sql<number>`case when changes()=1 then 1 else 0 end` }), ...fields.statements, this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, guardId))] : []), op.end]);
+      return (results[1] as (typeof contact.$inferSelect)[])[0]!;
+    } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
   }
   async archive(id: string, archivedAt: Date | null, context: RequestContext) {
     const rows = await authorizedWrite(this.db, context, [archivedAt ? "contact.archive" : "contact.restore"], this.db.update(contact).set({ archivedAt, updatedAt: new Date() }).where(eq(contact.id, id)).returning());

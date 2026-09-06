@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { env } from "cloudflare:workers";
 
 import {
@@ -32,11 +33,13 @@ export function createContactsGetHandler(root: CompositionRoot) {
 
 export function createContactsPostHandler(root: CompositionRoot) {
   return createRouteHandler(root, {
-    input: contactCreateInputSchema,
+    input: contactCreateInputSchema.extend({ draftId: z.string().uuid().optional() }),
     output: contactWriteOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.contacts.create(context, input);
+      const { draftId, ...data } = input;
+      const creation = draftId ? await root.drafts.prepareConsumption(context, "contact", draftId) : undefined;
+      return root.contacts.create(context, data, creation);
     },
   });
 }

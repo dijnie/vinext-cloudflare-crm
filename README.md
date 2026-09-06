@@ -368,8 +368,7 @@ Customer-linked records must be archived rather than hard-deleted while referenc
 These values extend the existing field definition/value tables without replacing
 IDs, timestamps, tombstones, options, user references or saved views. Member and
 customer names are returned in separate label maps. Multiselect and customer
-filters share list/count/facet predicates. Configurable layouts remain work in
-the active rebuild plan.
+filters share list/count/facet predicates.
 
 Formula fields compute numeric results at read time and never accept direct value
 writes or required-input settings. Expressions support arithmetic, parentheses,
@@ -479,3 +478,30 @@ company module is disabled; the disabled company row is unchanged. Manual activi
 mutations require every attached record module to be enabled. Existing owner-managed
 currency projection jobs and membership handover remain administrative operations;
 module settings do not change their authorization or original money/history rules.
+
+Owners configure one layout per entity at
+`/{locale}/{workspaceSlug}/settings/layouts`. Order and visibility apply to each
+field's eligible create/edit/detail screens; custom detail fields keep the
+Attributes tab. Initial layouts preserve existing defaults. Required creation
+fields remain visible, while hidden edit fields are omitted from updates.
+Owner layout overrides do not change member field-definition permissions or data
+access. Archived/deleted field slots remain reserved for restoration.
+
+Record create inputs and update `data` accept optional `customFields` and
+`calendarRevision`. New records require all active required custom values; the
+base record and values commit atomically. Unchanged historical blanks do not
+block unrelated edits. See [record field preparation](src/lib/services/custom-fields/field-service.ts).
+
+Creating a record with files first uses `POST /api/crm/record-drafts` with
+`{entity}`. Its 24-hour reservation binds the current user, entity and future
+record ID without creating a CRM record. Uploads include matching `draftId` and
+`recordId`; the final record POST includes `draftId` and `customFields`. That
+transaction consumes the reservation, so expiry or replay cannot create duplicate
+records. Draft uploads require create permission; existing-record uploads still
+require update permission. Permanent file metadata and existing retention rules
+also cover abandoned reservations.
+
+Layout API updates use `{entity, revision, fields: [{kind, key, visible}]}`.
+Builtin/custom identity stays distinct even when their keys match. Layout arrays
+allow up to 500 entries within the existing 64 KiB JSON body limit; other routes
+retain their existing validation limits.

@@ -1,3 +1,5 @@
+import { FieldService } from "../custom-fields/field-service";
+import type { PreparedRecordCreation } from "../shared/record-fields-contract";
 import { requirePermission } from "../permissions/permission-policy";
 import type { Permission } from "../permissions/access-contracts";
 import type { AppDatabase } from "@/lib/db/database";
@@ -73,7 +75,7 @@ export class DealService {
     };
   }
 
-  async create(context: RequestContext, input: DealCreateInput) {
+  async create(context: RequestContext, input: DealCreateInput, creation?: PreparedRecordCreation) {
     await this.guard(context, ["deal.create", "deal.assign"]);
     const [company, owner, stage] = await Promise.all([
       this.repository.company(input.companyId),
@@ -90,10 +92,12 @@ export class DealService {
       );
     if (!stage)
       throw new HttpError(400, "validation_failed", "Deal stage is invalid");
+    const id = creation?.recordId ?? crypto.randomUUID();
+    const fields = await new FieldService(this.db).prepareValues(context, { entity: "deal", recordId: id, values: input.customFields ?? {}, calendarRevision: input.calendarRevision }, "create");
     const now = new Date();
     try {
       const row = await this.repository.create({
-        id: crypto.randomUUID(),
+        id,
         name: input.name,
         companyId: input.companyId,
         ownerMembershipId: input.ownerMembershipId,
@@ -107,7 +111,7 @@ export class DealService {
         closedAt: stage.closedState === "open" ? null : now,
         createdAt: now,
         updatedAt: now,
-      }, context);
+      }, context, fields, creation);
       return { id: row.id, name: row.name, companyId: row.companyId };
     } catch (error) {
       try { currencyError(error); } catch (classified) { relationError(classified, "Deal relationships are invalid"); }
@@ -168,8 +172,9 @@ export class DealService {
           : null;
     } else if (input.closedReason !== undefined)
       values.closedReason = input.closedReason;
+    const fields = input.customFields === undefined ? undefined : await new FieldService(this.db).prepareValues(context, { entity: "deal", recordId: id, values: input.customFields, calendarRevision: input.calendarRevision });
     try {
-      const row = await this.repository.updateWithHistory(id, values, current.stageId, context.userId, context, moneyChanged ? { revision:current.moneyRevision,amountMinor:current.amountMinor,currency:current.currency } : undefined);
+      const row = await this.repository.updateWithHistory(id, values, current.stageId, context.userId, context, moneyChanged ? { revision:current.moneyRevision,amountMinor:current.amountMinor,currency:current.currency } : undefined, fields);
       if (!row) throw new HttpError(409, "conflict", "Deal stage changed before this update");
       return { id: row.id, name: row.name };
     } catch (error) {

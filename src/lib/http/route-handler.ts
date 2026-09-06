@@ -11,6 +11,7 @@ export interface RouteHandlerOptions<TInput, TResult> {
   output?: ZodType;
   unsafe?: boolean;
   rawBody?: boolean;
+  maxArrayItems?: number;
   rawResponse?: boolean;
   ownerOnly?: boolean;
   handle: (args: {
@@ -49,7 +50,7 @@ export function createRouteHandler<TInput = undefined, TResult = unknown>(
         else await assertSafeMutationRequest(request, new URL(baseUrl).origin);
       }
       const input = options.input
-        ? await parseJsonInput(request, options.input)
+        ? await parseJsonInput(request, options.input, options.maxArrayItems)
         : (undefined as TInput);
       const handled = await options.handle({ context, input, request, root });
       const result = options.output ? options.output.parse(handled) : handled;

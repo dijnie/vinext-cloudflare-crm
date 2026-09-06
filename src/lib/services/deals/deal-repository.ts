@@ -1,3 +1,5 @@
+import type { PreparedRecordFields, PreparedRecordCreation } from "../shared/record-fields-contract";
+import { operationConditionGuard } from "@/lib/db/schema";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { fieldConditionQuery } from "../custom-fields/field-condition-query";
 import { customFieldSort } from "../custom-fields/field-sort";
@@ -152,15 +154,16 @@ export class DealRepository {
     return { ...record, contacts };
   }
 
-  async create(values: typeof deal.$inferInsert, context: RequestContext) {
+  async create(values: typeof deal.$inferInsert, context: RequestContext, fields?: PreparedRecordFields, creation?: PreparedRecordCreation) {
     const fx = await prepareDealConversion(this.db,{id:values.id,amountMinor:values.amountMinor ?? null,currency:values.currency ?? "USD",moneyRevision:0});
     const op = actionGuard(this.db, context, ["deal.create", "deal.assign"]);
     try {
-      const results = await this.db.batch([op.begin,fx.guard,this.db.insert(deal).values(values).returning(),fx.conversion,fx.finish,op.end]);
-      return results[2][0]!;
-    } catch (error) { permissionError(error); }
+      const before = creation?.before ?? [];
+      const results = await this.db.batch([op.begin, ...before, fx.guard, this.db.insert(deal).values(values).returning(), fx.conversion, fx.finish, ...(fields?.statements ?? []), ...(creation?.after ?? []), op.end]);
+      return (results[2 + before.length] as (typeof deal.$inferSelect)[])[0]!;
+    } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
   }
-  async updateWithHistory(id: string, values: Partial<typeof deal.$inferInsert>, expectedStage: string, authorId: string, context: RequestContext, expectedMoney?: {revision:number;amountMinor:number|null;currency:string}) {
+  async updateWithHistory(id: string, values: Partial<typeof deal.$inferInsert>, expectedStage: string, authorId: string, context: RequestContext, expectedMoney?: {revision:number;amountMinor:number|null;currency:string}, fields?: PreparedRecordFields) {
     const changedStage = values.stageId !== undefined && values.stageId !== expectedStage;
     const now = values.updatedAt ?? new Date();
     const query = this.db.update(deal).set({
@@ -172,6 +175,7 @@ export class DealRepository {
     const prepared = (statement: {toSQL():{sql:string;params:unknown[]}}) => { const query=statement.toSQL(); return this.db.$client.prepare(query.sql).bind(...query.params); };
     const op = actionGuard(this.db, context, ["deal.update", ...(values.ownerMembershipId !== undefined ? ["deal.assign" as const] : [])]);
     const auditId = crypto.randomUUID();
+    const writeGuardId = crypto.randomUUID();
     // changes() refers to the preceding guarded UPDATE on the same batch connection.
     // A stale stage therefore produces neither history nor related-record stamps.
     let result;
@@ -185,14 +189,18 @@ export class DealRepository {
         SELECT ?, 'stage_change', company_id, id, ?, json_object('fromStageId', ?, 'toStageId', ?), ?, ?, ?
         FROM deal WHERE id = ? AND changes() = 1`)
         .bind(auditId, authorId, expectedStage, values.stageId, now.getTime(), now.getTime(), now.getTime(), id),
+      ] : []),
+      ...(fields ? [prepared(this.db.insert(operationConditionGuard).values({ id: writeGuardId, authorized: sql<number>`case when ${changedStage ? sql`exists(select 1 from activity where id=${auditId})` : sql`changes()=1`} then 1 else 0 end` }))] : []),
+      ...(changedStage ? [
       this.db.$client.prepare(`UPDATE company SET last_activity_at = max(coalesce(last_activity_at, 0), ?), updated_at = ?
         WHERE id = (SELECT company_id FROM activity WHERE id = ?)
         AND EXISTS (SELECT 1 FROM module_setting WHERE entity='company' AND enabled=1)`)
         .bind(now.getTime(), now.getTime(), auditId),
       ] : []),
       ...(fx ? [prepared(fx.conversion),prepared(fx.finish)] : []),
+      ...(fields ? [...fields.statements.map(prepared), prepared(this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, writeGuardId)))] : []),
       prepared(op.end),
-    ]); } catch (error) { permissionError(error); }
+    ]); } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
     return result[fx ? 2 : 1]!.results[0] as { id: string; name: string } | undefined;
   }
   async archive(id: string, archivedAt: Date | null, context: RequestContext) {

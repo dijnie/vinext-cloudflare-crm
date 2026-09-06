@@ -1,3 +1,5 @@
+import { FieldService } from "../custom-fields/field-service";
+import type { PreparedRecordCreation } from "../shared/record-fields-contract";
 import { requirePermission } from "../permissions/permission-policy";
 import type { Permission } from "../permissions/access-contracts";
 import type { AppDatabase } from "@/lib/db/database";
@@ -72,13 +74,15 @@ export class ContactService {
     };
   }
 
-  async create(context: RequestContext, input: ContactCreateInput) {
+  async create(context: RequestContext, input: ContactCreateInput, creation?: PreparedRecordCreation) {
     await this.guard(context, ["contact.create", ...(input.ownerMembershipId ? ["contact.assign" as const] : [])]);
     await this.requireRelations(input.companyId, input.ownerMembershipId);
+    const id = creation?.recordId ?? crypto.randomUUID();
+    const fields = await new FieldService(this.db).prepareValues(context, { entity: "contact", recordId: id, values: input.customFields ?? {}, calendarRevision: input.calendarRevision }, "create");
     const now = new Date();
     try {
       const row = await this.repository.create({
-        id: crypto.randomUUID(),
+        id,
         firstName: input.firstName,
         lastName: blankToNull(input.lastName) ?? null,
         email: normalizeEmail(input.email) ?? null,
@@ -88,7 +92,7 @@ export class ContactService {
         ownerMembershipId: input.ownerMembershipId ?? null,
         createdAt: now,
         updatedAt: now,
-      }, context);
+      }, context, fields, creation);
       return { id: row.id, firstName: row.firstName, lastName: row.lastName };
     } catch (error) {
       relationError(error, "An active contact already uses that email");
@@ -121,8 +125,9 @@ export class ContactService {
     if (input.companyId !== undefined) values.companyId = input.companyId;
     if (input.ownerMembershipId !== undefined)
       values.ownerMembershipId = input.ownerMembershipId;
+    const fields = input.customFields === undefined ? undefined : await new FieldService(this.db).prepareValues(context, { entity: "contact", recordId: id, values: input.customFields, calendarRevision: input.calendarRevision });
     try {
-      const row = await this.repository.update(id, values, context);
+      const row = await this.repository.update(id, values, context, fields);
       return { id: row.id, firstName: row.firstName, lastName: row.lastName };
     } catch (error) {
       relationError(error, "An active contact already uses that email");

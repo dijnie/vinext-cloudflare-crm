@@ -8,7 +8,7 @@ import type { EntityType } from "@/lib/listing/list-state";
 import type { FieldDefinition, FieldValue } from "@/lib/services/custom-fields/field-contracts";
 import type { CrmDictionary } from "@/lib/i18n/crm-dictionary";
 
-export type FileFieldContext = { entity: EntityType; recordId: string };
+export type FileFieldContext = { entity: EntityType; recordId: string; draftId?: string };
 type FileMetadata = { id: string; name: string; size: number; uploadedAt: string };
 
 export function FileFieldEditor({ id, field, value, onChange, labels, disabled, context }: {
@@ -47,7 +47,7 @@ export function FileFieldEditor({ id, field, value, onChange, labels, disabled, 
     try {
       const uploaded: FileMetadata[] = [];
       for (const file of files) {
-        const query = new URLSearchParams({ ...context, fieldId: field.id });
+        const query = new URLSearchParams({ entity: context.entity, recordId: context.recordId, fieldId: field.id, ...(context.draftId ? { draftId: context.draftId } : {}) });
         const response = await fetch(`/api/crm/files?${query}`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/octet-stream", "x-file-name": encodeURIComponent(file.name) }, body: file, signal: controller.signal });
         if (!response.ok) throw new Error();
         const ready = await response.json() as FileMetadata;

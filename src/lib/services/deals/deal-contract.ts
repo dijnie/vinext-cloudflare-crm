@@ -1,3 +1,4 @@
+import { recordFieldsShape } from "../shared/record-fields-contract";
 import { z } from "zod";
 import { currencyCodeSchema, dealConversionOutputSchema } from "@/lib/services/currencies/currency-contracts";
 import { fieldDefinitionSchema, fieldValuesSchema } from "@/lib/services/custom-fields/field-contracts";
@@ -45,6 +46,7 @@ export const dealListInputSchema = listContract([
 
 export const dealCreateInputSchema = z
   .object({
+    ...recordFieldsShape,
     name: z.string().trim().min(1).max(200),
     companyId: stableIdSchema,
     ownerMembershipId: membershipIdSchema,
@@ -60,6 +62,7 @@ export const dealUpdateInputSchema = z
     action: z.literal("update"),
     data: z
       .object({
+        ...recordFieldsShape,
         name: z.string().trim().min(1).max(200).optional(),
         description: z.string().trim().max(10_000).nullable().optional(),
         companyId: stableIdSchema.optional(),

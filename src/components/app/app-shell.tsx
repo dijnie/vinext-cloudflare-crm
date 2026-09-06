@@ -1,4 +1,5 @@
 "use client";
+import { getLayoutDictionary } from "@/lib/i18n/layout-dictionary";
 
 import Building from "@carbon/icons-react/es/Building";
 import Dashboard from "@carbon/icons-react/es/Dashboard";
@@ -45,7 +46,7 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
   const [dark, setDark] = useState(false);
   useEffect(() => { setDark(document.documentElement.classList.contains("dark")); }, []);
   const base = `/${locale}/${slug}`; const crm = getCrmDictionary(locale); const currency = getCurrencyDictionary(locale); const copy = getShellInterfaceDictionary(locale);
-  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, { href: `${base}/settings/general`, label: getBusinessSettingsDictionary(locale).title }, ...(role === "owner" ? [{ href: `${base}/settings/modules`, label: modules.labels.title },{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
+  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, { href: `${base}/settings/general`, label: getBusinessSettingsDictionary(locale).title }, ...(role === "owner" ? [{ href: `${base}/settings/layouts`, label: getLayoutDictionary(locale).title }, { href: `${base}/settings/modules`, label: modules.labels.title },{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
   const links = [
     { href: base, label: currency.dashboard, icon: Dashboard },
     { href: `${base}/companies`, label: `${dictionary.navigation.companies}${modules.isEnabled("company") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },

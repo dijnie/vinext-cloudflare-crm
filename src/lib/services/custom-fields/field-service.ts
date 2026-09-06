@@ -1,5 +1,5 @@
 import { MAX_FIELD_FILES } from "../files/file-contracts";
-import { authorizedBatch, authorizedWrite, requirePermission } from "../permissions/permission-policy";
+import { authorizedBatch, authorizedWrite, permissionError, requirePermission } from "../permissions/permission-policy";
 import { and, count, eq, isNull, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
 import { company, contact, deal, singletonMembership, operationConditionGuard, customFieldDefinition as definition, customFieldOption as option, customFieldValue as value } from "@/lib/db/schema";
@@ -25,6 +25,7 @@ function translateWriteError(error: unknown, message: string): never {
     current = "cause" in current ? current.cause : null;
   }
   const detail = messages.join(" ");
+  if (detail.includes("action_permission_required")) permissionError(error);
   const conflicts = ["operation_conflict", "field_unavailable", "field_file_invalid", "field_type_has_values", "field_option_unavailable", "field_option_mismatch", "field_entity_mismatch", "field_value_type_mismatch", "field_member_inactive", "field_rating_invalid", "field_rating_has_values", "field_json_value_invalid", "field_money_invalid", "field_customer_unavailable"];
   if (conflicts.some(code => detail.includes(code)) || detail.includes("check constraint failed") && /authorized\W*=\W*1/.test(detail)) conflict(message);
   relationError(error, message);
@@ -109,8 +110,13 @@ export class FieldService {
     const [total, filled] = await Promise.all([this.db.select({ count: count() }).from(table).get(), this.db.select({ count: count() }).from(value).where(and(eq(value.fieldId, id), sql`coalesce(${value.textValue}, ${value.numberValue}, ${value.dateValue}, ${value.booleanValue}, ${value.optionId}, ${value.userMembershipId}, ${value.jsonValue}, ${value.customerReferenceId}) is not null`)).get()]); return { total: total?.count ?? 0, filled: filled?.count ?? 0 }; }
   private async record(entity: FieldEntity, id: string) { const table = entity === "company" ? company : entity === "contact" ? contact : deal; if (!(await this.db.select({ id: table.id }).from(table).where(eq(table.id, id)).get())) throw new HttpError(404, "not_found", "Record not found"); }
   async values(context: RequestContext, input: { entity: FieldEntity; recordId: string }) { await this.guard(context); await this.record(input.entity, input.recordId); const fields = await this.repository.list(input.entity); const values = await this.repository.values(input.entity, input.recordId); const stored = Object.fromEntries(fields.map(field => { const row = values.find(item => item.fieldId === field.id); return [field.key, storedFieldValue(field.type, row)]; })) as Record<string, FieldValue>; return { ...stored, ...formulaEvaluator(fields)(stored) }; }
-  async writeValues(context: RequestContext, input: { entity: FieldEntity; recordId: string; values: Record<string, FieldValue>; calendarRevision?: number }) {
-    await requirePermission(this.db, context, [`${input.entity}.update`]); await this.record(input.entity, input.recordId); const fields = await this.repository.list(input.entity); const options = await this.repository.options(fields.map(field => field.id));
+  async prepareValues(context: RequestContext, input: { entity: FieldEntity; recordId: string; values: Record<string, FieldValue>; calendarRevision?: number }, mode: "create" | "update" = "update") {
+    await requirePermission(this.db, context, [`${input.entity}.${mode}`]);
+    if (mode === "update") await this.record(input.entity, input.recordId);
+    const snapshot = await this.repository.configuration(input.entity);
+    const fields = snapshot.fields.filter(field => !field.archivedAt && !field.deletedAt);
+    if (mode === "create" && fields.some(field => field.required && field.type !== "formula" && !Object.hasOwn(input.values, field.key))) invalid("Required field must be supplied when creating a record");
+    const options = await this.repository.options(fields.map(field => field.id));
     const writes = [];
     for (const [key, raw] of Object.entries(input.values)) {
       const field = fields.find(item => item.key === key); if (!field) invalid("Unknown or archived field");
@@ -154,7 +160,6 @@ export class FieldService {
       const column = recordColumn(input.entity);
       writes.push(blank ? this.db.delete(value).where(and(eq(value.fieldId, field.id), eq(value[column], input.recordId))) : this.db.insert(value).values({ ...data, id: crypto.randomUUID(), fieldId: field.id, [column]: input.recordId }).onConflictDoUpdate({ target: [value.fieldId, value[column]], set: data }));
     }
-    if (writes.length) {
       const operationId = crypto.randomUUID();
       const expected = Object.keys(input.values).map(key => {
         const field = fields.find(item => item.key === key)!;
@@ -172,9 +177,10 @@ export class FieldService {
                 ))
             )
           )` : sql`1=1`;
-      try {
-        await authorizedBatch(this.db, context, [`${input.entity}.update`], [
-          this.db.insert(operationConditionGuard).values({ id: operationId, authorized: sql<number>`case when not exists (
+      const configuration = mode === "create" ? sql`exists (select 1 from field_configuration_revision where entity=${input.entity} and revision=${snapshot.revision})` : sql`1=1`;
+      const table = input.entity === "company" ? company : input.entity === "contact" ? contact : deal;
+      const statements = [
+          this.db.insert(operationConditionGuard).values({ id: operationId, authorized: sql<number>`case when ${configuration} and exists (select 1 from ${table} where id=${input.recordId}) and not exists (
             select 1 from json_each(${JSON.stringify(expected)}) as wanted
             where not exists (select 1 from custom_field_definition as f
               where f.id=json_extract(wanted.value,'$.id') and f.type=json_extract(wanted.value,'$.type')
@@ -182,9 +188,13 @@ export class FieldService {
           ) and ${fileGuard} and ${input.calendarRevision === undefined ? sql`1=1` : sql`exists (select 1 from crm_setting where id='settings' and calendar_revision=${input.calendarRevision})`} and exists (select 1 from singleton_membership where user_id=${context.membershipId} and status='active') then 1 else 0 end` }),
           ...writes,
           this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, operationId)),
-        ]);
-      } catch (error) { translateWriteError(error, "Field or record changed before values were saved"); }
-    }
+      ];
+      return { statements, translateError: (error: unknown): never => translateWriteError(error, "Field or record changed before values were saved") };
+  }
+  async writeValues(context: RequestContext, input: { entity: FieldEntity; recordId: string; values: Record<string, FieldValue>; calendarRevision?: number }) {
+    const prepared = await this.prepareValues(context, input);
+    try { await authorizedBatch(this.db, context, [`${input.entity}.update`], [prepared.statements[0]!, ...prepared.statements.slice(1)]); }
+    catch (error) { prepared.translateError(error); }
     return this.values(context, input);
   }
 }

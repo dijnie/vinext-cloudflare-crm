@@ -1,3 +1,5 @@
+import { FieldService } from "../custom-fields/field-service";
+import type { PreparedRecordCreation } from "../shared/record-fields-contract";
 import { requirePermission } from "../permissions/permission-policy";
 import type { Permission } from "../permissions/access-contracts";
 import type { RequestContext } from "@/lib/http/request-context";
@@ -78,21 +80,23 @@ export class CompanyService {
     };
   }
 
-  async create(context: RequestContext, input: CompanyCreateInput) {
+  async create(context: RequestContext, input: CompanyCreateInput, creation?: PreparedRecordCreation) {
     await this.guard(context, ["company.create", ...(input.ownerMembershipId ? ["company.assign" as const] : [])]);
     await this.requireOwner(input.ownerMembershipId);
+    const id = creation?.recordId ?? crypto.randomUUID();
+    const fields = await new FieldService(this.db).prepareValues(context, { entity: "company", recordId: id, values: input.customFields ?? {}, calendarRevision: input.calendarRevision }, "create");
     const now = new Date();
     const domain = normalizeDomain(input.domain) ?? null;
     try {
       const row = await this.repository.create({
-        id: crypto.randomUUID(),
+        id,
         name: input.name,
         domain,
         website: domain ? `https://${domain}` : null,
         ownerMembershipId: input.ownerMembershipId ?? null,
         createdAt: now,
         updatedAt: now,
-      }, context);
+      }, context, fields, creation);
       return { id: row.id, name: row.name, domain: row.domain };
     } catch (error) {
       relationError(error, "An active company already uses that domain");
@@ -122,8 +126,9 @@ export class CompanyService {
     if (input.email !== undefined) values.email = normalizeEmail(input.email);
     if (input.ownerMembershipId !== undefined)
       values.ownerMembershipId = input.ownerMembershipId;
+    const fields = input.customFields === undefined ? undefined : await new FieldService(this.db).prepareValues(context, { entity: "company", recordId: id, values: input.customFields, calendarRevision: input.calendarRevision });
     try {
-      const row = await this.repository.update(id, values, context);
+      const row = await this.repository.update(id, values, context, fields);
       return { id: row.id, name: row.name, domain: row.domain };
     } catch (error) {
       relationError(error, "An active company already uses that domain");

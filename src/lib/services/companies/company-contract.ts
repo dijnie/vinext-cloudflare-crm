@@ -1,3 +1,4 @@
+import { recordFieldsShape } from "../shared/record-fields-contract";
 import { z } from "zod";
 import { fieldDefinitionSchema, fieldValuesSchema } from "@/lib/services/custom-fields/field-contracts";
 
@@ -32,6 +33,7 @@ const optionalNullableText = nullableText.optional();
 
 export const companyCreateInputSchema = z
   .object({
+    ...recordFieldsShape,
     name: z.string().trim().min(1).max(200),
     domain: z.string().trim().max(255).optional(),
     ownerMembershipId: membershipIdSchema.nullable().optional(),
@@ -43,6 +45,7 @@ export const companyUpdateInputSchema = z
     action: z.literal("update"),
     data: z
       .object({
+        ...recordFieldsShape,
         name: z.string().trim().min(1).max(200).optional(),
         domain: optionalNullableText,
         website: optionalNullableText,

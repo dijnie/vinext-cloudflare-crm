@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { layoutUpdateSchema } from "@/lib/services/layouts/layout-contracts";
 
 import {
   assertSafeMutationRequest,
@@ -63,5 +64,34 @@ describe("request validation", () => {
         z.unknown(),
       ),
     ).rejects.toMatchObject({ code: "input_limit_exceeded" });
+  });
+
+  it("allows larger layout arrays only with an explicit parser limit", async () => {
+    const payload = {
+      entity: "company",
+      revision: 0,
+      fields: Array.from({ length: 201 }, (_, index) => ({ key: `field_${index}`, kind: "custom", visible: true })),
+    };
+    const body = JSON.stringify(payload);
+    await expect(parseJsonInput(request(body), layoutUpdateSchema, 500)).resolves.toEqual(payload);
+    await expect(parseJsonInput(request(body), layoutUpdateSchema)).rejects.toMatchObject({
+      code: "input_limit_exceeded",
+    });
+    const oversizedArray = JSON.stringify({ ...payload, fields: Array.from({ length: 501 }, (_, index) => ({ key: `field_${index}`, kind: "custom", visible: true })) });
+    await expect(parseJsonInput(request(oversizedArray), layoutUpdateSchema, 500)).rejects.toMatchObject({
+      code: "input_limit_exceeded",
+    });
+  });
+
+  it("retains the 64 KiB byte limit with a larger array allowance", async () => {
+    const body = JSON.stringify({
+      entity: "company",
+      revision: 0,
+      fields: Array.from({ length: 500 }, (_, index) => ({ key: String(index).padEnd(100, "x"), kind: "custom", visible: true })),
+    });
+    expect(new TextEncoder().encode(body).byteLength).toBeGreaterThan(64 * 1024);
+    await expect(parseJsonInput(request(body), layoutUpdateSchema, 500)).rejects.toMatchObject({
+      code: "input_limit_exceeded",
+    });
   });
 });

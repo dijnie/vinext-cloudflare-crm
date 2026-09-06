@@ -543,3 +543,19 @@ export const moduleSetting = sqliteTable("module_setting", {
   check("module_setting_enabled_check", sql`${table.enabled} in (0,1)`),
   check("module_setting_revision_check", sql`typeof(${table.revision}) = 'integer' and ${table.revision} >= 0`),
 ]);
+
+export const recordLayout = sqliteTable("record_layout", {
+  entity: text("entity", { enum: ["company", "contact", "deal"] }).primaryKey(),
+  revision: integer("revision").notNull().default(0),
+  fieldsJson: text("fields_json").notNull().default("null"),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, table => [check("record_layout_entity", sql`${table.entity} in ('company','contact','deal')`), check("record_layout_revision", sql`${table.revision} >= 0`), check("record_layout_json", sql`json_valid(${table.fieldsJson})`)]);
+
+export const recordDraft = sqliteTable("record_draft", {
+  id: text("id").primaryKey(),
+  entity: text("entity", { enum: ["company", "contact", "deal"] }).notNull(),
+  userId: text("user_id").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  consumedAt: integer("consumed_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, table => [check("record_draft_entity", sql`${table.entity} in ('company','contact','deal')`), check("record_draft_expiry", sql`${table.expiresAt} > ${table.createdAt}`)]);

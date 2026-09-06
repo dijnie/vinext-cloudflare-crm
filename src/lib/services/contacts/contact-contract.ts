@@ -1,3 +1,4 @@
+import { recordFieldsShape } from "../shared/record-fields-contract";
 import { z } from "zod";
 import { fieldDefinitionSchema, fieldValuesSchema } from "@/lib/services/custom-fields/field-contracts";
 
@@ -33,6 +34,7 @@ const nullableText = z.string().trim().max(2_000).nullable();
 
 export const contactCreateInputSchema = z
   .object({
+    ...recordFieldsShape,
     firstName: z.string().trim().min(1).max(120),
     lastName: z.string().trim().max(120).optional(),
     email: z.union([z.email(), z.literal("")]).optional(),
@@ -48,6 +50,7 @@ export const contactUpdateInputSchema = z
     action: z.literal("update"),
     data: z
       .object({
+        ...recordFieldsShape,
         firstName: z.string().trim().min(1).max(120).optional(),
         lastName: nullableText.optional(),
         email: z.union([z.email(), z.literal(""), z.null()]).optional(),
