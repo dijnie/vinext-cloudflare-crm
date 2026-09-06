@@ -6,7 +6,7 @@ export default async function LayoutSettingsPage({ params }: { params: Promise<{
   const { locale } = await params;
   if (!isAppLocale(locale)) notFound();
   const { root, context } = await getPageContext();
-  const initialData = await Promise.all((["company", "contact", "deal"] as const).map(entity => root.layouts.get(context, { entity })));
+  const initialData = await Promise.all((["company", "contact", "deal", "lead"] as const).map(entity => root.layouts.get(context, { entity })));
   if (!initialData.every(item => item.canManage)) notFound();
   return <LayoutSettings locale={locale} initialData={initialData} />;
 }

@@ -1,3 +1,4 @@
+import { recordAnchorNames } from "@/lib/db/record-entities";
 import { sql, type SQL } from "drizzle-orm";
 import { parseFormula, type FormulaNode } from "./field-formula";
 import type { customFieldDefinition } from "@/lib/db/schema";
@@ -6,7 +7,7 @@ import type { FieldEntity } from "./field-contracts";
 // Only parsed operators and fixed identifiers enter SQL syntax; values stay bound.
 export function formulaExpression(fields: (typeof customFieldDefinition.$inferSelect)[], key: string, entity: FieldEntity, recordId: SQL): SQL {
   const byKey = new Map(fields.map(field => [field.key, field]));
-  const anchor = sql.raw({ company: "company_id", contact: "contact_id", deal: "deal_id" }[entity]);
+  const anchor = sql.raw(recordAnchorNames[entity]);
   const visiting = new Set<string>();
   let nodes = 0;
   const bounded = (value: SQL) => sql`(select case when calculated between -1.7976931348623157e308 and 1.7976931348623157e308 then calculated else null end from (select ${value} as calculated))`;

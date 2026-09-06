@@ -1,3 +1,4 @@
+import { recordTables } from "@/lib/db/record-entities";
 import { FieldRepository } from "./field-repository";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
@@ -11,8 +12,8 @@ import { fieldConfig, storedFieldValue } from "./field-storage";
 import type { FieldValue } from "./field-contracts";
 import { HttpError } from "@/lib/http/http-errors";
 
-const tables = { company, contact, deal };
-const anchors = { company: value.companyId, contact: value.contactId, deal: value.dealId };
+const tables = recordTables;
+const anchors = { company: value.companyId, contact: value.contactId, deal: value.dealId, lead: value.leadId };
 type Filters = Record<string, string[]>;
 const customer = alias(contact, "field_customer");
 
@@ -90,7 +91,7 @@ export async function fieldListData(db: AppDatabase, entity: EntityType, ids: st
   const fieldsByRecord: Record<string, Record<string, FieldValue>> = {};
   for (const row of values) {
     const field = byId.get(row.fieldId)!;
-    const recordId = row.companyId ?? row.contactId ?? row.dealId!;
+    const recordId = row.companyId ?? row.contactId ?? row.dealId ?? row.leadId!;
     const scalar = storedFieldValue(field.type, row);
     (fieldsByRecord[recordId] ??= {})[field.key] = scalar;
   }

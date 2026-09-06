@@ -48,13 +48,13 @@ export class DashboardRepository {
         co.id AS company_id, co.name AS company_name, u.id AS owner_id, u.name AS owner_name
         ${FROM} INNER JOIN company co ON co.id = d.company_id INNER JOIN user u ON u.id = d.owner_membership_id
         WHERE ${where} AND ${OPEN} ORDER BY base_amount_minor DESC, d.expected_close_at ASC, d.id ASC LIMIT 6`, args),
-      prepare(`SELECT a.id, a.subject, a.due_at, a.company_id AS anchor_company_id, a.contact_id AS anchor_contact_id, a.deal_id AS anchor_deal_id, co.id AS company_id, co.name AS company_name, d.id AS deal_id, d.name AS deal_name
-        FROM activity a LEFT JOIN company co ON co.id = a.company_id LEFT JOIN deal d ON d.id = a.deal_id
+      prepare(`SELECT a.id, a.subject, a.due_at, a.company_id AS anchor_company_id, a.contact_id AS anchor_contact_id, a.deal_id AS anchor_deal_id, a.lead_id AS anchor_lead_id, co.id AS company_id, co.name AS company_name, d.id AS deal_id, d.name AS deal_name, l.id AS lead_id, trim(l.first_name || ' ' || coalesce(l.last_name,'')) AS lead_name
+        FROM activity a LEFT JOIN company co ON co.id = a.company_id LEFT JOIN deal d ON d.id = a.deal_id LEFT JOIN lead l ON l.id = a.lead_id
         WHERE a.type = 'task' AND a.completed_at IS NULL AND a.due_at < ? AND a.author_user_id = ?
         ORDER BY a.due_at ASC, a.id ASC LIMIT 10`, [now.getTime(), userId]),
       prepare(`SELECT a.id, a.type, a.subject, substr(a.content, 1, 600) AS content, a.metadata_json, a.created_at,
-        u.id AS author_id, u.name AS author_name, co.id AS company_id, co.name AS company_name, d.id AS deal_id, d.name AS deal_name
-        FROM activity a INNER JOIN user u ON u.id = a.author_user_id LEFT JOIN company co ON co.id = a.company_id LEFT JOIN deal d ON d.id = a.deal_id
+        u.id AS author_id, u.name AS author_name, co.id AS company_id, co.name AS company_name, d.id AS deal_id, d.name AS deal_name, l.id AS lead_id, trim(l.first_name || ' ' || coalesce(l.last_name,'')) AS lead_name
+        FROM activity a INNER JOIN user u ON u.id = a.author_user_id LEFT JOIN company co ON co.id = a.company_id LEFT JOIN deal d ON d.id = a.deal_id LEFT JOIN lead l ON l.id = a.lead_id
         ${input.scope === "me" ? "WHERE a.author_user_id = ?" : ""} ORDER BY a.created_at DESC, a.id DESC LIMIT 12`, args),
     ];
   }

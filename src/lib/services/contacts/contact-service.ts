@@ -1,4 +1,6 @@
 import { FieldService } from "../custom-fields/field-service";
+import { normalizeLeadPhone } from "../leads/lead-normalization";
+import { contactCreateInputSchema } from "./contact-contract";
 import type { PreparedRecordCreation } from "../shared/record-fields-contract";
 import { requirePermission } from "../permissions/permission-policy";
 import type { Permission } from "../permissions/access-contracts";
@@ -42,7 +44,7 @@ export class ContactService {
     await this.guard(context);
     const row = await this.repository.byId(id);
     if (!row) throw new HttpError(404, "not_found", "Contact was not found");
-    const { deals, ...record } = row;
+    const { deals, convertedFrom, ...record } = row;
     return {
       ...record,
       owner: record.ownerMembershipId
@@ -67,6 +69,7 @@ export class ContactService {
       archivedAt: toIso(record.archivedAt),
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
+      convertedFrom: convertedFrom.map(source => ({ ...source, convertedAt: source.convertedAt.toISOString() })),
       deals: deals.map((linkedDeal) => ({
         ...linkedDeal,
         archivedAt: toIso(linkedDeal.archivedAt),
@@ -75,28 +78,37 @@ export class ContactService {
   }
 
   async create(context: RequestContext, input: ContactCreateInput, creation?: PreparedRecordCreation) {
+    const prepared = await this.prepareCreate(context, input, creation);
+    try { await this.db.batch(prepared.statements); return prepared.result; }
+    catch (error) { return prepared.translateError(error); }
+  }
+
+  async prepareCreate(context: RequestContext, raw: ContactCreateInput, creation?: PreparedRecordCreation) {
+    const parsed = contactCreateInputSchema.safeParse(raw);
+    if (!parsed.success) throw new HttpError(400, "validation_failed", "Contact values are invalid");
+    const input = parsed.data;
     await this.guard(context, ["contact.create", ...(input.ownerMembershipId ? ["contact.assign" as const] : [])]);
     await this.requireRelations(input.companyId, input.ownerMembershipId);
     const id = creation?.recordId ?? crypto.randomUUID();
     const fields = await new FieldService(this.db).prepareValues(context, { entity: "contact", recordId: id, values: input.customFields ?? {}, calendarRevision: input.calendarRevision }, "create");
     const now = new Date();
-    try {
-      const row = await this.repository.create({
+    const values = {
         id,
         firstName: input.firstName,
         lastName: blankToNull(input.lastName) ?? null,
         email: normalizeEmail(input.email) ?? null,
         phone: blankToNull(input.phone) ?? null,
+        normalizedPhone: normalizeLeadPhone(input.phone),
         title: blankToNull(input.title) ?? null,
         companyId: input.companyId ?? null,
         ownerMembershipId: input.ownerMembershipId ?? null,
         createdAt: now,
         updatedAt: now,
-      }, context, fields, creation);
-      return { id: row.id, firstName: row.firstName, lastName: row.lastName };
-    } catch (error) {
-      relationError(error, "An active contact already uses that email");
-    }
+      };
+    const prepared = this.repository.prepareCreate(values, context, fields, creation);
+    return { statements: prepared.statements, result: { id, firstName: values.firstName, lastName: values.lastName }, translateError(error: unknown): never {
+      try { return prepared.translateError(error); } catch (classified) { return relationError(classified, "An active contact already uses that email"); }
+    } };
   }
 
   async update(context: RequestContext, id: string, input: ContactUpdateData) {
@@ -120,7 +132,7 @@ export class ContactService {
     if (input.lastName !== undefined)
       values.lastName = blankToNull(input.lastName);
     if (input.email !== undefined) values.email = normalizeEmail(input.email);
-    if (input.phone !== undefined) values.phone = blankToNull(input.phone);
+    if (input.phone !== undefined) { values.phone = blankToNull(input.phone); values.normalizedPhone = normalizeLeadPhone(input.phone); }
     if (input.title !== undefined) values.title = blankToNull(input.title);
     if (input.companyId !== undefined) values.companyId = input.companyId;
     if (input.ownerMembershipId !== undefined)

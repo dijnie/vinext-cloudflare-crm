@@ -1,3 +1,4 @@
+import { recordTables, recordAnchorNames } from "@/lib/db/record-entities";
 import { and, eq, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
 import { crmFile } from "@/lib/db/schema";
@@ -10,7 +11,7 @@ import { readUploadBody, uploadFileName } from "./file-upload-body";
 
 function anchors(input: FileUploadInput, context?: RequestContext) {
   // Entity names are validated before this helper; SQL identifiers never come from request strings.
-  const table = input.entity === "company" ? sql`company` : input.entity === "contact" ? sql`contact` : sql`deal`;
+  const table = recordTables[input.entity];
   const record = input.draftId && context ? draftPredicate(context, input.entity, input.draftId) : sql`EXISTS (SELECT 1 FROM ${table} WHERE id=${input.recordId})`;
   return sql`EXISTS (SELECT 1 FROM custom_field_definition WHERE id=${input.fieldId} AND entity=${input.entity} AND type='file' AND archived_at IS NULL AND deleted_at IS NULL) AND (${record})`;
 }
@@ -49,7 +50,7 @@ export class FileService {
     await requirePermission(this.db, context);
     const row = await this.db.select().from(crmFile).where(and(eq(crmFile.id, id), eq(crmFile.status, "ready"))).get();
     if (!row) throw new HttpError(404, "not_found", "File is unavailable");
-    const column = row.entity === "company" ? sql`company_id` : row.entity === "contact" ? sql`contact_id` : sql`deal_id`;
+    const column = sql.raw(recordAnchorNames[row.entity]);
     const existing = sql`(${anchors(row)}) AND (${row.uploaderId}=${context.userId} OR EXISTS (SELECT 1 FROM custom_field_value v, json_each(v.json_value) j WHERE v.field_id=${row.fieldId} AND v.${column}=${row.recordId} AND j.value=${row.id}))`;
     const draft = sql`${row.uploaderId}=${context.userId} AND (${permissionPredicate(context, [`${row.entity}.create`])}) AND (${anchors({ ...row, draftId: row.recordId }, context)})`;
     const allowed = await this.db.get<{ allowed: number }>(sql`SELECT (${permissionPredicate(context)}) AND ((${existing}) OR (${draft})) AS allowed`);

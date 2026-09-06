@@ -118,6 +118,7 @@ export const contactListOutputSchema = z.object({
   rows: z.array(contactListRowOutputSchema),
 });
 export const contactDetailOutputSchema = contactListRowOutputSchema.extend({
+  convertedFrom: z.array(z.object({ id: stableIdSchema, firstName: z.string(), lastName: z.string().nullable(), convertedAt: isoDateTimeSchema })).max(100),
   deals: z.array(
     z.object({
       id: stableIdSchema,

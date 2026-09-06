@@ -3,6 +3,11 @@ import type { LayoutField, LayoutSurface } from "./layout-contracts";
 
 // Detail keys use their stored input identity; renderers map owner/stage/amount labels.
 export const DEFAULT_LAYOUT_KEYS: Record<FieldEntity, Record<LayoutSurface, readonly string[]>> = {
+  lead: {
+    create: ["firstName", "lastName", "email", "phone", "title", "companyId", "sourceId", "statusId", "ownerMembershipId", "collaboratorMembershipIds", "description", "rejectionReason"],
+    edit: ["firstName", "lastName", "email", "phone", "title", "companyId", "sourceId", "statusId", "ownerMembershipId", "collaboratorMembershipIds", "description", "rejectionReason"],
+    detail: ["firstName", "lastName", "email", "phone", "title", "companyId", "sourceId", "statusId", "ownerMembershipId", "collaboratorMembershipIds", "description", "rejectionReason", "createdAt", "updatedAt"],
+  },
   company: {
     create: ["name", "domain", "ownerMembershipId"],
     edit: ["name", "domain", "website", "description", "industry", "city", "countryCode", "phone", "email", "ownerMembershipId"],
@@ -24,7 +29,7 @@ export function layoutCatalog(entity: FieldEntity, definitions: FieldDefinition[
   const defaults = DEFAULT_LAYOUT_KEYS[entity];
   const surfaces: LayoutSurface[] = ["create", "edit", "detail"];
   const keys = [...new Set(surfaces.flatMap(surface => defaults[surface]))];
-  const required = new Set(entity === "contact" ? ["firstName"] : entity === "deal" ? ["name", "companyId", "ownerMembershipId", "stageId", "currency"] : ["name"]);
+  const required = new Set(entity === "contact" || entity === "lead" ? ["firstName"] : entity === "deal" ? ["name", "companyId", "ownerMembershipId", "stageId", "currency"] : ["name"]);
   return [
     ...keys.map(key => ({ key, kind: "builtin" as const, visible: true, required: required.has(key), readOnly: key === "createdAt" || key === "updatedAt", surfaces: surfaces.filter(surface => defaults[surface].includes(key)) })),
     ...definitions.filter(field => !field.archivedAt).sort((a, b) => a.position - b.position || a.id.localeCompare(b.id)).map(field => ({ key: field.key, kind: "custom" as const, visible: field.showOnSheet, required: field.required, readOnly: field.type === "formula", surfaces: [...surfaces], label: field.label })),

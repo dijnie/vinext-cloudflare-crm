@@ -4,6 +4,7 @@ export const PERMISSIONS = [
   "company.create", "company.update", "company.archive", "company.restore", "company.assign", "company.export",
   "contact.create", "contact.update", "contact.archive", "contact.restore", "contact.assign", "contact.export",
   "deal.create", "deal.update", "deal.archive", "deal.restore", "deal.assign", "deal.export",
+  "lead.create", "lead.update", "lead.archive", "lead.restore", "lead.assign", "lead.export", "lead.convert",
   "activity.create", "activity.update", "field.configure", "view.create", "view.update", "view.delete",
 ] as const;
 export type Permission = typeof PERMISSIONS[number];

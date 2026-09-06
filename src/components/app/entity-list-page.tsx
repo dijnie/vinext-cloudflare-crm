@@ -1,3 +1,4 @@
+import type { LeadListInput } from "@/lib/services/leads/lead-contract";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { isAppLocale } from "@/lib/i18n/config";
@@ -26,7 +27,7 @@ export async function EntityListPage({ entity, params, searchParams }: EntityPag
   }
   let state; try { state = parseListState(entity, query); } catch { const labels = getCrmDictionary(locale); return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}/${entityPaths[entity]}?page=1`}>{labels.reset}</Link></div>; }
   try {
-    const initialData = entity === "company" ? await root.companies.list(context, state.list as CompanyListInput) : entity === "contact" ? await root.contacts.list(context, state.list as ContactListInput) : await root.deals.list(context, state.list as DealListInput);
+    const initialData = entity === "company" ? await root.companies.list(context, state.list as CompanyListInput) : entity === "contact" ? await root.contacts.list(context, state.list as ContactListInput) : entity === "lead" ? await root.leads.list(context, state.list as LeadListInput) : await root.deals.list(context, state.list as DealListInput);
     return <EntityList entity={entity} initialData={initialData} initialQueryKey={`${entity}:${JSON.stringify(state.list)}`} locale={locale} />;
   } catch (error) {
     if (!isHttpError(error) || error.status !== 400) throw error;

@@ -14,7 +14,7 @@ export function moduleWritePredicate(permissions: readonly Permission[]): SQL {
   const entities: FieldEntity[] = [];
   for (const permission of permissions) {
     const [entity, action] = permission.split(".");
-    if (["company", "contact", "deal"].includes(entity!) && ["create", "update", "archive", "restore", "assign"].includes(action!)) entities.push(entity as FieldEntity);
+    if (["company", "contact", "deal", "lead"].includes(entity!) && ["create", "update", "archive", "restore", "assign", "convert"].includes(action!)) entities.push(entity as FieldEntity);
   }
   return modulesEnabledPredicate(entities);
 }
@@ -24,6 +24,6 @@ export async function requireModulesEnabled(db: AppDatabase, entities: readonly 
   if (!row?.enabled) throw new HttpError(403, "permission_required", "Module is disabled and historical records are read-only");
 }
 
-export function activityModules(anchors: { companyId?: string | null; contactId?: string | null; dealId?: string | null }): FieldEntity[] {
-  return [anchors.companyId ? "company" : null, anchors.contactId ? "contact" : null, anchors.dealId ? "deal" : null].filter((entity): entity is FieldEntity => entity !== null);
+export function activityModules(anchors: { companyId?: string | null; contactId?: string | null; dealId?: string | null; leadId?: string | null }): FieldEntity[] {
+  return [anchors.companyId ? "company" : null, anchors.contactId ? "contact" : null, anchors.dealId ? "deal" : null, anchors.leadId ? "lead" : null].filter((entity): entity is FieldEntity => entity !== null);
 }

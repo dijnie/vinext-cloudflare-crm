@@ -79,6 +79,7 @@ export const contact = sqliteTable(
     lastName: text("last_name"),
     email: text("email"),
     phone: text("phone"),
+    normalizedPhone: text("normalized_phone"),
     title: text("title"),
     companyId: text("company_id").references(() => company.id, {
       onDelete: "set null",
@@ -97,6 +98,7 @@ export const contact = sqliteTable(
     index("contact_owner_idx").on(table.ownerMembershipId),
     index("contact_last_activity_idx").on(table.lastActivityAt),
     index("contact_archived_idx").on(table.archivedAt),
+    index("contact_normalized_phone_idx").on(table.normalizedPhone),
     uniqueIndex("contact_active_email_unique")
       .on(table.email)
       .where(sql`${table.archivedAt} is null and ${table.email} is not null`),
@@ -172,6 +174,7 @@ export const dealContact = sqliteTable(
 export const activity = sqliteTable(
   "activity",
   {
+    leadId: text("lead_id").references(() => lead.id, { onDelete: "cascade" }),
     id: text("id").primaryKey(),
     type: text("type", {
       enum: ["note", "call", "meeting", "task", "stage_change"],
@@ -197,6 +200,7 @@ export const activity = sqliteTable(
     ...timestamps,
   },
   (table) => [
+    index("activity_lead_created_idx").on(table.leadId, table.createdAt, table.id),
     index("activity_company_created_idx").on(table.companyId, table.createdAt, table.id),
     index("activity_contact_created_idx").on(table.contactId, table.createdAt, table.id),
     index("activity_deal_created_idx").on(table.dealId, table.createdAt, table.id),
@@ -208,7 +212,7 @@ export const activity = sqliteTable(
     ),
     check(
       "activity_anchor_check",
-      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null)) >= 1`,
+      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null) + (${table.leadId} is not null)) >= 1`,
     ),
     check(
       "activity_metadata_json_check",
@@ -245,7 +249,7 @@ export const memberOperationGuard = sqliteTable(
 );
 
 export const fieldConfigurationRevision = sqliteTable("field_configuration_revision", {
-  entity: text("entity", { enum: ["company", "contact", "deal"] }).primaryKey().notNull(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead"] }).primaryKey().notNull(),
   revision: integer("revision").default(0).notNull(),
 });
 
@@ -253,7 +257,7 @@ export const customFieldDefinition = sqliteTable(
   "custom_field_definition",
   {
     id: text("id").primaryKey(),
-    entity: text("entity", { enum: ["company", "contact", "deal"] }).notNull(),
+    entity: text("entity", { enum: ["company", "contact", "deal", "lead"] }).notNull(),
     key: text("key").notNull(),
     label: text("label").notNull(),
     type: text("type", {
@@ -291,7 +295,7 @@ export const customFieldDefinition = sqliteTable(
     index("custom_field_entity_position_idx").on(table.entity, table.position),
     check(
       "custom_field_entity_check",
-      sql`${table.entity} in ('company', 'contact', 'deal')`,
+      sql`${table.entity} in ('company', 'contact', 'deal', 'lead')`,
     ),
     check(
       "custom_field_type_check",
@@ -321,6 +325,7 @@ export const customFieldOption = sqliteTable(
 export const customFieldValue = sqliteTable(
   "custom_field_value",
   {
+    leadId: text("lead_id").references(() => lead.id, { onDelete: "cascade" }),
     id: text("id").primaryKey(),
     fieldId: text("field_id")
       .notNull()
@@ -351,6 +356,7 @@ export const customFieldValue = sqliteTable(
     uniqueIndex("custom_field_company_unique").on(table.fieldId, table.companyId),
     uniqueIndex("custom_field_contact_unique").on(table.fieldId, table.contactId),
     uniqueIndex("custom_field_deal_unique").on(table.fieldId, table.dealId),
+    uniqueIndex("custom_field_lead_unique").on(table.fieldId, table.leadId),
     index("custom_field_value_text_idx").on(table.fieldId, table.textValue),
     index("custom_field_value_number_idx").on(table.fieldId, table.numberValue),
     index("custom_field_value_date_idx").on(table.fieldId, table.dateValue),
@@ -359,7 +365,7 @@ export const customFieldValue = sqliteTable(
     check("custom_field_json_value_check", sql`${table.jsonValue} is null or json_valid(${table.jsonValue})`),
     check(
       "custom_field_value_one_record_check",
-      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null)) = 1`,
+      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null) + (${table.leadId} is not null)) = 1`,
     ),
   ],
 );
@@ -368,7 +374,7 @@ export const savedView = sqliteTable(
   "saved_view",
   {
     id: text("id").primaryKey(),
-    entity: text("entity", { enum: ["company", "contact", "deal"] }).notNull(),
+    entity: text("entity", { enum: ["company", "contact", "deal", "lead"] }).notNull(),
     name: text("name").notNull(),
     shared: integer("shared", { mode: "boolean" }).default(false).notNull(),
     stateJson: text("state_json").notNull(),
@@ -389,7 +395,7 @@ export const savedView = sqliteTable(
     index("saved_view_entity_shared_idx").on(table.entity, table.shared),
     check(
       "saved_view_entity_check",
-      sql`${table.entity} in ('company', 'contact', 'deal')`,
+      sql`${table.entity} in ('company', 'contact', 'deal', 'lead')`,
     ),
     check("saved_view_state_json_check", sql`json_valid(${table.stateJson})`),
   ],
@@ -397,12 +403,12 @@ export const savedView = sqliteTable(
 
 export const savedViewDefault = sqliteTable("saved_view_default", {
   userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  entity: text("entity", { enum: ["company", "contact", "deal"] }).notNull(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead"] }).notNull(),
   viewId: text("view_id").notNull().references(() => savedView.id, { onDelete: "cascade" }),
 }, table => [
   primaryKey({ columns: [table.userId, table.entity] }),
   index("saved_view_default_view_idx").on(table.viewId),
-  check("saved_view_default_entity_check", sql`${table.entity} in ('company','contact','deal')`),
+  check("saved_view_default_entity_check", sql`${table.entity} in ('company','contact','deal','lead')`),
 ]);
 
 export const exchangeRate = sqliteTable(
@@ -514,7 +520,7 @@ export const dealConversion = sqliteTable("deal_conversion", {
 export const crmFile = sqliteTable("crm_file", {
   id: text("id").primaryKey(),
   objectKey: text("object_key").notNull(),
-  entity: text("entity", { enum: ["company", "contact", "deal"] }).notNull(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead"] }).notNull(),
   recordId: text("record_id").notNull(),
   fieldId: text("field_id").notNull(),
   uploaderId: text("uploader_id").notNull(),
@@ -528,7 +534,7 @@ export const crmFile = sqliteTable("crm_file", {
   uniqueIndex("crm_file_object_key_unique").on(table.objectKey),
   index("crm_file_anchor_idx").on(table.entity, table.recordId, table.fieldId),
   index("crm_file_cleanup_idx").on(table.status, table.createdAt),
-  check("crm_file_entity_check", sql`${table.entity} in ('company','contact','deal')`),
+  check("crm_file_entity_check", sql`${table.entity} in ('company','contact','deal','lead')`),
   check("crm_file_status_check", sql`${table.status} in ('pending','ready','failed','cleaning')`),
   check("crm_file_name_check", sql`length(${table.fileName}) between 1 and 255`),
   check("crm_file_size_check", sql`typeof(${table.size}) = 'integer' and ${table.size} between 0 and 10485760`),
@@ -536,33 +542,82 @@ export const crmFile = sqliteTable("crm_file", {
 ]);
 
 export const moduleSetting = sqliteTable("module_setting", {
-  entity: text("entity", { enum: ["company", "contact", "deal"] }).primaryKey(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead"] }).primaryKey(),
   enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
   revision: integer("revision").default(0).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, table => [
-  check("module_setting_entity_check", sql`${table.entity} in ('company','contact','deal')`),
+  check("module_setting_entity_check", sql`${table.entity} in ('company','contact','deal','lead')`),
   check("module_setting_enabled_check", sql`${table.enabled} in (0,1)`),
   check("module_setting_revision_check", sql`typeof(${table.revision}) = 'integer' and ${table.revision} >= 0`),
 ]);
 
 export const recordLayout = sqliteTable("record_layout", {
-  entity: text("entity", { enum: ["company", "contact", "deal"] }).primaryKey(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead"] }).primaryKey(),
   revision: integer("revision").notNull().default(0),
   fieldsJson: text("fields_json").notNull().default("null"),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
-}, table => [check("record_layout_entity", sql`${table.entity} in ('company','contact','deal')`), check("record_layout_revision", sql`${table.revision} >= 0`), check("record_layout_json", sql`json_valid(${table.fieldsJson})`)]);
+}, table => [check("record_layout_entity", sql`${table.entity} in ('company','contact','deal','lead')`), check("record_layout_revision", sql`${table.revision} >= 0`), check("record_layout_json", sql`json_valid(${table.fieldsJson})`)]);
 
 export const recordDraft = sqliteTable("record_draft", {
   id: text("id").primaryKey(),
-  entity: text("entity", { enum: ["company", "contact", "deal"] }).notNull(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead"] }).notNull(),
   userId: text("user_id").notNull(),
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   consumedAt: integer("consumed_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-}, table => [check("record_draft_entity", sql`${table.entity} in ('company','contact','deal')`), check("record_draft_expiry", sql`${table.expiresAt} > ${table.createdAt}`)]);
+}, table => [check("record_draft_entity", sql`${table.entity} in ('company','contact','deal','lead')`), check("record_draft_expiry", sql`${table.expiresAt} > ${table.createdAt}`)]);
 
 export const dealStageCatalogRevision = sqliteTable("deal_stage_catalog_revision", {
   id: text("id").primaryKey(),
   revision: integer("revision").notNull().default(0),
 }, table => [check("deal_stage_catalog_singleton", sql`${table.id} = 'stages'`), check("deal_stage_catalog_revision_nonnegative", sql`${table.revision} >= 0`)]);
+
+
+export const leadSource = sqliteTable("lead_source", {
+  id: text("id").primaryKey().notNull(), label: text("label"), labelKey: text("label_key").notNull(),
+  position: integer("position").notNull().unique(), archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
+});
+export const leadStatus = sqliteTable("lead_status", {
+  id: text("id").primaryKey().notNull(), label: text("label"), labelKey: text("label_key").notNull(),
+  position: integer("position").notNull().unique(), archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
+  meaning: text("meaning", { enum: ["working", "rejected", "converted"] }).notNull(),
+  requiresReason: integer("requires_reason", { mode: "boolean" }).notNull().default(false),
+}, table => [check("lead_status_meaning", sql`${table.meaning} in ('working','rejected','converted')`), check("lead_converted_status", sql`(${table.meaning} = 'converted') = (${table.id} = 'converted')`), check("lead_requires_reason", sql`${table.requiresReason} in (0,1)`)]);
+export const leadSettingsRevision = sqliteTable("lead_settings_revision", {
+  id: text("id", { enum: ["settings"] }).primaryKey().notNull(), revision: integer("revision").notNull().default(0),
+}, table => [check("lead_settings_singleton", sql`${table.id} = 'settings'`), check("lead_settings_revision", sql`${table.revision} >= 0`)]);
+export const lead = sqliteTable("lead", {
+  id: text("id").primaryKey().notNull(), firstName: text("first_name").notNull(), lastName: text("last_name"),
+  email: text("email"), phone: text("phone"), normalizedEmail: text("normalized_email"), normalizedPhone: text("normalized_phone"),
+  title: text("title"), description: text("description"), companyId: text("company_id").references(() => company.id, { onDelete: "set null" }),
+  sourceId: text("source_id").notNull().default("manual").references(() => leadSource.id, { onDelete: "restrict" }),
+  statusId: text("status_id").notNull().default("new").references(() => leadStatus.id, { onDelete: "restrict" }), rejectionReason: text("rejection_reason"),
+  ownerMembershipId: text("owner_membership_id").references(() => singletonMembership.userId, { onDelete: "set null" }),
+  creatorUserId: text("creator_user_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+  revision: integer("revision").notNull().default(0), lastActivityAt: integer("last_activity_at", { mode: "timestamp_ms" }),
+  archivedAt: integer("archived_at", { mode: "timestamp_ms" }), convertedAt: integer("converted_at", { mode: "timestamp_ms" }),
+  convertedContactId: text("converted_contact_id").references(() => contact.id, { onDelete: "restrict" }), ...timestamps,
+}, table => [
+  index("lead_source_idx").on(table.sourceId), index("lead_status_idx").on(table.statusId), index("lead_owner_idx").on(table.ownerMembershipId),
+  index("lead_email_idx").on(table.normalizedEmail), index("lead_phone_idx").on(table.normalizedPhone), index("lead_created_idx").on(table.createdAt, table.id),
+  check("lead_revision", sql`${table.revision} >= 0`),
+  check("lead_conversion_state", sql`(${table.convertedAt} is null and ${table.convertedContactId} is null and ${table.statusId} != 'converted') or (${table.convertedAt} is not null and ${table.convertedContactId} is not null and ${table.statusId} = 'converted')`),
+]);
+export const leadCollaborator = sqliteTable("lead_collaborator", {
+  leadId: text("lead_id").notNull().references(() => lead.id, { onDelete: "cascade" }),
+  membershipId: text("membership_id").notNull().references(() => singletonMembership.userId, { onDelete: "cascade" }),
+}, table => [primaryKey({ columns: [table.leadId, table.membershipId] }), index("lead_collaborator_member_idx").on(table.membershipId, table.leadId)]);
+export const leadMapping = sqliteTable("lead_mapping", {
+  id: text("id", { enum: ["contact"] }).primaryKey().notNull(), revision: integer("revision").notNull().default(0),
+  mappingsJson: text("mappings_json").notNull().default("[]"), autoOrder: integer("auto_order", { mode: "boolean" }).notNull().default(false),
+  autoDeal: integer("auto_deal", { mode: "boolean" }).notNull().default(false), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, table => [check("lead_mapping_singleton", sql`${table.id} = 'contact'`), check("lead_mapping_revision", sql`${table.revision} >= 0`), check("lead_mapping_json", sql`json_valid(${table.mappingsJson})`), check("lead_mapping_order_disabled", sql`${table.autoOrder} = 0`), check("lead_mapping_deal_disabled", sql`${table.autoDeal} = 0`)]);
+export const leadConversion = sqliteTable("lead_conversion", {
+  id: text("id").primaryKey().notNull(), leadId: text("lead_id").notNull().unique().references(() => lead.id, { onDelete: "restrict" }),
+  operationKey: text("operation_key").notNull().unique(), fingerprint: text("fingerprint").notNull(),
+  actorId: text("actor_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+  contactId: text("contact_id").notNull().references(() => contact.id, { onDelete: "restrict" }), mode: text("mode", { enum: ["create", "link"] }).notNull(),
+  leadRevision: integer("lead_revision").notNull(), mappingRevision: integer("mapping_revision").notNull(),
+  snapshotJson: text("snapshot_json").notNull(), resultJson: text("result_json").notNull(), completedAt: integer("completed_at", { mode: "timestamp_ms" }).notNull(),
+}, table => [index("lead_conversion_contact_completed_idx").on(table.contactId, sql`${table.completedAt} desc`, table.leadId), check("lead_conversion_mode", sql`${table.mode} in ('create','link')`), check("lead_conversion_snapshot_json", sql`json_valid(${table.snapshotJson})`), check("lead_conversion_result_json", sql`json_valid(${table.resultJson})`)]);

@@ -36,9 +36,14 @@ it("preserves populated field history, conversion state and current triggers whi
   const snapshots = await Promise.all(tables.map(table => db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all()));
   const triggers = (await db.prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger' ORDER BY name").all<{name: string; sql: string}>()).results;
   await applyD1Migrations(db, env.TEST_MIGRATIONS.slice(11));
-  for (const [index, table] of tables.entries()) expect((await db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all()).results, table).toEqual(snapshots[index].results);
+  for (const [index, table] of tables.entries()) {
+    const rows = (await db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all()).results;
+    const retained = table === "field_configuration_revision" ? rows.filter(row => row.entity !== "lead") : rows;
+    const expected = table === "custom_field_value" ? snapshots[index].results.map(row => ({ ...row, lead_id: null })) : snapshots[index].results;
+    expect(retained, table).toEqual(expected);
+  }
   const after = (await db.prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger'").all<{name: string; sql: string}>()).results;
-  const changed = new Set(["custom_field_type_with_values", "custom_field_value_validate_insert", "custom_field_value_validate_update"]);
+  const changed = new Set(["custom_field_type_with_values", "custom_field_value_validate_insert", "custom_field_value_validate_update", "membership_requires_reference_cleanup", "activity_compatible_anchors_insert", "activity_history_immutable"]);
   for (const old of triggers) {
     const restored = after.find(trigger => trigger.name === old.name);
     expect(restored, old.name).toBeDefined();

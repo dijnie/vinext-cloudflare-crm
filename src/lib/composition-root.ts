@@ -1,3 +1,7 @@
+import { LeadService } from "@/lib/services/leads/lead-service";
+import { LeadSettingsService } from "@/lib/services/leads/lead-settings-service";
+import { LeadConversionService } from "@/lib/services/conversions/lead-conversion-service";
+import { LeadMappingService } from "@/lib/services/conversions/lead-mapping-service";
 import { DealStageService } from "@/lib/services/deals/deal-stage-service";
 import { LayoutService } from "@/lib/services/layouts/layout-service";
 import { DraftService } from "@/lib/services/record-drafts/draft-service";
@@ -57,6 +61,10 @@ export function createCompositionRoot(
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
   return {
+    leads: new LeadService(db),
+    leadSettings: new LeadSettingsService(db),
+    leadConversions: new LeadConversionService(db),
+    leadMapping: new LeadMappingService(db),
     access: new AccessService(db, securityLogger),
     settings: new BusinessSettingsService(db, securityLogger),
     modules: new ModuleService(db),

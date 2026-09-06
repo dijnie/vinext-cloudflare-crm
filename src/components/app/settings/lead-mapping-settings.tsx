@@ -1,0 +1,28 @@
+"use client";
+import { useState } from "react";
+import type { z } from "zod";
+import { Button } from "@/components/ui/button";
+import type { AppLocale } from "@/lib/i18n/config";
+import { getCrmDictionary } from "@/lib/i18n/crm-dictionary";
+import { getLeadDictionary } from "@/lib/i18n/lead-dictionary";
+import type { leadMappingOutputSchema, LeadMappingPair } from "@/lib/services/conversions/lead-conversion-contracts";
+import { invalidateCrm } from "@/lib/listing/invalidation";
+import { crmRequest, fieldLabel, requestError } from "../record-types";
+import { FormSelect } from "../record-sheet/form-select";
+type Mapping = z.infer<typeof leadMappingOutputSchema>;
+const builtinKeys = ["firstName", "lastName", "email", "phone", "title", "companyId", "ownerMembershipId"];
+export function LeadMappingSettings({ initialData, locale }: { initialData: Mapping; locale: AppLocale }) {
+  const labels = getLeadDictionary(locale), crm = getCrmDictionary(locale);
+  const [saved, setSaved] = useState(initialData); const [pairs, setPairs] = useState(initialData.mappings);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [stale, setStale] = useState(false); const [message, setMessage] = useState("");
+  const sourceOptions = [...builtinKeys, "description"].map(key => ({ value: `builtin:${key}`, label: fieldLabel(key, crm) })).concat(saved.leadFields.filter(field => field.type !== "file").map(field => ({ value: `custom:${field.id}`, label: field.label })));
+  const targetOptions = builtinKeys.map(key => ({ value: `builtin:${key}`, label: fieldLabel(key, crm) })).concat(saved.contactFields.filter(field => !["file", "formula"].includes(field.type)).map(field => ({ value: `custom:${field.id}`, label: field.label })));
+  const disabled = busy || stale || !saved.canManage;
+  function change(index: number, pair: LeadMappingPair) { setPairs(current => current.map((value, i) => i === index ? pair : value)); setMessage(""); }
+  async function save() { setBusy(true); setError(""); setMessage(""); try { const value = await crmRequest<Mapping>("/api/crm/lead-conversion-settings", { method: "PATCH", body: JSON.stringify({ revision: saved.revision, mappings: pairs, autoOrder: false, autoDeal: false }) }); setSaved(value); setPairs(value.mappings); setMessage(crm.saved); invalidateCrm("lead"); } catch (reason) { setStale(reason instanceof Error && reason.message === "409"); setError(requestError(reason, crm)); } finally { setBusy(false); } }
+  async function reload() { setBusy(true); try { const value = await crmRequest<Mapping>("/api/crm/lead-conversion-settings"); setSaved(value); setPairs(value.mappings); setError(""); setStale(false); } catch (reason) { setError(requestError(reason, crm)); } finally { setBusy(false); } }
+  return <section className="mx-auto max-w-3xl space-y-5"><h1 className="text-2xl font-medium">{labels.mapping}</h1><p className="text-sm text-muted-foreground">{labels.mappingHelp}</p><form className="space-y-4" onSubmit={event => { event.preventDefault(); void save(); }}><ol className="space-y-3">{pairs.map((pair, index) => {
+    const source = saved.leadFields.find(field => pair.source === `custom:${field.id}`), target = saved.contactFields.find(field => pair.target === `custom:${field.id}`);
+    return <li key={index} className="space-y-3 rounded-md border p-4"><div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-sm">{labels.sourceField}<FormSelect id={`mapping-source-${index}`} value={pair.source} disabled={disabled} onValueChange={source => change(index, { source, target: pair.target })} options={sourceOptions} /></label><label className="space-y-1 text-sm">{labels.targetField}<FormSelect id={`mapping-target-${index}`} value={pair.target} disabled={disabled} onValueChange={target => change(index, { source: pair.source, target })} options={targetOptions} /></label></div>{source && ["select", "multiselect"].includes(source.type) && <fieldset className="space-y-2"><legend className="text-sm">{labels.options}</legend>{source.options.filter(option => !option.archivedAt).map(option => <label key={option.id} className="block space-y-1 text-sm">{option.label}<FormSelect id={`mapping-option-${index}-${option.id}`} value={pair.options?.[option.id] ?? ""} disabled={disabled} onValueChange={to => change(index, { ...pair, options: { ...pair.options, [option.id]: to } })} options={[{ value: "", label: labels.choose, disabled: true }, ...(target?.options ?? []).filter(item => !item.archivedAt).map(item => ({ value: item.id, label: item.label }))]} /></label>)}</fieldset>}<Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => setPairs(current => current.filter((_, i) => i !== index))}>{labels.remove}</Button></li>;
+  })}</ol><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" disabled={disabled || pairs.length >= 100} onClick={() => setPairs(current => [...current, { source: "builtin:firstName", target: "builtin:firstName" }])}>{labels.addMapping}</Button><Button type="submit" disabled={disabled}>{crm.save}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setPairs(saved.mappings); setMessage(""); }}>{crm.cancel}</Button></div></form><p className="text-sm text-muted-foreground">{labels.retainedFiles}</p><p className="text-sm text-muted-foreground">{labels.downstream}</p>{error && <p role="alert" className="text-sm text-destructive">{error}</p>}{message && <p role="status">{message}</p>}<Button variant="outline" disabled={busy} onClick={() => void reload()}>{labels.reload}</Button></section>;
+}

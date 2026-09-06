@@ -5,7 +5,7 @@
 A CRM rebuild on Vinext, Shadcn UI, Cloudflare Workers, and D1. The current
 foundation provides verified email/password auth, race-safe singleton membership,
 the CRM database baseline, a Vietnamese/English application shell, owner-only
-member settings, and guarded company, contact, and deal APIs.
+member settings, and guarded lead, company, contact, and deal APIs.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/dijnie/vinext-cloudflare-crm.git)
 
@@ -19,10 +19,10 @@ member settings, and guarded company, contact, and deal APIs.
 - 🌐 Vietnamese and English sign-up, sign-in, verification, and password-reset routes
 - 🧭 Protected localized application shell with canonical cosmetic workspace URLs
 - 👤 Owner-only localized member management
-- 🏢 Localized company, contact, and deal lists with stable record sheets
+- 🏢 Localized lead, company, contact, and deal lists with stable record sheets
 - 📝 Manual activities, tasks, deal stage history, and record ownership
 - 🧩 Custom fields and private/shared saved list views
-- 🔗 Guarded company, contact, and deal APIs with archive/restore workflows
+- 🔗 Guarded lead, company, contact, and deal APIs with archive/restore workflows
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
 - ✨ Clean, responsive interface
@@ -252,22 +252,22 @@ shared UI primitives in `src/components/ui`.
 The shared layout follows the Cloudflare CRM reference: `src/lib/auth`, `db`,
 `email`, `http`, `i18n`, and `listing` hold infrastructure and list contracts.
 Business services live under `src/lib/services`, grouped into activities,
-companies, contacts, currencies, custom-fields, dashboard, deals, members,
+companies, contacts, conversions, currencies, custom-fields, dashboard, deals, leads, members,
 saved-views, and shared helpers. `src/lib/composition-root.ts` wires the services.
 Vinext routing and runtime conventions remain unchanged.
 
 Public auth is available under `/{locale}/sign-up`, `/{locale}/sign-in`,
 `/{locale}/verify-email`, `/{locale}/forgot-password`, and
 `/{locale}/reset-password`, where `locale` is `vi` or `en`. Authenticated users
-enter the CRM at `/{locale}/{workspaceSlug}/companies`, with contact and deal
-lists at the corresponding `/contacts` and `/deals` paths; owners can manage
+enter the CRM at `/{locale}/{workspaceSlug}/companies`, with lead, contact and deal
+lists at the corresponding `/leads`, `/contacts` and `/deals` paths; owners can manage
 members at `/{locale}/{workspaceSlug}/settings/members`. The workspace slug is canonical
 for navigation but does not select or authorize data. Legacy sample admin and
 REST implementations are removed; their old URLs remain unavailable with `404`
 responses.
 
 Authenticated active members can access the core CRM API under
-`/api/crm/companies`, `/api/crm/contacts`, and `/api/crm/deals`. The route files
+`/api/crm/leads`, `/api/crm/companies`, `/api/crm/contacts`, and `/api/crm/deals`. The route files
 under [src/app/api/crm](src/app/api/crm) are the HTTP entry points; request validation
 is owned by [lib/http](src/lib/http), with shared list contracts in
 [lib/listing](src/lib/listing) and entity contracts beside their services.
@@ -467,7 +467,7 @@ R2 and do not create that bucket remotely. Before an authorized release, provisi
 or select the intended bucket and verify the binding with public access disabled.
 Changing source configuration alone is not proof of a production bucket or upload.
 
-Owners manage company, contact and deal availability at
+Owners manage lead, company, contact and deal availability at
 `/{locale}/{workspaceSlug}/settings/modules`. Disabling a module preserves historical
 records, relations, files and exports while blocking its record mutations, including
 owner writes and uploads already in progress. Re-enabling restores editing. Settings
@@ -528,3 +528,41 @@ and exact currency-conversion rules.
 Once custom stage IDs are used, an older application restricted to the seven
 legacy IDs cannot safely read all records/history/filters. Preserve the additive
 schema and use a forward fix instead of reverting to that incompatible reader.
+
+
+Leads use the same shared-member access, 17 custom field types, private R2 files,
+record reservations, layouts and saved views as other records. Each lead records
+its creator, source, status, assignee and collaborators. Collaborators are an
+organizational filter, not an additional access boundary. Lead updates require
+`expectedRevision`; stale edits fail without overwriting newer data. Owners manage
+retained source/status catalogs at `/settings/leads`; converted is a protected
+outcome and ordinary statuses can require a rejection reason.
+
+Duplicate suggestions compare normalized email or formatted phone numbers against
+active leads and contacts. Phone matching removes formatting while preserving an
+initial `+`; it does not infer a country or merge national/international formats.
+Unsupported phone text remains stored but is not used for suggestions. Suggestions
+never merge records or relax the existing unique active-contact email rule.
+
+The lead sheet previews either a new contact or an explicitly selected existing
+contact. Linking leaves that contact's data, ownership, fields and timestamps
+unchanged. Creating validates the normal contact contract, including required
+custom fields and optional private-file reservations. The lead state, new contact,
+custom values, reservation consumption and immutable conversion result commit in
+one guarded transaction. Retrying the same operation returns its stored result;
+reusing the key for a different request conflicts. Read authorization still applies
+to retries, including when a module has since been disabled.
+
+Owners configure explicit builtin/custom mappings at `/settings/lead-conversion`.
+The initial mapping proposes matching contact fields; removing mappings removes
+those proposals. Choice fields require explicit option mappings. Formula targets
+are read-only and attachment IDs cannot be copied between record anchors. Original
+lead files remain available on the lead; new-contact files use a contact draft.
+Automatic order/deal creation remains disabled until their real target workflows
+are available. Lead-to-contact conversion does not create placeholder destinations.
+
+HTTP contracts are owned by [lead contracts](src/lib/services/leads/lead-contract.ts)
+and [conversion contracts](src/lib/services/conversions/lead-conversion-contracts.ts).
+After lead writes, older three-entity application versions are incompatible; preserve
+records and apply a forward fix. Local validation does not authorize remote schema
+changes or deployment.

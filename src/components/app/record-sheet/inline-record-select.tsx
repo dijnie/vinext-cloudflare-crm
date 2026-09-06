@@ -21,7 +21,7 @@ export function InlineRecordSelect({ entity, record, field, shown, labels }: { e
   async function save(value: string | null) {
     if (!moduleEnabled) return;
     setBusy(true); setError("");
-    try { await crmRequest(`/api/crm/${entityPaths[entity]}/${record.id}`, { method: "PATCH", body: JSON.stringify({ action: "update", data: { [field === "owner" ? "ownerMembershipId" : "stageId"]: value } }) }); setEditing(false); invalidateCrm(entity); if (field === "owner") invalidateCrm("ownership"); }
+    try { await crmRequest(`/api/crm/${entityPaths[entity]}/${record.id}`, { method: "PATCH", body: JSON.stringify({ action: "update", data: { ...(entity === "lead" ? { expectedRevision: record.revision } : {}), [field === "owner" ? "ownerMembershipId" : "stageId"]: value } }) }); setEditing(false); invalidateCrm(entity); if (field === "owner") invalidateCrm("ownership"); }
     catch (reason) { setError(requestError(reason, labels)); }
     finally { setBusy(false); }
   }

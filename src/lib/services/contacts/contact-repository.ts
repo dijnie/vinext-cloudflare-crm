@@ -1,5 +1,5 @@
 import type { PreparedRecordFields, PreparedRecordCreation } from "../shared/record-fields-contract";
-import { dealStage, operationConditionGuard } from "@/lib/db/schema";
+import { lead, leadConversion, dealStage, operationConditionGuard } from "@/lib/db/schema";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { fieldConditionQuery } from "../custom-fields/field-condition-query";
 import { customFieldSort } from "../custom-fields/field-sort";
@@ -126,16 +126,28 @@ export class ContactRepository {
       .innerJoin(dealStage, eq(dealStage.id, deal.stageId))
       .where(eq(dealContact.contactId, id))
       .orderBy(asc(deal.name), asc(deal.id));
-    return { ...record, deals };
+    const convertedFrom = await this.db.select({ id: lead.id, firstName: lead.firstName, lastName: lead.lastName, convertedAt: leadConversion.completedAt })
+      .from(leadConversion).innerJoin(lead, eq(lead.id, leadConversion.leadId))
+      .where(eq(leadConversion.contactId, id)).orderBy(desc(leadConversion.completedAt), asc(leadConversion.leadId)).limit(100);
+    return { ...record, deals, convertedFrom };
   }
 
-  async create(values: typeof contact.$inferInsert, context: RequestContext, fields?: PreparedRecordFields, creation?: PreparedRecordCreation) {
+  prepareCreate(values: typeof contact.$inferInsert, context: RequestContext, fields?: PreparedRecordFields, creation?: PreparedRecordCreation) {
     const op = actionGuard(this.db, context, ["contact.create", ...(values.ownerMembershipId ? ["contact.assign" as const] : [])]);
     const before = creation?.before ?? [];
+    const statements: Parameters<AppDatabase["batch"]>[0] = [op.begin, ...before, this.db.insert(contact).values(values).returning(), ...(fields?.statements ?? []), ...(creation?.after ?? []), op.end];
+    return {
+      statements,
+      resultIndex: 1 + before.length,
+      translateError(error: unknown): never { if (fields) fields.translateError(error); permissionError(error); },
+    };
+  }
+  async create(values: typeof contact.$inferInsert, context: RequestContext, fields?: PreparedRecordFields, creation?: PreparedRecordCreation) {
+    const prepared = this.prepareCreate(values, context, fields, creation);
     try {
-      const results = await this.db.batch([op.begin, ...before, this.db.insert(contact).values(values).returning(), ...(fields?.statements ?? []), ...(creation?.after ?? []), op.end]);
-      return (results[1 + before.length] as (typeof contact.$inferSelect)[])[0]!;
-    } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
+      const results = await this.db.batch(prepared.statements);
+      return (results[prepared.resultIndex] as (typeof contact.$inferSelect)[])[0]!;
+    } catch (error) { return prepared.translateError(error); }
   }
   async update(id: string, values: Partial<typeof contact.$inferInsert>, context: RequestContext, fields?: PreparedRecordFields) {
     const op = actionGuard(this.db, context, ["contact.update", ...(values.ownerMembershipId !== undefined ? ["contact.assign" as const] : [])]);

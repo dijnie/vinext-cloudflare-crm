@@ -4,14 +4,14 @@ import { moduleSetting } from "@/lib/db/schema";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
 import { actionGuard, permissionError, permissionPredicate, requirePermission } from "../permissions/permission-policy";
-import { moduleUpdateInputSchema, type ModuleSettings, type ModuleUpdateInput } from "./module-contracts";
+import { moduleEntitySchema, moduleUpdateInputSchema, type ModuleSettings, type ModuleUpdateInput } from "./module-contracts";
 
 export class ModuleService {
   constructor(private readonly db: AppDatabase) {}
   async get(context: RequestContext): Promise<ModuleSettings> {
     await requirePermission(this.db, context);
     const rows = await this.db.select({ entity: moduleSetting.entity, enabled: moduleSetting.enabled, revision: moduleSetting.revision, canManage: sql<number>`${permissionPredicate(context, [], true)}` }).from(moduleSetting).where(permissionPredicate(context)).orderBy(asc(moduleSetting.entity));
-    if (rows.length !== 3) throw new HttpError(403, "membership_required", "Active membership is required");
+    if (rows.length !== moduleEntitySchema.options.length) throw new HttpError(403, "membership_required", "Active membership is required");
     return { canManage: Boolean(rows[0]!.canManage), modules: rows.map(({ entity, enabled, revision }) => ({ entity, enabled, revision })) };
   }
   async update(context: RequestContext, input: ModuleUpdateInput): Promise<ModuleSettings> {

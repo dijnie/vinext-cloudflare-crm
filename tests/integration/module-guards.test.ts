@@ -249,6 +249,6 @@ describe.sequential("disabled modules preserve history and block record mutation
     expect(await env.DB.prepare("SELECT status FROM singleton_membership WHERE user_id=?").bind(departing.id).first()).toEqual({ status: "revoked" });
     for (const [entity, id] of [["company", company.id], ["contact", contact.id], ["deal", deal.id]] as const) expect(await env.DB.prepare(`SELECT owner_membership_id FROM ${entity} WHERE id=?`).bind(id).first()).toEqual({ owner_membership_id: actor.id });
     expect(await env.DB.prepare("SELECT count(*) AS count FROM custom_field_value WHERE user_membership_id=?").bind(departing.id).first()).toEqual({ count: 0 });
-    expect((await env.DB.prepare("SELECT enabled FROM module_setting").all()).results).toEqual([{ enabled: 0 }, { enabled: 0 }, { enabled: 0 }]);
+    expect((await env.DB.prepare("SELECT enabled FROM module_setting WHERE entity IN ('company','contact','deal')").all()).results).toEqual([{ enabled: 0 }, { enabled: 0 }, { enabled: 0 }]);
   });
 });

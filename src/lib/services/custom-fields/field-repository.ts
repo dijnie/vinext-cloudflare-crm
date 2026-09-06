@@ -1,3 +1,4 @@
+import { recordAnchorKeys } from "@/lib/db/record-entities";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { inJsonArray } from "@/lib/db/sql-filters";
 import type { AppDatabase } from "@/lib/db/database";
@@ -27,4 +28,4 @@ export class FieldRepository {
   async hasValues(id: string) { return Boolean(await this.db.select({ id: value.id }).from(value).where(eq(value.fieldId, id)).get()); }
   async nextPosition(entity: FieldEntity) { const row = await this.db.select({ position: sql<number>`coalesce(max(${definition.position}), -1) + 1` }).from(definition).where(eq(definition.entity, entity)).get(); return row?.position ?? 0; }
 }
-export function recordColumn(entity: FieldEntity) { return entity === "company" ? "companyId" : entity === "contact" ? "contactId" : "dealId"; }
+export function recordColumn(entity: FieldEntity) { return recordAnchorKeys[entity]; }

@@ -1,3 +1,4 @@
+import { recordTables } from "@/lib/db/record-entities";
 import { MAX_FIELD_FILES } from "../files/file-contracts";
 import { authorizedBatch, authorizedWrite, permissionError, requirePermission } from "../permissions/permission-policy";
 import { and, count, eq, isNull, sql } from "drizzle-orm";
@@ -101,14 +102,14 @@ export class FieldService {
   restore(context: RequestContext, id: string) { return this.lifecycle(context, id, "restore"); }
   recover(context: RequestContext, id: string) { return this.lifecycle(context, id, "recover"); }
   async delete(context: RequestContext, id: string, confirmation: string) { await requirePermission(this.db, context, ["field.configure"]); const row = await this.existing(id); if (confirmation !== row.key) invalid("Confirmation must match the stable field key"); await authorizedWrite(this.db, context, ["field.configure"], this.db.update(definition).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(definition.id, id), isNull(definition.deletedAt)))); return { id }; }
-  async coverage(context: RequestContext, id: string) { await this.guard(context); const row = await this.existing(id); const table = row.entity === "company" ? company : row.entity === "contact" ? contact : deal; if (row.type === "formula") {
+  async coverage(context: RequestContext, id: string) { await this.guard(context); const row = await this.existing(id); const table = recordTables[row.entity]; if (row.type === "formula") {
       const fields = (await this.repository.configuration(row.entity)).fields;
       const expression = formulaExpression(fields, row.key, row.entity, sql`${table.id}`);
       const result = await this.db.select({ total: count(), filled: sql<number>`coalesce(sum(case when ${expression} is not null then 1 else 0 end),0)` }).from(table).get();
       return result ?? { total: 0, filled: 0 };
     }
     const [total, filled] = await Promise.all([this.db.select({ count: count() }).from(table).get(), this.db.select({ count: count() }).from(value).where(and(eq(value.fieldId, id), sql`coalesce(${value.textValue}, ${value.numberValue}, ${value.dateValue}, ${value.booleanValue}, ${value.optionId}, ${value.userMembershipId}, ${value.jsonValue}, ${value.customerReferenceId}) is not null`)).get()]); return { total: total?.count ?? 0, filled: filled?.count ?? 0 }; }
-  private async record(entity: FieldEntity, id: string) { const table = entity === "company" ? company : entity === "contact" ? contact : deal; if (!(await this.db.select({ id: table.id }).from(table).where(eq(table.id, id)).get())) throw new HttpError(404, "not_found", "Record not found"); }
+  private async record(entity: FieldEntity, id: string) { const table = recordTables[entity]; if (!(await this.db.select({ id: table.id }).from(table).where(eq(table.id, id)).get())) throw new HttpError(404, "not_found", "Record not found"); }
   async values(context: RequestContext, input: { entity: FieldEntity; recordId: string }) { await this.guard(context); await this.record(input.entity, input.recordId); const fields = await this.repository.list(input.entity); const values = await this.repository.values(input.entity, input.recordId); const stored = Object.fromEntries(fields.map(field => { const row = values.find(item => item.fieldId === field.id); return [field.key, storedFieldValue(field.type, row)]; })) as Record<string, FieldValue>; return { ...stored, ...formulaEvaluator(fields)(stored) }; }
   async prepareValues(context: RequestContext, input: { entity: FieldEntity; recordId: string; values: Record<string, FieldValue>; calendarRevision?: number }, mode: "create" | "update" = "update") {
     await requirePermission(this.db, context, [`${input.entity}.${mode}`]);
@@ -178,7 +179,7 @@ export class FieldService {
             )
           )` : sql`1=1`;
       const configuration = mode === "create" ? sql`exists (select 1 from field_configuration_revision where entity=${input.entity} and revision=${snapshot.revision})` : sql`1=1`;
-      const table = input.entity === "company" ? company : input.entity === "contact" ? contact : deal;
+      const table = recordTables[input.entity];
       const statements = [
           this.db.insert(operationConditionGuard).values({ id: operationId, authorized: sql<number>`case when ${configuration} and exists (select 1 from ${table} where id=${input.recordId}) and not exists (
             select 1 from json_each(${JSON.stringify(expected)}) as wanted

@@ -1,3 +1,5 @@
+import { recordAnchorNames } from "@/lib/db/record-entities";
+import { recordTables } from "@/lib/db/record-entities";
 import { sql, type SQL } from "drizzle-orm";
 import { company, contact, deal, type customFieldDefinition } from "@/lib/db/schema";
 import type { FieldEntity } from "./field-contracts";
@@ -7,9 +9,9 @@ export type StoredFieldDefinition = typeof customFieldDefinition.$inferSelect;
 
 /** Reference identity is retained for predicates; only display sorting resolves labels. */
 export function fieldValueExpression(fields: StoredFieldDefinition[], field: StoredFieldDefinition, entity: FieldEntity, displayReferences = false): SQL {
-  const recordId = sql`${{ company, contact, deal }[entity].id}`;
+  const recordId = sql`${recordTables[entity].id}`;
   if (field.type === "formula") return formulaExpression(fields, field.key, entity, recordId);
-  const anchor = sql.raw({ company: "company_id", contact: "contact_id", deal: "deal_id" }[entity]);
+  const anchor = sql.raw(recordAnchorNames[entity]);
   let stored: SQL;
   if (field.type === "number" || field.type === "rating") stored = sql`v.number_value`;
   else if (field.type === "date") stored = sql`v.date_value`;

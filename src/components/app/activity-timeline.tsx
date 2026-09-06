@@ -16,8 +16,8 @@ import { crmRequest, requestError } from "./record-types";
 export function ActivityTimeline({ entity, recordId, companyId, locale, labels }: { entity: EntityType; recordId: string; companyId?: string; locale: AppLocale; labels: CrmDictionary }) {
   const stageCatalog = useDealStages();
   const modules = useModules();
-  const canCompose = modules.isEnabled(entity) && (!companyId || modules.isEnabled("company"));
-  const canChange = (entry: ActivityEntry) => (!entry.companyId || modules.isEnabled("company")) && (!entry.contactId || modules.isEnabled("contact")) && (!entry.dealId || modules.isEnabled("deal"));
+  const canCompose = modules.isEnabled(entity) && (entity === "lead" || !companyId || modules.isEnabled("company"));
+  const canChange = (entry: ActivityEntry) => (!entry.companyId || modules.isEnabled("company")) && (!entry.contactId || modules.isEnabled("contact")) && (!entry.dealId || modules.isEnabled("deal")) && (!entry.leadId || modules.isEnabled("lead"));
   const [filter, setFilter] = useState<TimelineInput["filter"]>("all");
   const [cursor, setCursor] = useState<string>(); const [revision, setRevision] = useState(0);
   const [data, setData] = useState<{ key: string; entries: ActivityEntry[]; nextCursor: string | null }>({ key: "", entries: [], nextCursor: null });

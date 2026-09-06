@@ -34,12 +34,14 @@ const vi: typeof en = {
 };
 const permissions: Record<AppLocale, Record<Permission, string>> = {
   en: {
+    "lead.create": "Create leads", "lead.update": "Edit leads", "lead.archive": "Archive leads", "lead.restore": "Restore leads", "lead.assign": "Assign leads", "lead.export": "Export leads", "lead.convert": "Convert leads",
     "company.create": "Create companies", "company.update": "Edit companies", "company.archive": "Archive companies", "company.restore": "Restore companies", "company.assign": "Assign companies", "company.export": "Export companies",
     "contact.create": "Create contacts", "contact.update": "Edit contacts", "contact.archive": "Archive contacts", "contact.restore": "Restore contacts", "contact.assign": "Assign contacts", "contact.export": "Export contacts",
     "deal.create": "Create deals", "deal.update": "Edit deals", "deal.archive": "Archive deals", "deal.restore": "Restore deals", "deal.assign": "Assign deals", "deal.export": "Export deals",
     "activity.create": "Create activities", "activity.update": "Edit activities", "field.configure": "Configure custom fields", "view.create": "Create saved views", "view.update": "Edit saved views", "view.delete": "Delete saved views",
   },
   vi: {
+    "lead.create": "Tạo tiềm năng", "lead.update": "Sửa tiềm năng", "lead.archive": "Lưu trữ tiềm năng", "lead.restore": "Khôi phục tiềm năng", "lead.assign": "Phân công tiềm năng", "lead.export": "Xuất tiềm năng", "lead.convert": "Chuyển đổi tiềm năng",
     "company.create": "Tạo công ty", "company.update": "Sửa công ty", "company.archive": "Lưu trữ công ty", "company.restore": "Khôi phục công ty", "company.assign": "Phân công công ty", "company.export": "Xuất công ty",
     "contact.create": "Tạo liên hệ", "contact.update": "Sửa liên hệ", "contact.archive": "Lưu trữ liên hệ", "contact.restore": "Khôi phục liên hệ", "contact.assign": "Phân công liên hệ", "contact.export": "Xuất liên hệ",
     "deal.create": "Tạo cơ hội", "deal.update": "Sửa cơ hội", "deal.archive": "Lưu trữ cơ hội", "deal.restore": "Khôi phục cơ hội", "deal.assign": "Phân công cơ hội", "deal.export": "Xuất cơ hội",

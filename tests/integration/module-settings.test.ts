@@ -67,18 +67,18 @@ const update = (cookie:string,input:unknown) => createModulesPatchHandler(root()
 async function owner() { const actor=await session(`module-${crypto.randomUUID()}@example.com`);await env.DB.prepare("UPDATE singleton_membership SET role='owner' WHERE user_id=?").bind(actor.id).run();return actor; }
 describe.sequential("module settings",()=>{
   beforeEach(async()=>{await clearState();await env.DB.prepare("UPDATE module_setting SET enabled=1,revision=0,updated_at=0").run();});
-  it("defaults three enabled modules and preserves historical records during migration",async()=>{
+  it("defaults enabled modules and preserves historical records during migration",async()=>{
     const db=env.UPGRADE_DB;await applyD1Migrations(db,env.TEST_MIGRATIONS.slice(0,12));
     await db.prepare("INSERT INTO company (id,name,created_at,updated_at) VALUES ('module-upgrade','Historical company',1700000000000,1700000000001)").run();
     const before=await db.prepare("SELECT * FROM company WHERE id='module-upgrade'").first();
     await applyD1Migrations(db,env.TEST_MIGRATIONS.slice(12));
     expect(await db.prepare("SELECT * FROM company WHERE id='module-upgrade'").first()).toEqual(before);
-    expect((await db.prepare("SELECT entity,enabled,revision FROM module_setting ORDER BY entity").all()).results).toEqual(["company","contact","deal"].map(entity=>({entity,enabled:1,revision:0})));
+    expect((await db.prepare("SELECT entity,enabled,revision FROM module_setting ORDER BY entity").all()).results).toEqual(["company","contact","deal","lead"].map(entity=>({entity,enabled:1,revision:0})));
     expect((await db.prepare("PRAGMA foreign_key_check").all()).results).toEqual([]);
   });
   it("allows active reads and owner revisions while denying members and stale updates",async()=>{
     const actor=await owner(),member=await session(`module-member-${crypto.randomUUID()}@example.com`);
-    const initial=await successful(await get(actor.cookie));expect(initial.canManage).toBe(true);expect(initial.modules).toEqual(["company","contact","deal"].map(entity=>({entity,enabled:true,revision:0})));
+    const initial=await successful(await get(actor.cookie));expect(initial.canManage).toBe(true);expect(initial.modules).toEqual(["company","contact","deal","lead"].map(entity=>({entity,enabled:true,revision:0})));
     expect((await successful(await get(member.cookie))).canManage).toBe(false);
     expect((await update(member.cookie,{entity:"company",enabled:false,revision:0})).status).toBe(403);
     const changed=await successful(await update(actor.cookie,{entity:"company",enabled:false,revision:0}));expect(changed.modules[0]).toEqual({entity:"company",enabled:false,revision:1});

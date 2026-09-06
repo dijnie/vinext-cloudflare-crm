@@ -7,6 +7,8 @@ import {
   contact,
   customFieldValue,
   deal,
+  lead,
+  leadCollaborator,
   memberOperationGuard,
   savedView,
   session,
@@ -139,6 +141,8 @@ export class MemberRepository {
         .set({ ownerMembershipId: replacement, updatedAt: new Date(now) })
         .where(eq(contact.ownerMembershipId, targetMembershipId)),
       dealOwnershipUpdate,
+      this.db.update(lead).set({ ownerMembershipId: replacement, revision: sql`${lead.revision}+1`, updatedAt: new Date(now) }).where(eq(lead.ownerMembershipId, targetMembershipId)),
+      this.db.delete(leadCollaborator).where(eq(leadCollaborator.membershipId, targetMembershipId)),
       this.db
         .update(customFieldValue)
         .set({ userMembershipId: replacement, updatedAt: new Date(now) })
