@@ -17,7 +17,7 @@ export class ActivityService {
   constructor(private readonly db: AppDatabase) { this.repository = new ActivityRepository(db); }
   private guard(context: RequestContext, permissions: Permission[] = []) { return requirePermission(this.db, context, permissions); }
   async create(context: RequestContext, input: ActivityCreateInput) {
-    await this.guard(context, ["activity.create"]);
+    await this.guard(context, [input.type === "task" ? "task.create" : "activity.create"]);
     if (input.leadId && (input.companyId || input.contactId || input.dealId || input.productId || input.orderId)) throw new HttpError(400, "validation_failed", "Lead activities have a single lead anchor");
     if (input.leadId && !(await this.db.select({ id: lead.id }).from(lead).where(eq(lead.id, input.leadId)).get())) throw new HttpError(404, "not_found", "Activity lead was not found");
     if (input.productId && (input.companyId || input.contactId || input.dealId || input.leadId || input.orderId)) throw new HttpError(400, "validation_failed", "Product activities have a single product anchor");
@@ -38,7 +38,7 @@ export class ActivityService {
         companyId, contactId: input.contactId ?? null, dealId: input.dealId ?? null, leadId: input.leadId ?? null, productId: input.productId ?? null, orderId: input.orderId ?? null, authorUserId: context.userId,
         occurredAt: input.occurredAt ? new Date(input.occurredAt) : now, dueAt: input.dueAt ? new Date(input.dueAt) : null,
         completedAt: null, metadataJson: null, createdAt: now, updatedAt: now,
-      }, context);
+      }, context, input.type === "task" ? input.assigneeMembershipId ?? context.userId : undefined);
       return this.serialize(row);
     } catch (error) { relationError(error, "Activity relationships changed"); }
   }
@@ -51,13 +51,13 @@ export class ActivityService {
     const last = page.at(-1);
     return { entries: page.map(row => this.serialize(row)), nextCursor: rows.length > input.limit && last ? `${last.createdAt.getTime()}:${last.id}` : null };
   }
-  async complete(context: RequestContext, id: string, completed: boolean) {
-    await this.guard(context, ["activity.update"]);
+  async complete(context: RequestContext, id: string, completed: boolean, reason?: string, operationKey?: string, expectedRevision?: number) {
+    await this.guard(context);
     const current = await this.repository.byId(id);
     if (!current) throw new HttpError(404, "not_found", "Activity was not found");
     if (current.type !== "task") throw new HttpError(400, "validation_failed", "Only tasks can be completed");
     await requireModulesEnabled(this.db, activityModules(current));
-    const row = await this.repository.complete(id, completed, context);
+    const row = await this.repository.complete(id, completed, context, { reason, operationKey: operationKey ?? crypto.randomUUID(), expectedRevision });
     if (!row) throw new HttpError(409, "conflict", "Task changed before completion");
     return this.serialize(row);
   }

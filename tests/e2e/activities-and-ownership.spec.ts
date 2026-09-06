@@ -85,6 +85,7 @@ for (const locale of ["vi", "en"] as const) {
       const completed = (await timeline(entity, records[entity].id)).find(entry => entry.subject === taskName)!;
       expect(completed.completedAt).not.toBeNull();
       expect(completed.dueAt).toBe("2030-01-02T10:00:00.000Z");
+      page.once("dialog", dialog => dialog.accept("Customer replied"));
       await taskRow.getByRole("button", { name: copy.reopen, exact: true }).click();
       await expect(taskRow).toHaveCount(0);
       await pick(page, sheet.getByLabel(copy.filter, { exact: true }), "history");

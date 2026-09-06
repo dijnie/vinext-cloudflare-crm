@@ -35,6 +35,7 @@ const defaultGroups = [
   ["leads"],
   ["catalog"],
   ["orders"],
+  ["scheduling-support"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();

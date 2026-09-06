@@ -30,6 +30,10 @@ import { DashboardService } from "@/lib/services/dashboard/dashboard-service";
 import { CurrencyService } from "@/lib/services/currencies/currency-service";
 import { AccessService } from "@/lib/services/permissions/access-service";
 import { BusinessSettingsService } from "@/lib/services/settings/business-settings-service";
+import { TaskService } from "@/lib/services/tasks/task-service";
+import { AppointmentService } from "@/lib/services/appointments/appointment-service";
+import { TicketService } from "@/lib/services/tickets/ticket-service";
+import { NotificationService } from "@/lib/services/notifications/notification-service";
 
 import { defaultSecurityLogger, type SecurityLogger } from "./http/security-logging";
 
@@ -68,6 +72,10 @@ export function createCompositionRoot(
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
   return {
+    notifications: new NotificationService(db),
+    tickets: new TicketService(db),
+    appointments: new AppointmentService(db),
+    tasks: new TaskService(db, activities),
     orders: new OrderService(db),
     orderCommands: new OrderCommandService(db),
     payments: new PaymentService(db),

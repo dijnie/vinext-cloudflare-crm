@@ -1,0 +1,2 @@
+import {notFound} from "next/navigation";import {TaskBoard} from "@/components/app/scheduling/task-board";import {getPageContext} from "@/lib/http/page-context";import {isAppLocale} from "@/lib/i18n/config";
+export const dynamic="force-dynamic";export default async function Page({params}:{params:Promise<{locale:string}>}){const {locale}=await params;if(!isAppLocale(locale))notFound();const {root,context}=await getPageContext();return <TaskBoard locale={locale} initialData={await root.tasks.list(context,{scope:"mine",state:"all",limit:100})}/>;}

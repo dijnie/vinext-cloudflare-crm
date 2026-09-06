@@ -1,0 +1,2 @@
+import {notFound} from "next/navigation";import {TicketBoard} from "@/components/app/scheduling/ticket-board";import {getPageContext} from "@/lib/http/page-context";import {isAppLocale} from "@/lib/i18n/config";
+export const dynamic="force-dynamic";export default async function Page({params}:{params:Promise<{locale:string}>}){const {locale}=await params;if(!isAppLocale(locale))notFound();const {root,context}=await getPageContext();return <TicketBoard locale={locale} initialData={await root.tickets.list(context,{scope:"mine",status:"all",limit:100})}/>;}

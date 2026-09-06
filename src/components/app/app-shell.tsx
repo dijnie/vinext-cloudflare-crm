@@ -2,6 +2,7 @@
 import { getCatalogDictionary } from "@/lib/i18n/catalog-dictionary";
 import { getLeadDictionary } from "@/lib/i18n/lead-dictionary";
 import { getOrderDictionary } from "@/lib/i18n/order-dictionary";
+import { getSchedulingDictionary } from "@/lib/i18n/scheduling-dictionary";
 import { DealStageRefreshStatus } from "./deal-stage-provider";
 import { getDealStageDictionary } from "@/lib/i18n/deal-stage-dictionary";
 import { getLayoutDictionary } from "@/lib/i18n/layout-dictionary";
@@ -39,6 +40,8 @@ import { useCrmInvalidation } from "./use-crm-invalidation";
 import { NavigationSkeleton } from "./navigation-skeleton";
 import { useModules } from "./module-provider";
 import { ShellLogo } from "./shell-logo";
+import { NotificationCenter } from "./scheduling/notification-center";
+import { Calendar, Task, Ticket } from "@carbon/icons-react";
 
 export function AppShell({ children, dictionary, locale, role, slug, user }: {
   children: ReactNode; dictionary: AppDictionary; locale: AppLocale; role: "owner" | "member"; slug: string;
@@ -58,6 +61,9 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
     { href: `${base}/products`, label: `${crm.product}${modules.isEnabled("product") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },
     { href: `${base}/orders`, label: `${crm.order}${modules.isEnabled("order") ? "" : ` · ${modules.labels.disabled}`}`, icon: ShoppingCart },
     { href: `${base}/inventory`, label: getOrderDictionary(locale).inventory, icon: Building },
+    { href: `${base}/calendar`, label: getSchedulingDictionary(locale).calendar, icon: Calendar },
+    { href: `${base}/tasks`, label: getSchedulingDictionary(locale).tasks, icon: Task },
+    { href: `${base}/tickets`, label: getSchedulingDictionary(locale).tickets, icon: Ticket },
     { href: `${base}/leads`, label: `${crm.lead}${modules.isEnabled("lead") ? "" : ` · ${modules.labels.disabled}`}`, icon: UserMultiple },
     { href: `${base}/companies`, label: `${dictionary.navigation.companies}${modules.isEnabled("company") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },
     { href: `${base}/contacts`, label: `${crm.contact}${modules.isEnabled("contact") ? "" : ` · ${modules.labels.disabled}`}`, icon: UserMultiple },
@@ -91,6 +97,7 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {signOutError && <p className="max-w-48 text-xs text-destructive" role="alert">{dictionary.auth.signOutError}</p>}
         <div className="[&_button]:min-h-0 [&_button]:h-8 [&_button]:border-transparent"><LocaleSwitcher label={dictionary.common.language} locale={locale} /></div>
+        <NotificationCenter locale={locale} base={base} />
         <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={copy.account}><span className="flex size-7 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-medium">{user?.image ? <img alt={user.name} src={user.image} className="size-full object-cover" /> : initials || <UserAvatar size={20} />}</span></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-56"><DropdownMenuLabel className="flex items-center gap-2"><UserAvatar size={16} /><span className="max-w-64 truncate">{user?.email ?? copy.account}</span></DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem onSelect={event => { event.preventDefault(); toggleTheme(); }}>{dark ? <Light /> : <Asleep />}{dark ? copy.light : copy.dark}</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => void signOut()}><Logout />{dictionary.auth.signOut}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
       </div>
     </header>

@@ -33,8 +33,10 @@ export function ActivityTimeline({ entity, recordId, companyId, locale, labels }
   }, [entity, recordId, filter, cursor, revision, key, labels]);
   async function complete(entry: ActivityEntry) {
     if (!canChange(entry)) return;
+    const reason = entry.completedAt ? window.prompt(copy.reopenReason)?.trim() : undefined;
+    if (entry.completedAt && !reason) return;
     setBusyId(entry.id); setError("");
-    try { await crmRequest(`/api/crm/activities/${entry.id}`, { method: "PATCH", body: JSON.stringify({ completed: !entry.completedAt }) }); invalidateCrm("activity"); }
+    try { await crmRequest(`/api/crm/activities/${entry.id}`, { method: "PATCH", body: JSON.stringify({ completed: !entry.completedAt, ...(reason ? { reason } : {}) }) }); invalidateCrm("activity"); }
     catch (reason) { setError(requestError(reason, labels)); } finally { setBusyId(undefined); }
   }
   const time = (value: string) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));

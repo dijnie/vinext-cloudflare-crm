@@ -3,6 +3,8 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
 import {
   activityVisibility,
+  appointment,
+  appointmentParticipant,
   company,
   contact,
   customFieldValue,
@@ -12,10 +14,14 @@ import {
   salesOrder,
   leadCollaborator,
   memberOperationGuard,
+  notification,
   savedView,
   session,
   singletonMembership,
   singletonWorkspace,
+  taskRecord,
+  ticket,
+  ticketCollaborator,
   user,
 } from "@/lib/db/schema";
 
@@ -104,6 +110,7 @@ export class MemberRepository {
     replacementMembershipId: string | null,
   ): Promise<boolean> {
     const replacement = replacementMembershipId;
+    const schedulingReplacement = replacement ?? actorMembershipId;
     const now = Date.now();
     const operationId = crypto.randomUUID();
     const dealOwnershipUpdate = replacement
@@ -146,6 +153,13 @@ export class MemberRepository {
       this.db.update(product).set({ ownerMembershipId: replacement, revision: sql`${product.revision}+1`, updatedAt: new Date(now) }).where(eq(product.ownerMembershipId, targetMembershipId)),
       this.db.update(lead).set({ ownerMembershipId: replacement, revision: sql`${lead.revision}+1`, updatedAt: new Date(now) }).where(eq(lead.ownerMembershipId, targetMembershipId)),
       this.db.update(salesOrder).set({ ownerMembershipId: replacement, revision: sql`${salesOrder.revision}+1`, updatedAt: new Date(now) }).where(eq(salesOrder.ownerMembershipId, targetMembershipId)),
+      this.db.update(taskRecord).set({ assigneeMembershipId: replacement, revision: sql`${taskRecord.revision}+1`, updatedAt: new Date(now) }).where(eq(taskRecord.assigneeMembershipId, targetMembershipId)),
+      this.db.insert(appointmentParticipant).select(this.db.select({ appointmentId: appointment.id, membershipId: sql<string>`${schedulingReplacement}`.as("membership_id") }).from(appointment).where(eq(appointment.organizerMembershipId, targetMembershipId))).onConflictDoNothing(),
+      this.db.update(appointment).set({ organizerMembershipId: sql<string>`CASE WHEN ${appointment.organizerMembershipId}=${targetMembershipId} THEN ${schedulingReplacement} ELSE ${appointment.organizerMembershipId} END`, revision: sql`${appointment.revision}+1`, updatedAt: new Date(now) }).where(sql`${appointment.organizerMembershipId}=${targetMembershipId} OR EXISTS(SELECT 1 FROM appointment_participant p WHERE p.appointment_id=${appointment.id} AND p.membership_id=${targetMembershipId})`),
+      this.db.delete(appointmentParticipant).where(eq(appointmentParticipant.membershipId, targetMembershipId)),
+      this.db.update(ticket).set({ assigneeMembershipId: replacement, revision: sql`${ticket.revision}+1`, updatedAt: new Date(now) }).where(eq(ticket.assigneeMembershipId, targetMembershipId)),
+      this.db.delete(ticketCollaborator).where(eq(ticketCollaborator.membershipId, targetMembershipId)),
+      this.db.update(notification).set({ state: "cancelled", updatedAt: new Date(now) }).where(eq(notification.recipientMembershipId, targetMembershipId)),
       this.db.delete(leadCollaborator).where(eq(leadCollaborator.membershipId, targetMembershipId)),
       this.db
         .update(customFieldValue)

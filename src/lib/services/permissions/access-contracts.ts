@@ -9,6 +9,9 @@ export const PERMISSIONS = [
   "order.confirm", "order.complete", "order.cancel", "order.collect", "order.refund", "order.adjust", "order.backdate",
   "inventory.configure", "inventory.adjust", "inventory.return", "entitlement.use", "entitlement.restore",
   "lead.create", "lead.update", "lead.archive", "lead.restore", "lead.assign", "lead.export", "lead.convert",
+  "appointment.create", "appointment.update", "appointment.cancel",
+  "task.create", "task.update", "task.complete", "task.reopen", "task.assign",
+  "ticket.create", "ticket.update", "ticket.respond", "ticket.resolve", "ticket.reopen", "ticket.assign",
   "activity.create", "activity.update", "field.configure", "view.create", "view.update", "view.delete",
 ] as const;
 export type Permission = typeof PERMISSIONS[number];

@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,12 +15,14 @@ export function ActivityComposer({ entity, recordId, labels, disabled = false }:
   const [type, setType] = useState<ActivityCreateInput["type"]>("note");
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({}); const form = useRef<HTMLFormElement>(null);
+  const [owners,setOwners]=useState<{membershipId:string;name:string;email:string}[]>([]);
+  useEffect(()=>{if(type!=="task"||owners.length)return;const controller=new AbortController();void crmRequest<{rows:typeof owners}>("/api/crm/owners",{signal:controller.signal}).then(data=>setOwners(data.rows)).catch(()=>{});return()=>controller.abort();},[type,owners.length]);
   const copy = labels.activity;
   async function submit() {
     if (disabled || submitting.current || !form.current || !form.current.reportValidity()) return;
     const values = new FormData(form.current); setError(""); setErrors({}); setSaved(false);
     const date = (key: string) => { const raw = String(values.get(key) ?? ""); return raw ? new Date(raw).toISOString() : undefined; };
-    const parsed = activityCreateInputSchema.safeParse({ type, [`${entity}Id`]: recordId, subject: String(values.get("subject") ?? "") || null, content: String(values.get("content") ?? "") || null, occurredAt: date("occurredAt"), ...(type === "task" ? { dueAt: date("dueAt") } : {}) });
+    const parsed = activityCreateInputSchema.safeParse({ type, [`${entity}Id`]: recordId, subject: String(values.get("subject") ?? "") || null, content: String(values.get("content") ?? "") || null, occurredAt: date("occurredAt"), ...(type === "task" ? { dueAt: date("dueAt"),assigneeMembershipId:String(values.get("assigneeMembershipId")??"")||undefined } : {}) });
     if (!parsed.success) { const next = Object.fromEntries(parsed.error.issues.map(issue => [String(issue.path.at(-1)), labels.invalid])); setErrors(next); setError(labels.invalid); const first = Object.keys(next)[0]; if (first) form.current.querySelector<HTMLElement>(`[name="${first}"]`)?.focus(); return; }
     submitting.current = true; setBusy(true);
     try { await crmRequest("/api/crm/activities", { method: "POST", body: JSON.stringify(parsed.data) }); form.current?.reset(); setType("note"); setSaved(true); invalidateCrm("activity"); }
@@ -35,7 +37,7 @@ export function ActivityComposer({ entity, recordId, labels, disabled = false }:
     </div>
     <details className="text-xs text-muted-foreground"><summary className="cursor-pointer py-1">{labels.details}</summary><div className="space-y-3 py-2">
       {type === "task" ? <div className="space-y-1"><label htmlFor="activity-content">{copy.content}</label><Textarea id="activity-content" name="content" maxLength={10000} disabled={busy || disabled} /></div> : <div className="space-y-1"><label htmlFor="activity-subject">{copy.subject}</label><Input id="activity-subject" name="subject" maxLength={300} disabled={busy || disabled} aria-invalid={Boolean(errors.subject)} /></div>}
-      <div className="grid gap-3 sm:grid-cols-2">{(["occurredAt", ...(type === "task" ? ["dueAt"] : [])] as Array<"occurredAt" | "dueAt">).map(key => <div className="space-y-1" key={key}><label htmlFor={`activity-${key}`}>{copy[key]}</label><Input id={`activity-${key}`} name={key} type="datetime-local" disabled={busy || disabled} aria-invalid={Boolean(errors[key])} />{errors[key] && <p className="text-destructive">{errors[key]}</p>}</div>)}</div>
+      <div className="grid gap-3 sm:grid-cols-2">{(["occurredAt", ...(type === "task" ? ["dueAt"] : [])] as Array<"occurredAt" | "dueAt">).map(key => <div className="space-y-1" key={key}><label htmlFor={`activity-${key}`}>{copy[key]}</label><Input id={`activity-${key}`} name={key} type="datetime-local" disabled={busy || disabled} aria-invalid={Boolean(errors[key])} />{errors[key] && <p className="text-destructive">{errors[key]}</p>}</div>)}{type==="task"&&<div className="space-y-1"><label htmlFor="activity-assignee">{copy.assignee}</label><select id="activity-assignee" name="assigneeMembershipId" className="h-9 w-full rounded-md border bg-background px-3" disabled={busy||disabled}><option value="">{copy.me}</option>{owners.map(owner=><option key={owner.membershipId} value={owner.membershipId}>{owner.name||owner.email}</option>)}</select></div>}</div>
     </div></details>
     {errors.subject && <p className="text-xs text-destructive">{errors.subject}</p>}{error && <p role="alert" className="text-xs text-destructive">{error}</p>}{saved && <p role="status" className="text-xs">{copy.saved}</p>}
   </form>;

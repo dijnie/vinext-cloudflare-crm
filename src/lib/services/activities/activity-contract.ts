@@ -16,6 +16,7 @@ export const activityCreateInputSchema = activityAnchorSchema.extend({
   content: z.string().trim().max(10_000).nullable().optional(),
   occurredAt: isoDateTimeSchema.optional(),
   dueAt: isoDateTimeSchema.nullable().optional(),
+  assigneeMembershipId: membershipIdSchema.nullable().optional(),
 }).strict().superRefine((input, ctx) => {
   if (!input.companyId && !input.contactId && !input.dealId && !input.leadId && !input.productId && !input.orderId) ctx.addIssue({ code: "custom", path: ["companyId"], message: "An activity needs a record" });
   if (input.leadId && (input.companyId || input.contactId || input.dealId || input.productId || input.orderId)) ctx.addIssue({ code: "custom", path: ["leadId"], message: "Lead activities have a single lead anchor" });
@@ -23,8 +24,9 @@ export const activityCreateInputSchema = activityAnchorSchema.extend({
   if (input.orderId && (input.companyId || input.contactId || input.dealId || input.leadId || input.productId)) ctx.addIssue({ code: "custom", path: ["orderId"], message: "Order activities have a single order anchor" });
   if (input.type === "task" && !input.subject) ctx.addIssue({ code: "custom", path: ["subject"], message: "A task needs a subject" });
   if (input.type !== "task" && input.dueAt) ctx.addIssue({ code: "custom", path: ["dueAt"], message: "Only tasks have due dates" });
+  if (input.type !== "task" && input.assigneeMembershipId) ctx.addIssue({ code: "custom", path: ["assigneeMembershipId"], message: "Only tasks have assignees" });
 });
-export const activityCompleteInputSchema = z.object({ completed: z.boolean() }).strict();
+export const activityCompleteInputSchema = z.object({ completed: z.boolean(), reason: z.string().trim().min(1).max(500).optional(), operationKey: stableIdSchema.optional(), expectedRevision: z.number().int().nonnegative().optional() }).strict().superRefine((value,ctx)=>{if(!value.completed&&!value.reason)ctx.addIssue({code:"custom",path:["reason"],message:"Reopening needs a reason"});});
 export const activityFilterSchema = z.enum(["all", "history", "notes", "calls", "meetings", "upcoming", "done"]);
 export const timelineInputSchema = z.object({
   entity: z.enum(["company", "contact", "deal", "lead", "product", "order"]), recordId: stableIdSchema,

@@ -77,7 +77,7 @@ async function records(cookie: string, owner: string) {
 }
 const create = (cookie: string, input: unknown) => createActivitiesPostHandler(root())(request("/api/crm/activities", cookie, "POST", input));
 const timeline = async (cookie: string, entity: string, recordId: string, extra = "") => successful(await createActivitiesGetHandler(root())(request(`/api/crm/activities?entity=${entity}&recordId=${recordId}${extra}`, cookie)));
-const complete = (cookie: string, id: string, completed: boolean) => createActivityPatchHandler(root(), id)(request(`/api/crm/activities/${id}`, cookie, "PATCH", { completed }));
+const complete = (cookie: string, id: string, completed: boolean) => createActivityPatchHandler(root(), id)(request(`/api/crm/activities/${id}`, cookie, "PATCH", { completed, ...completed ? {} : { reason: "More work is required" } }));
 
 describe.sequential("activities and ownership API", () => {
   beforeEach(clearState);

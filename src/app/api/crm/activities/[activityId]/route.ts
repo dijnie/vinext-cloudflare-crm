@@ -10,7 +10,7 @@ export function createActivityPatchHandler(root: CompositionRoot, id: string) {
     input: activityCompleteInputSchema, output: activityEntryOutputSchema, unsafe: true,
     handle: ({ context, input }) => {
       if (!stableIdSchema.safeParse(id).success) throw new HttpError(400, "validation_failed", "Activity ID is invalid");
-      return root.activities.complete(context, id, input.completed);
+      return root.activities.complete(context, id, input.completed, input.reason, input.operationKey, input.expectedRevision);
     },
   });
 }
