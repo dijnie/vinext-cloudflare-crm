@@ -1,7 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { ModuleSettings } from "@/lib/services/modules/module-contracts";
-import type { EntityType } from "@/lib/listing/list-state";
+import type { ModuleEntity, ModuleSettings } from "@/lib/services/modules/module-contracts";
 import { getModuleDictionary } from "@/lib/i18n/module-dictionary";
 import type { AppLocale } from "@/lib/i18n/config";
 import { crmRequest } from "./record-types";
@@ -25,10 +24,10 @@ export function ModuleProvider({ initialSettings, locale, children }: { initialS
 }
 export function useModules() {
   const context = useContext(ModuleContext);
-  const isEnabled = (entity: EntityType | undefined) => Boolean(entity && context && !context.unavailable && context.settings.modules.find(module => module.entity === entity)?.enabled);
+  const isEnabled = (entity: ModuleEntity | undefined) => Boolean(entity && context && !context.unavailable && context.settings.modules.find(module => module.entity === entity)?.enabled);
   return { isEnabled, labels: getModuleDictionary(context?.locale ?? "en"), unavailable: context?.unavailable ?? true };
 }
-export function ModuleReadOnlyBanner({ entity }: { entity: EntityType }) {
+export function ModuleReadOnlyBanner({ entity }: { entity: ModuleEntity }) {
   const { isEnabled, labels, unavailable } = useModules();
   return isEnabled(entity) ? null : <p role="status" className="rounded-md border bg-muted/40 px-4 py-3 text-sm">{unavailable ? labels.error : labels.readOnly}</p>;
 }

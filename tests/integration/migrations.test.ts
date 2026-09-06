@@ -6,6 +6,10 @@ const crmTables = [
   "activity_visibility",
   "company",
   "contact",
+  "contract",
+  "contract_party",
+  "contract_version",
+  "contract_document",
   "crm_setting",
   "crm_file",
   "custom_field_definition",
@@ -15,6 +19,7 @@ const crmTables = [
   "deal_contact",
   "deal_stage",
   "exchange_rate",
+  "review",
   "saved_view",
 ];
 
@@ -44,6 +49,7 @@ describe("CRM baseline migration", () => {
       { name: "0017_catalog.sql" },
       { name: "0018_order_ledger.sql" },
       { name: "0019_scheduling_support.sql" },
+      { name: "0020_contracts_reviews.sql" },
     ]);
   });
 

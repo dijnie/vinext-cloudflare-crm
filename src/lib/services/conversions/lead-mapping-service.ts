@@ -45,18 +45,18 @@ export class LeadMappingService {
     const [leadFields, contactFields] = await Promise.all([service.list(context, { entity: "lead" }), service.list(context, { entity: "contact" })]);
     const row = await this.db.select({ revision: leadMapping.revision, mappingsJson: leadMapping.mappingsJson, autoOrder: leadMapping.autoOrder, autoDeal: leadMapping.autoDeal, canManage: sql<number>`${permissionPredicate(context, [], true)}` }).from(leadMapping).where(and(eq(leadMapping.id, "contact"), permissionPredicate(context))).get();
     if (!row) throw new HttpError(403, "membership_required", "Conversion settings unavailable");
-    return { revision: row.revision, mappings: leadMappingPairSchema.array().parse(JSON.parse(row.mappingsJson)), autoOrder: row.autoOrder, autoDeal: false as const, canManage: Boolean(row.canManage), leadFieldRevision: leadConfiguration.revision, contactFieldRevision: contactConfiguration.revision, leadFields, contactFields };
+    return { revision: row.revision, mappings: leadMappingPairSchema.array().parse(JSON.parse(row.mappingsJson)), autoOrder: row.autoOrder, autoDeal: row.autoDeal, canManage: Boolean(row.canManage), leadFieldRevision: leadConfiguration.revision, contactFieldRevision: contactConfiguration.revision, leadFields, contactFields };
   }
   async update(context: RequestContext, raw: LeadMappingUpdate) {
     await requirePermission(this.db, context, [], true);
     const parsed = leadMappingUpdateSchema.safeParse(raw);
-    if (!parsed.success) throw new HttpError(400, "validation_failed", "Invalid mapping; automatic order/deal creation is unavailable");
+    if (!parsed.success) throw new HttpError(400, "validation_failed", "Invalid conversion mapping");
     const input = parsed.data, current = await this.get(context);
     if (input.revision !== current.revision) throw new HttpError(409, "conflict", "Mapping settings changed");
     validateMappings(input.mappings, current.leadFields, current.contactFields);
     const guard = actionGuard(this.db, context, [], true);
     try {
-      const [, changed] = await this.db.batch([guard.begin, this.db.update(leadMapping).set({ mappingsJson: JSON.stringify(input.mappings), autoOrder: input.autoOrder, revision: sql`${leadMapping.revision}+1`, updatedAt: new Date() }).where(and(eq(leadMapping.id, "contact"), eq(leadMapping.revision, input.revision), sql`EXISTS (SELECT 1 FROM field_configuration_revision WHERE entity='lead' AND revision=${current.leadFieldRevision}) AND EXISTS (SELECT 1 FROM field_configuration_revision WHERE entity='contact' AND revision=${current.contactFieldRevision})`)).returning({ id: leadMapping.id }), guard.end]);
+      const [, changed] = await this.db.batch([guard.begin, this.db.update(leadMapping).set({ mappingsJson: JSON.stringify(input.mappings), autoOrder: input.autoOrder, autoDeal: input.autoDeal, revision: sql`${leadMapping.revision}+1`, updatedAt: new Date() }).where(and(eq(leadMapping.id, "contact"), eq(leadMapping.revision, input.revision), sql`EXISTS (SELECT 1 FROM field_configuration_revision WHERE entity='lead' AND revision=${current.leadFieldRevision}) AND EXISTS (SELECT 1 FROM field_configuration_revision WHERE entity='contact' AND revision=${current.contactFieldRevision})`)).returning({ id: leadMapping.id }), guard.end]);
       if (!changed.length) throw new HttpError(409, "conflict", "Mapping or fields changed");
     } catch (error) { permissionError(error); }
     return this.get(context);

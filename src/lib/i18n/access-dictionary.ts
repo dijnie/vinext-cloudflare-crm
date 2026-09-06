@@ -41,6 +41,8 @@ const permissions: Record<AppLocale, Record<Permission, string>> = {
     "company.create": "Create companies", "company.update": "Edit companies", "company.archive": "Archive companies", "company.restore": "Restore companies", "company.assign": "Assign companies", "company.export": "Export companies",
     "contact.create": "Create contacts", "contact.update": "Edit contacts", "contact.archive": "Archive contacts", "contact.restore": "Restore contacts", "contact.assign": "Assign contacts", "contact.export": "Export contacts",
     "deal.create": "Create deals", "deal.update": "Edit deals", "deal.archive": "Archive deals", "deal.restore": "Restore deals", "deal.assign": "Assign deals", "deal.export": "Export deals",
+    "contract.create": "Create contracts", "contract.update": "Edit contracts", "contract.archive": "Archive contracts", "contract.restore": "Restore contracts", "contract.assign": "Assign contracts", "contract.document": "Manage contract documents", "contract.export": "Export contracts",
+    "review.create": "Create reviews", "review.update": "Edit reviews", "review.archive": "Archive reviews", "review.restore": "Restore reviews", "review.export": "Export reviews",
     "activity.create": "Create activities", "activity.update": "Edit activities", "field.configure": "Configure custom fields", "view.create": "Create saved views", "view.update": "Edit saved views", "view.delete": "Delete saved views",
   },
   vi: {
@@ -51,6 +53,8 @@ const permissions: Record<AppLocale, Record<Permission, string>> = {
     "company.create": "Tạo công ty", "company.update": "Sửa công ty", "company.archive": "Lưu trữ công ty", "company.restore": "Khôi phục công ty", "company.assign": "Phân công công ty", "company.export": "Xuất công ty",
     "contact.create": "Tạo liên hệ", "contact.update": "Sửa liên hệ", "contact.archive": "Lưu trữ liên hệ", "contact.restore": "Khôi phục liên hệ", "contact.assign": "Phân công liên hệ", "contact.export": "Xuất liên hệ",
     "deal.create": "Tạo cơ hội", "deal.update": "Sửa cơ hội", "deal.archive": "Lưu trữ cơ hội", "deal.restore": "Khôi phục cơ hội", "deal.assign": "Phân công cơ hội", "deal.export": "Xuất cơ hội",
+    "contract.create": "Tạo hợp đồng", "contract.update": "Sửa hợp đồng", "contract.archive": "Lưu trữ hợp đồng", "contract.restore": "Khôi phục hợp đồng", "contract.assign": "Phân công hợp đồng", "contract.document": "Quản lý tài liệu hợp đồng", "contract.export": "Xuất hợp đồng",
+    "review.create": "Tạo đánh giá", "review.update": "Sửa đánh giá", "review.archive": "Lưu trữ đánh giá", "review.restore": "Khôi phục đánh giá", "review.export": "Xuất đánh giá",
     "activity.create": "Tạo hoạt động", "activity.update": "Sửa hoạt động", "field.configure": "Cấu hình trường tùy chỉnh", "view.create": "Tạo chế độ xem", "view.update": "Sửa chế độ xem", "view.delete": "Xóa chế độ xem",
   },
 };

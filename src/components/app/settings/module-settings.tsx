@@ -5,17 +5,17 @@ import type { AppLocale } from "@/lib/i18n/config";
 import { getCrmDictionary } from "@/lib/i18n/crm-dictionary";
 import { getModuleDictionary } from "@/lib/i18n/module-dictionary";
 import type { ModuleSettings as Settings } from "@/lib/services/modules/module-contracts";
-import type { EntityType } from "@/lib/listing/list-state";
+import type { ModuleEntity } from "@/lib/services/modules/module-contracts";
 import { invalidateCrm } from "@/lib/listing/invalidation";
 import { crmRequest } from "../record-types";
 
 export function ModuleSettings({ initialData, locale }: { initialData: Settings; locale: AppLocale }) {
   const [settings, setSettings] = useState(initialData);
-  const [draft, setDraft] = useState<Partial<Record<EntityType, boolean>>>({});
+  const [draft, setDraft] = useState<Partial<Record<ModuleEntity, boolean>>>({});
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [stale, setStale] = useState(false); const [saved, setSaved] = useState(false);
   const labels = getModuleDictionary(locale); const crm = getCrmDictionary(locale);
   async function reload() { setBusy(true); setError(""); setSaved(false); try { setSettings(await crmRequest<Settings>("/api/crm/modules")); setDraft({}); setStale(false); invalidateCrm("modules"); } catch { setError(labels.error); } finally { setBusy(false); } }
-  async function save(entity: EntityType) {
+  async function save(entity: ModuleEntity) {
     const module = settings.modules.find(item => item.entity === entity); if (!module || busy || stale || !settings.canManage) return;
     setBusy(true); setError(""); setSaved(false);
     try { const result = await crmRequest<Settings>("/api/crm/modules", { method: "PATCH", body: JSON.stringify({ entity, enabled: draft[entity] ?? module.enabled, revision: module.revision }) }); setSettings(previous => ({ ...result, modules: result.modules.map(item => item.entity !== entity && draft[item.entity] !== undefined ? previous.modules.find(old => old.entity === item.entity)! : item) })); setDraft(previous => { const next = { ...previous }; delete next[entity]; return next; }); setSaved(true); invalidateCrm("modules"); }

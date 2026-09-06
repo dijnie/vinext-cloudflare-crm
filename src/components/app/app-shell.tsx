@@ -3,6 +3,7 @@ import { getCatalogDictionary } from "@/lib/i18n/catalog-dictionary";
 import { getLeadDictionary } from "@/lib/i18n/lead-dictionary";
 import { getOrderDictionary } from "@/lib/i18n/order-dictionary";
 import { getSchedulingDictionary } from "@/lib/i18n/scheduling-dictionary";
+import { getB2bDictionary } from "@/lib/i18n/b2b-dictionary";
 import { DealStageRefreshStatus } from "./deal-stage-provider";
 import { getDealStageDictionary } from "@/lib/i18n/deal-stage-dictionary";
 import { getLayoutDictionary } from "@/lib/i18n/layout-dictionary";
@@ -41,7 +42,7 @@ import { NavigationSkeleton } from "./navigation-skeleton";
 import { useModules } from "./module-provider";
 import { ShellLogo } from "./shell-logo";
 import { NotificationCenter } from "./scheduling/notification-center";
-import { Calendar, Task, Ticket } from "@carbon/icons-react";
+import { Calendar, Task, Ticket, Document, Star } from "@carbon/icons-react";
 
 export function AppShell({ children, dictionary, locale, role, slug, user }: {
   children: ReactNode; dictionary: AppDictionary; locale: AppLocale; role: "owner" | "member"; slug: string;
@@ -68,6 +69,8 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
     { href: `${base}/companies`, label: `${dictionary.navigation.companies}${modules.isEnabled("company") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },
     { href: `${base}/contacts`, label: `${crm.contact}${modules.isEnabled("contact") ? "" : ` · ${modules.labels.disabled}`}`, icon: UserMultiple },
     { href: `${base}/deals`, label: `${crm.deal}${modules.isEnabled("deal") ? "" : ` · ${modules.labels.disabled}`}`,  icon: Partnership },
+    { href: `${base}/contracts`, label: `${getB2bDictionary(locale).contracts}${modules.isEnabled("contract") ? "" : ` · ${modules.labels.disabled}`}`, icon: Document },
+    { href: `${base}/reviews`, label: `${getB2bDictionary(locale).reviews}${modules.isEnabled("review") ? "" : ` · ${modules.labels.disabled}`}`, icon: Star },
     { href: settings[0].href, match: `${base}/settings`, label: copy.settings, icon: Settings },
   ];
   const inSettings = pathname.startsWith(`${base}/settings`);

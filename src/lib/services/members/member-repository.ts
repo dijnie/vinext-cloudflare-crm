@@ -6,6 +6,8 @@ import {
   appointment,
   appointmentParticipant,
   company,
+  contract,
+  contractVersion,
   contact,
   customFieldValue,
   deal,
@@ -150,17 +152,121 @@ export class MemberRepository {
         .set({ ownerMembershipId: replacement, updatedAt: new Date(now) })
         .where(eq(contact.ownerMembershipId, targetMembershipId)),
       dealOwnershipUpdate,
-      this.db.update(product).set({ ownerMembershipId: replacement, revision: sql`${product.revision}+1`, updatedAt: new Date(now) }).where(eq(product.ownerMembershipId, targetMembershipId)),
-      this.db.update(lead).set({ ownerMembershipId: replacement, revision: sql`${lead.revision}+1`, updatedAt: new Date(now) }).where(eq(lead.ownerMembershipId, targetMembershipId)),
-      this.db.update(salesOrder).set({ ownerMembershipId: replacement, revision: sql`${salesOrder.revision}+1`, updatedAt: new Date(now) }).where(eq(salesOrder.ownerMembershipId, targetMembershipId)),
-      this.db.update(taskRecord).set({ assigneeMembershipId: replacement, revision: sql`${taskRecord.revision}+1`, updatedAt: new Date(now) }).where(eq(taskRecord.assigneeMembershipId, targetMembershipId)),
-      this.db.insert(appointmentParticipant).select(this.db.select({ appointmentId: appointment.id, membershipId: sql<string>`${schedulingReplacement}`.as("membership_id") }).from(appointment).where(eq(appointment.organizerMembershipId, targetMembershipId))).onConflictDoNothing(),
-      this.db.update(appointment).set({ organizerMembershipId: sql<string>`CASE WHEN ${appointment.organizerMembershipId}=${targetMembershipId} THEN ${schedulingReplacement} ELSE ${appointment.organizerMembershipId} END`, revision: sql`${appointment.revision}+1`, updatedAt: new Date(now) }).where(sql`${appointment.organizerMembershipId}=${targetMembershipId} OR EXISTS(SELECT 1 FROM appointment_participant p WHERE p.appointment_id=${appointment.id} AND p.membership_id=${targetMembershipId})`),
-      this.db.delete(appointmentParticipant).where(eq(appointmentParticipant.membershipId, targetMembershipId)),
-      this.db.update(ticket).set({ assigneeMembershipId: replacement, revision: sql`${ticket.revision}+1`, updatedAt: new Date(now) }).where(eq(ticket.assigneeMembershipId, targetMembershipId)),
-      this.db.delete(ticketCollaborator).where(eq(ticketCollaborator.membershipId, targetMembershipId)),
-      this.db.update(notification).set({ state: "cancelled", updatedAt: new Date(now) }).where(eq(notification.recipientMembershipId, targetMembershipId)),
-      this.db.delete(leadCollaborator).where(eq(leadCollaborator.membershipId, targetMembershipId)),
+      this.db.insert(contractVersion).select(
+        this.db
+          .select({
+            contractId: contract.id,
+            version: sql<number>`${contract.revision} + 1`.as("version"),
+            snapshotJson: sql<string>`json_object(
+            'id', ${contract.id}, 'name', ${contract.name}, 'companyId', ${contract.companyId},
+            'contactId', ${contract.contactId}, 'dealId', ${contract.dealId}, 'orderId', ${contract.orderId},
+            'valueMinor', ${contract.valueMinor}, 'currency', ${contract.currency},
+            'effectiveAt', CASE WHEN ${contract.effectiveAt} IS NULL THEN NULL ELSE strftime('%Y-%m-%dT%H:%M:%fZ', ${contract.effectiveAt} / 1000.0, 'unixepoch') END,
+            'expiresAt', CASE WHEN ${contract.expiresAt} IS NULL THEN NULL ELSE strftime('%Y-%m-%dT%H:%M:%fZ', ${contract.expiresAt} / 1000.0, 'unixepoch') END,
+            'ownerMembershipId', ${schedulingReplacement}, 'status', ${contract.status},
+            'creatorUserId', ${contract.creatorUserId}, 'revision', ${contract.revision} + 1,
+            'archivedAt', CASE WHEN ${contract.archivedAt} IS NULL THEN NULL ELSE strftime('%Y-%m-%dT%H:%M:%fZ', ${contract.archivedAt} / 1000.0, 'unixepoch') END,
+            'createdAt', strftime('%Y-%m-%dT%H:%M:%fZ', ${contract.createdAt} / 1000.0, 'unixepoch'),
+            'updatedAt', strftime('%Y-%m-%dT%H:%M:%fZ', ${now} / 1000.0, 'unixepoch'),
+            'parties', json((SELECT coalesce(json_group_array(json_object(
+              'companyId', party.company_id, 'contactId', party.contact_id, 'role', party.role
+            )), '[]') FROM contract_party AS party WHERE party.contract_id = ${contract.id}))
+          )`.as("snapshot_json"),
+            reason:
+              sql<string>`'Owner reassigned because member access was revoked'`.as(
+                "reason",
+              ),
+            actorId: sql<string>`${actorMembershipId}`.as("actor_id"),
+            createdAt: sql<Date>`${now}`.as("created_at"),
+          })
+          .from(contract)
+          .where(eq(contract.ownerMembershipId, targetMembershipId)),
+      ),
+      this.db
+        .update(contract)
+        .set({
+          ownerMembershipId: schedulingReplacement,
+          revision: sql`${contract.revision}+1`,
+          updatedAt: new Date(now),
+        })
+        .where(eq(contract.ownerMembershipId, targetMembershipId)),
+      this.db
+        .update(product)
+        .set({
+          ownerMembershipId: replacement,
+          revision: sql`${product.revision}+1`,
+          updatedAt: new Date(now),
+        })
+        .where(eq(product.ownerMembershipId, targetMembershipId)),
+      this.db
+        .update(lead)
+        .set({
+          ownerMembershipId: replacement,
+          revision: sql`${lead.revision}+1`,
+          updatedAt: new Date(now),
+        })
+        .where(eq(lead.ownerMembershipId, targetMembershipId)),
+      this.db
+        .update(salesOrder)
+        .set({
+          ownerMembershipId: replacement,
+          revision: sql`${salesOrder.revision}+1`,
+          updatedAt: new Date(now),
+        })
+        .where(eq(salesOrder.ownerMembershipId, targetMembershipId)),
+      this.db
+        .update(taskRecord)
+        .set({
+          assigneeMembershipId: replacement,
+          revision: sql`${taskRecord.revision}+1`,
+          updatedAt: new Date(now),
+        })
+        .where(eq(taskRecord.assigneeMembershipId, targetMembershipId)),
+      this.db
+        .insert(appointmentParticipant)
+        .select(
+          this.db
+            .select({
+              appointmentId: appointment.id,
+              membershipId: sql<string>`${schedulingReplacement}`.as(
+                "membership_id",
+              ),
+            })
+            .from(appointment)
+            .where(eq(appointment.organizerMembershipId, targetMembershipId)),
+        )
+        .onConflictDoNothing(),
+      this.db
+        .update(appointment)
+        .set({
+          organizerMembershipId: sql<string>`CASE WHEN ${appointment.organizerMembershipId}=${targetMembershipId} THEN ${schedulingReplacement} ELSE ${appointment.organizerMembershipId} END`,
+          revision: sql`${appointment.revision}+1`,
+          updatedAt: new Date(now),
+        })
+        .where(
+          sql`${appointment.organizerMembershipId}=${targetMembershipId} OR EXISTS(SELECT 1 FROM appointment_participant p WHERE p.appointment_id=${appointment.id} AND p.membership_id=${targetMembershipId})`,
+        ),
+      this.db
+        .delete(appointmentParticipant)
+        .where(eq(appointmentParticipant.membershipId, targetMembershipId)),
+      this.db
+        .update(ticket)
+        .set({
+          assigneeMembershipId: replacement,
+          revision: sql`${ticket.revision}+1`,
+          updatedAt: new Date(now),
+        })
+        .where(eq(ticket.assigneeMembershipId, targetMembershipId)),
+      this.db
+        .delete(ticketCollaborator)
+        .where(eq(ticketCollaborator.membershipId, targetMembershipId)),
+      this.db
+        .update(notification)
+        .set({ state: "cancelled", updatedAt: new Date(now) })
+        .where(eq(notification.recipientMembershipId, targetMembershipId)),
+      this.db
+        .delete(leadCollaborator)
+        .where(eq(leadCollaborator.membershipId, targetMembershipId)),
       this.db
         .update(customFieldValue)
         .set({ userMembershipId: replacement, updatedAt: new Date(now) })

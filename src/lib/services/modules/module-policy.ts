@@ -3,25 +3,26 @@ import type { AppDatabase } from "@/lib/db/database";
 import { HttpError } from "@/lib/http/http-errors";
 import type { FieldEntity } from "../custom-fields/field-contracts";
 import type { Permission } from "../permissions/access-contracts";
+import type { ModuleEntity } from "./module-contracts";
 
-export function modulesEnabledPredicate(entities: readonly FieldEntity[]): SQL {
+export function modulesEnabledPredicate(entities: readonly ModuleEntity[]): SQL {
   if (!entities.length) return sql`1=1`;
   return sql`not exists (select 1 from json_each(${JSON.stringify([...new Set(entities)])}) wanted
     where not exists (select 1 from module_setting m where m.entity=wanted.value and m.enabled=1))`;
 }
 
 export function moduleWritePredicate(permissions: readonly Permission[]): SQL {
-  const entities: FieldEntity[] = [];
+  const entities: ModuleEntity[] = [];
   for (const permission of permissions) {
     const [entity, action] = permission.split(".");
     if (entity === "inventory" && ["configure", "adjust", "return"].includes(action!)) entities.push("product");
     else if (entity === "entitlement" && ["use", "restore"].includes(action!)) entities.push("order");
-    else if (["company", "contact", "deal", "lead", "product", "order"].includes(entity!) && ["create", "update", "archive", "restore", "assign", "convert", "confirm", "complete", "cancel", "collect", "refund", "adjust", "backdate"].includes(action!)) entities.push(entity as FieldEntity);
+    else if (["company", "contact", "deal", "lead", "product", "order", "contract", "review"].includes(entity!) && ["create", "update", "archive", "restore", "assign", "convert", "confirm", "complete", "cancel", "collect", "refund", "adjust", "backdate", "document"].includes(action!)) entities.push(entity as ModuleEntity);
   }
   return modulesEnabledPredicate(entities);
 }
 
-export async function requireModulesEnabled(db: AppDatabase, entities: readonly FieldEntity[]) {
+export async function requireModulesEnabled(db: AppDatabase, entities: readonly ModuleEntity[]) {
   const row = await db.get<{ enabled: number }>(sql`select ${modulesEnabledPredicate(entities)} as enabled`);
   if (!row?.enabled) throw new HttpError(403, "permission_required", "Module is disabled and historical records are read-only");
 }

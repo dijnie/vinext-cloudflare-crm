@@ -14,6 +14,9 @@ import { toIso } from "@/lib/listing/list-contract";
 import { blankToNull, relationError } from "@/lib/services/shared/service-utils";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
+import { deal } from "@/lib/db/schema";
+import { actionGuard, permissionError } from "../permissions/permission-policy";
+import { prepareDealConversion } from "./deal-conversion-write";
 
 import { DealRepository } from "./deal-repository";
 
@@ -76,7 +79,12 @@ export class DealService {
     };
   }
 
-  async create(context: RequestContext, input: DealCreateInput, creation?: PreparedRecordCreation) {
+  async create(context: RequestContext, input: DealCreateInput, creation?: PreparedRecordCreation):Promise<{id:string;name:string;companyId:string}> {
+    const prepared=await this.prepareCreate(context,input,creation);
+    try{await this.db.batch(prepared.statements);return prepared.result;}catch(error){return prepared.translateError(error);}
+  }
+
+  async prepareCreate(context: RequestContext, input: DealCreateInput, creation?: PreparedRecordCreation) {
     await this.guard(context, ["deal.create", "deal.assign"]);
     const [company, owner, stage] = await Promise.all([
       this.repository.company(input.companyId),
@@ -96,8 +104,7 @@ export class DealService {
     const id = creation?.recordId ?? crypto.randomUUID();
     const fields = await new FieldService(this.db).prepareValues(context, { entity: "deal", recordId: id, values: input.customFields ?? {}, calendarRevision: input.calendarRevision }, "create");
     const now = new Date();
-    try {
-      const row = await this.repository.create({
+    const values={
         id,
         name: input.name,
         companyId: input.companyId,
@@ -112,11 +119,11 @@ export class DealService {
         closedAt: stage.closedState === "open" ? null : now,
         createdAt: now,
         updatedAt: now,
-      }, context, fields, creation);
-      return { id: row.id, name: row.name, companyId: row.companyId };
-    } catch (error) {
-      try { dealStageWriteError(error); } catch (stageError) { try { currencyError(stageError); } catch (classified) { relationError(classified, "Deal relationships are invalid"); } }
-    }
+      };
+    const fx=await prepareDealConversion(this.db,{id,amountMinor:values.amountMinor,currency:values.currency,moneyRevision:0});
+    const auth=actionGuard(this.db,context,["deal.create","deal.assign"]);
+    const statements:Parameters<AppDatabase["batch"]>[0]=[auth.begin,...creation?.before??[],fx.guard,this.db.insert(deal).values(values),fx.conversion,fx.finish,...fields.statements,...creation?.after??[],auth.end];
+    return {statements,result:{id,name:values.name,companyId:values.companyId},translateError(error:unknown):never{try{fields.translateError(error);}catch(fieldError){try{dealStageWriteError(fieldError);}catch(stageError){try{currencyError(stageError);}catch(classified){relationError(classified,"Deal relationships are invalid");}}}try{permissionError(error);}catch(classified){try{dealStageWriteError(classified);}catch(stageError){try{currencyError(stageError);}catch(finalError){relationError(finalError,"Deal relationships are invalid");}}}}};
   }
 
   async update(context: RequestContext, id: string, input: DealUpdateData) {

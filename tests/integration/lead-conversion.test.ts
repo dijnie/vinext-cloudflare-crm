@@ -286,4 +286,19 @@ describe.sequential("lead contact conversion", () => {
     finally { await env.DB.prepare("UPDATE singleton_membership SET role='owner' WHERE user_id=?").bind(context.userId).run(); }
     expect(other.actor.id).not.toBe(context.userId);
   });
+  it("creates and replays a configured deal atomically with its converted contact",async()=>{
+    const {services,context,conversions,mapping}=fixture;
+    const customer=await services.companies.create(context,{name:`Converted company ${crypto.randomUUID()}`});
+    const config=await mapping.get(context);await mapping.update(context,{revision:config.revision,mappings:defaultMappings,autoOrder:false,autoDeal:true});
+    const source=await leadRecord({companyId:customer.id}),contactDraft=await services.drafts.create(context,{entity:"contact"}),dealDraft=await services.drafts.create(context,{entity:"deal"});
+    const deal={draftId:dealDraft.id,name:"Converted opportunity",companyId:customer.id,ownerMembershipId:fixture.actor.id,stageId:"demo-booked",amountMinor:900000,currency:"USD" as const};
+    const preview=await conversions.preview(context,source.id,{contact:{firstName:"Buyer",companyId:customer.id},deal});
+    expect(preview).toMatchObject({autoDeal:true,autoOrder:false,errors:[]});
+    const input:LeadConversionRequest={operationKey:crypto.randomUUID(),expectedLeadRevision:preview.leadRevision,expectedLeadValueRevision:preview.leadValueRevision,expectedMappingRevision:preview.mappingRevision,expectedLeadFieldRevision:preview.leadFieldRevision,expectedContactFieldRevision:preview.contactFieldRevision,target:{mode:"create",contact:{firstName:"Buyer",companyId:customer.id},draftId:contactDraft.id},deal};
+    await env.DB.exec("CREATE TRIGGER reject_auto_deal_conversion BEFORE INSERT ON lead_conversion BEGIN SELECT RAISE(ABORT,'forced_conversion_failure'); END;");
+    try{await expect(conversions.apply(context,source.id,input)).rejects.toThrow();}finally{await env.DB.exec("DROP TRIGGER reject_auto_deal_conversion;");}
+    expect(await env.DB.prepare("SELECT id FROM contact WHERE id=?").bind(contactDraft.id).first()).toBeNull();expect(await env.DB.prepare("SELECT id FROM deal WHERE id=?").bind(dealDraft.id).first()).toBeNull();
+    const saved=await conversions.apply(context,source.id,input);expect(saved).toMatchObject({contactId:contactDraft.id,dealId:dealDraft.id,orderId:null});expect(await conversions.apply(context,source.id,input)).toEqual(saved);
+    expect(await env.DB.prepare("SELECT company_id,amount_minor FROM deal WHERE id=?").bind(dealDraft.id).first()).toEqual({company_id:customer.id,amount_minor:900000});expect(await env.DB.prepare("SELECT contact_id,role FROM deal_contact WHERE deal_id=?").bind(dealDraft.id).first()).toEqual({contact_id:contactDraft.id,role:"converted contact"});
+  });
 });

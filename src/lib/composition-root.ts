@@ -34,6 +34,9 @@ import { TaskService } from "@/lib/services/tasks/task-service";
 import { AppointmentService } from "@/lib/services/appointments/appointment-service";
 import { TicketService } from "@/lib/services/tickets/ticket-service";
 import { NotificationService } from "@/lib/services/notifications/notification-service";
+import { ContractService } from "@/lib/services/contracts/contract-service";
+import { ContractDocumentService } from "@/lib/services/contracts/contract-document-service";
+import { ReviewService } from "@/lib/services/reviews/review-service";
 
 import { defaultSecurityLogger, type SecurityLogger } from "./http/security-logging";
 
@@ -72,6 +75,9 @@ export function createCompositionRoot(
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
   return {
+    reviews: new ReviewService(db),
+    contractDocuments: new ContractDocumentService(db, runtimeBindings.CRM_FILES),
+    contracts: new ContractService(db),
     notifications: new NotificationService(db),
     tickets: new TicketService(db),
     appointments: new AppointmentService(db),

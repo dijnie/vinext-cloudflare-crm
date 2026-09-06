@@ -1,6 +1,6 @@
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
-import { contact, crmSetting, lead, leadConversion, operationConditionGuard } from "@/lib/db/schema";
+import { contact, crmSetting, dealContact, lead, leadConversion, operationConditionGuard } from "@/lib/db/schema";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
 import { contactCreateInputSchema, type ContactCreateInput } from "../contacts/contact-contract";
@@ -12,6 +12,8 @@ import { modulesEnabledPredicate, requireModulesEnabled } from "../modules/modul
 import { actionGuard, permissionError, permissionPredicate, requirePermission } from "../permissions/permission-policy";
 import { DraftService } from "../record-drafts/draft-service";
 import { OrderService } from "../orders/order-service";
+import { DealService } from "../deals/deal-service";
+import type { DealCreateInput } from "../deals/deal-contract";
 import type { OrderCreateInput } from "../orders/order-contract";
 import { normalizeEmail, relationError } from "../shared/service-utils";
 import { leadConversionPreviewInputSchema, leadConversionRequestSchema, leadConversionResultSchema, type LeadConversionPreviewInput, type LeadConversionRequest, type LeadConversionResult } from "./lead-conversion-contracts";
@@ -56,7 +58,7 @@ export class LeadConversionService {
     const previous = rows.find(row => row.leadId === leadId);
     if (!previous) return null;
     const historical = leadConversionResultSchema.parse(JSON.parse(previous.resultJson));
-    if (previous.fingerprint === digest || !input.order && historical.orderId === null && input.target.mode === "link" && input.target.contactId === previous.contactId) return historical;
+    if (previous.fingerprint === digest || !input.order && !input.deal && historical.orderId === null && historical.dealId === null && input.target.mode === "link" && input.target.contactId === previous.contactId) return historical;
     conflict("Lead already converted to a different destination or request");
   }
   async preview(context: RequestContext, leadId: string, raw: LeadConversionPreviewInput = {}) {
@@ -94,6 +96,9 @@ export class LeadConversionService {
       catch (error) { errors.push({ field: "contact", message: error instanceof Error ? error.message : "Contact is invalid" }); }
     }
     let orderPreview = null;
+    if (mapping.autoDeal && !input.deal) errors.push({ field: "deal", message: "A draft deal is required by the current conversion settings" });
+    else if (!mapping.autoDeal && input.deal) errors.push({ field: "deal", message: "Automatic deal creation is disabled" });
+    else if (input.deal) { try { const { draftId, ...deal } = input.deal; const creation = draftId ? await new DraftService(this.db).prepareConsumption(context, "deal", draftId) : undefined; void await new DealService(this.db).prepareCreate(context, deal as DealCreateInput, creation); } catch (error) { errors.push({ field: "deal", message: error instanceof Error ? error.message : "Deal is invalid" }); } }
     if (mapping.autoOrder && !input.order) errors.push({ field: "order", message: "A draft order is required by the current conversion settings" });
     else if (!mapping.autoOrder && input.order) errors.push({ field: "order", message: "Automatic order creation is disabled" });
     else if (input.order) {
@@ -117,7 +122,7 @@ export class LeadConversionService {
       AND EXISTS (SELECT 1 FROM crm_setting WHERE id='settings' AND calendar_revision=${calendar.revision})
       AND ${leadValuesRevision}=${valueRevision!.revision}) AS valid`);
     if (!consistent?.valid) conflict("Lead or conversion settings changed while preparing the preview");
-    return { leadRevision: record.revision, mappingRevision: mapping.revision, leadValueRevision: valueRevision!.revision, leadFieldRevision: mapping.leadFieldRevision, contactFieldRevision: mapping.contactFieldRevision, calendarRevision: calendar.revision, autoOrder: mapping.autoOrder, orderPreview,
+    return { leadRevision: record.revision, mappingRevision: mapping.revision, leadValueRevision: valueRevision!.revision, leadFieldRevision: mapping.leadFieldRevision, contactFieldRevision: mapping.contactFieldRevision, calendarRevision: calendar.revision, autoOrder: mapping.autoOrder, autoDeal: mapping.autoDeal, orderPreview,
       proposedContact: proposed as Partial<ContactCreateInput>, candidates: candidates.map(({ normalizedPhone, ...candidate }) => ({ ...candidate, reasons: [email && candidate.email === email ? "email" as const : null, phone && normalizedPhone === phone ? "phone" as const : null].filter((reason): reason is "email" | "phone" => reason !== null) })), errors, conversion: (await this.history(context, leadId))[0] ?? null };
   }
   async apply(context: RequestContext, leadId: string, raw: LeadConversionRequest): Promise<LeadConversionResult> {
@@ -135,7 +140,7 @@ export class LeadConversionService {
   }
   private async fresh(context: RequestContext, leadId: string, input: LeadConversionRequest, digest: string): Promise<LeadConversionResult> {
     await requirePermission(this.db, context, ["lead.convert"]);
-    await requireModulesEnabled(this.db, ["lead", "contact", ...(input.order ? ["order" as const] : [])]);
+    await requireModulesEnabled(this.db, ["lead", "contact", ...(input.deal ? ["deal" as const] : []), ...(input.order ? ["order" as const] : [])]);
     const record = await this.db.select().from(lead).where(eq(lead.id, leadId)).get();
     if (!record) throw new HttpError(404, "not_found", "Lead was not found");
     if (record.archivedAt || record.convertedAt || record.revision !== input.expectedLeadRevision) conflict("Lead changed or is already converted");
@@ -143,6 +148,7 @@ export class LeadConversionService {
     const valueRevision = await this.db.get<{ revision: number }>(sql`SELECT ${leadValuesRevision} AS revision`);
     if (valueRevision!.revision !== input.expectedLeadValueRevision) conflict("Lead field values changed; preview again");
     if (mapping.revision !== input.expectedMappingRevision || input.expectedLeadFieldRevision !== undefined && input.expectedLeadFieldRevision !== mapping.leadFieldRevision || input.expectedContactFieldRevision !== undefined && input.expectedContactFieldRevision !== mapping.contactFieldRevision) conflict("Conversion configuration changed; preview again");
+    if (mapping.autoDeal !== Boolean(input.deal)) throw new HttpError(400, "validation_failed", mapping.autoDeal ? "A draft deal is required" : "Automatic deal creation is disabled");
     if (mapping.autoOrder !== Boolean(input.order)) throw new HttpError(400, "validation_failed", mapping.autoOrder ? "A draft order is required" : "Automatic order creation is disabled");
     let prepared: Awaited<ReturnType<ContactService["prepareCreate"]>> | undefined;
     let contactId: string;
@@ -157,14 +163,22 @@ export class LeadConversionService {
       contactId = input.target.contactId;
       if (!await this.db.select({ id: contact.id }).from(contact).where(and(eq(contact.id, contactId), isNull(contact.archivedAt))).get()) throw new HttpError(400, "validation_failed", "Choose an active contact");
     }
+    let preparedDeal: Awaited<ReturnType<DealService["prepareCreate"]>> | undefined;
+    if (input.deal) {
+      const { draftId, ...dealInput } = input.deal;
+      const contactCompanyId = input.target.mode === "create" ? input.target.contact.companyId : (await this.db.select({ companyId: contact.companyId }).from(contact).where(eq(contact.id, contactId)).get())?.companyId;
+      if (!contactCompanyId || contactCompanyId !== dealInput.companyId) throw new HttpError(400, "validation_failed", "The converted contact and deal must belong to the same company");
+      const creation = draftId ? await new DraftService(this.db).prepareConsumption(context, "deal", draftId) : undefined;
+      preparedDeal = await new DealService(this.db).prepareCreate(context, dealInput as DealCreateInput, creation);
+    }
     let preparedOrder: Awaited<ReturnType<OrderService["prepareCreate"]>> | undefined;
     if (input.order) {
       const { draftId, ...order } = input.order;
       const creation = draftId ? await new DraftService(this.db).prepareConsumption(context, "order", draftId) : undefined;
-      preparedOrder = await new OrderService(this.db).prepareCreate(context, { ...order, contactId, leadId } as OrderCreateInput, creation, input.target.mode === "create" ? { preparedContactId: contactId } : undefined);
+      preparedOrder = await new OrderService(this.db).prepareCreate(context, { ...order, contactId, leadId, ...(preparedDeal ? { dealId: preparedDeal.result.id, companyId: preparedDeal.result.companyId } : {}) } as OrderCreateInput, creation, input.target.mode === "create" ? { preparedContactId: contactId } : undefined);
     }
-    const now = new Date(), result: LeadConversionResult = { operationKey: input.operationKey, leadId, contactId, orderId: preparedOrder?.result.id ?? null, mode: input.target.mode, convertedAt: now.toISOString() };
-    const conversionModules: ("lead" | "contact" | "order")[] = ["lead", "contact", ...(input.order ? ["order" as const] : [])];
+    const now = new Date(), result: LeadConversionResult = { operationKey: input.operationKey, leadId, contactId, dealId: preparedDeal?.result.id ?? null, orderId: preparedOrder?.result.id ?? null, mode: input.target.mode, convertedAt: now.toISOString() };
+    const conversionModules = ["lead", "contact", ...(input.deal ? ["deal" as const] : []), ...(input.order ? ["order" as const] : [])] as const;
     const authorization = actionGuard(this.db, context, ["lead.convert"], false, modulesEnabledPredicate(conversionModules));
     const guardId = crypto.randomUUID();
     const predicate = sql`EXISTS (SELECT 1 FROM lead WHERE id=${leadId} AND archived_at IS NULL AND converted_at IS NULL AND revision=${input.expectedLeadRevision})
@@ -176,7 +190,7 @@ export class LeadConversionService {
     try {
       await this.db.batch([authorization.begin,
         this.db.insert(operationConditionGuard).values({ id: guardId, authorized: sql<number>`CASE WHEN ${predicate} THEN 1 ELSE 0 END` }),
-        ...(prepared?.statements ?? []), ...(preparedOrder?.statements ?? []),
+        ...(prepared?.statements ?? []), ...(preparedDeal?.statements ?? []), ...(preparedDeal ? [this.db.insert(dealContact).values({ dealId: preparedDeal.result.id, contactId, role: "converted contact" })] : []), ...(preparedOrder?.statements ?? []),
         this.db.update(lead).set({ statusId: "converted", convertedContactId: contactId, convertedAt: now, revision: sql`${lead.revision}+1`, updatedAt: now }).where(eq(lead.id, leadId)),
         this.db.insert(leadConversion).values({ id: crypto.randomUUID(), leadId, operationKey: input.operationKey, fingerprint: digest, actorId: context.userId, contactId, mode: input.target.mode, leadRevision: input.expectedLeadRevision, mappingRevision: mapping.revision, snapshotJson: JSON.stringify({ mappings: mapping.mappings, leadFieldRevision: mapping.leadFieldRevision, contactFieldRevision: mapping.contactFieldRevision, leadValueRevision: input.expectedLeadValueRevision, target: input.target }), resultJson: JSON.stringify(result), completedAt: now }),
         this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, guardId)), authorization.end]);
@@ -184,7 +198,7 @@ export class LeadConversionService {
       const replayed = await this.replay(context, leadId, input, digest);
       if (replayed) return replayed;
       try { permissionError(error); } catch (classified) {
-        try { if (prepared) prepared.translateError(classified); if (preparedOrder) preparedOrder.translateError(classified); throw classified; } catch (translated) { operationError(translated); }
+        try { if (prepared) prepared.translateError(classified); if (preparedDeal) preparedDeal.translateError(classified); if (preparedOrder) preparedOrder.translateError(classified); throw classified; } catch (translated) { operationError(translated); }
       }
     }
     return result;
