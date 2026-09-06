@@ -408,3 +408,18 @@ pagination. Text uses the existing SQLite ordering, not locale-aware collation.
 Money and multi-value collections are not assigned an implicit scalar ordering.
 Saved/default views retain these sort keys; an archived/deleted sorted field
 requires resetting the list query without deleting the saved view.
+
+The conditions dialog adds up to twenty typed conditions using the `criteria`
+JSON query parameter. All conditions must match, alongside existing categorical
+filters and access scope. Apply/clear resets pagination; cancel leaves the current
+query intact. Saved views retain conditions through the existing versioned query.
+
+Conditions use stable IDs for references and exact element membership for
+collections. Text containment is literal and case-sensitive. Missing values,
+empty text and empty arrays match **empty**; zero, false and zero money do not.
+Ordinary comparisons exclude missing values. Money always matches the selected
+currency before comparing minor units, including inequality. Date-only conditions
+compare UTC calendar days, consistent with the existing date display, including
+timestamps within that day. Formula conditions use the same computed null rules
+as displayed values. Over-complex query combinations are rejected before their
+statements exceed database limits; no conditions are silently discarded.

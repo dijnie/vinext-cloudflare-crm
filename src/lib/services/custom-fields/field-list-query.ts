@@ -1,3 +1,4 @@
+import { assertQueryLimits } from "@/lib/db/query-limits";
 import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
 import { company, contact, deal, customFieldDefinition as definition, customFieldOption as option, customFieldValue as value, user, singletonMembership } from "@/lib/db/schema";
@@ -46,29 +47,31 @@ export async function fieldListData(db: AppDatabase, entity: EntityType, ids: st
   const definitions = await db.select().from(definition).where(and(eq(definition.entity, entity), isNull(definition.archivedAt), sql`${definition}.deleted_at is null`)).orderBy(asc(definition.position), asc(definition.id));
   const definitionIds = definitions.map(field => field.id);
   const filterIds = definitions.filter(field => field.showOnFilter && ["select", "user", "multiselect", "customer"].includes(field.type)).map(field => field.id);
+  const facetQuery = db.select({
+    fieldId: value.fieldId,
+    choiceId: sql<string>`choice.value`,
+    label: sql<string>`coalesce(${option.label}, ${user.name}, trim(coalesce(${customer.firstName}, '') || ' ' || coalesce(${customer.lastName}, '')))`,
+    count: sql<number>`count(*)`,
+  }).from(value).innerJoin(definition, eq(definition.id, value.fieldId))
+    .innerJoin(tables[entity], eq(anchors[entity], tables[entity].id))
+    .innerJoin(sql`json_each(case when ${definition.type}='multiselect' then ${value.jsonValue}
+      else json_array(coalesce(${value.optionId},${value.userMembershipId},${value.customerReferenceId})) end) as choice`, sql`1=1`)
+    .leftJoin(option, sql`${option.id}=choice.value and ${definition.type} in ('select','multiselect')`)
+    .leftJoin(user, sql`${user.id}=choice.value and ${definition.type}='user'`)
+    .leftJoin(singletonMembership, eq(singletonMembership.userId, user.id))
+    .leftJoin(customer, sql`${customer.id}=choice.value and ${definition.type}='customer'`)
+    .where(and(facetWhere, inJsonArray(value.fieldId, filterIds), sql`(
+      (${definition.type} in ('select','multiselect') and ${option.id} is not null and ${option.archivedAt} is null)
+      or (${definition.type}='user' and ${singletonMembership.status}='active')
+      or (${definition.type}='customer' and ${customer.id} is not null and ${customer.archivedAt} is null))`))
+    .groupBy(sql`1`, sql`2`, sql`3`).orderBy(sql`1`, sql`3`).limit(2000);
+  if (filterIds.length) assertQueryLimits(facetQuery);
   const [[options, values], facetRows] = await Promise.all([
     definitionIds.length ? db.batch([
       db.select().from(option).where(inJsonArray(option.fieldId, definitionIds)).orderBy(asc(option.position), asc(option.id)),
       db.select().from(value).where(and(inJsonArray(anchors[entity], ids), inJsonArray(value.fieldId, definitionIds))),
     ]) : Promise.resolve([[], []] as [typeof option.$inferSelect[], typeof value.$inferSelect[]]),
-    filterIds.length ? db.all<{ fieldId: string; choiceId: string; label: string; count: number }>(sql`
-      select ${value.fieldId} as fieldId, choice.value as choiceId,
-        coalesce(${option.label}, ${user.name}, trim(coalesce(${customer.firstName}, '') || ' ' || coalesce(${customer.lastName}, ''))) as label,
-        count(*) as count
-      from ${value} inner join ${definition} on ${definition.id}=${value.fieldId}
-      inner join ${tables[entity]} on ${anchors[entity]}=${tables[entity].id}
-      cross join json_each(case when ${definition.type}='multiselect' then ${value.jsonValue}
-        else json_array(coalesce(${value.optionId},${value.userMembershipId},${value.customerReferenceId})) end) as choice
-      left join ${option} on ${option.id}=choice.value and ${definition.type} in ('select','multiselect')
-      left join ${user} on ${user.id}=choice.value and ${definition.type}='user'
-      left join ${singletonMembership} on ${singletonMembership.userId}=${user.id}
-      left join contact as field_customer on ${customer.id}=choice.value and ${definition.type}='customer'
-      where ${facetWhere} and ${inJsonArray(value.fieldId, filterIds)} and (
-        (${definition.type} in ('select','multiselect') and ${option.id} is not null and ${option.archivedAt} is null)
-        or (${definition.type}='user' and ${singletonMembership.status}='active')
-        or (${definition.type}='customer' and ${customer.id} is not null and ${customer.archivedAt} is null))
-      group by 1, 2, 3 order by 1, 3 limit 2000
-    `) : Promise.resolve([]),
+    filterIds.length ? facetQuery : Promise.resolve([]),
   ]);
   const customFields = definitions.map(field => ({ id: field.id, entity: field.entity, key: field.key, label: field.label, type: field.type, config: fieldConfig(field.configJson), required: field.required, showOnSheet: field.showOnSheet, showOnTable: field.showOnTable, showOnFilter: field.showOnFilter, position: field.position, archivedAt: null, options: options.filter(item => item.fieldId === field.id).map(item => ({ id: item.id, label: item.label, position: item.position, archivedAt: item.archivedAt?.toISOString() ?? null })) }));
   const byId = new Map(definitions.map(field => [field.id, field]));

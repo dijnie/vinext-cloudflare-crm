@@ -31,7 +31,7 @@ export function FieldEditor({ field, value, onChange, labels, disabled }: { fiel
   </div>;
 }
 
-function MoneyEditor({ id, value, onChange, labels, disabled, required }: { id: string; value: FieldValue; onChange: (value: FieldValue) => void; labels: CrmDictionary; disabled?: boolean; required?: boolean }) {
+export function MoneyEditor({ id, value, onChange, labels, disabled, required }: { id: string; value: FieldValue; onChange: (value: FieldValue) => void; labels: CrmDictionary; disabled?: boolean; required?: boolean }) {
   const money = value && typeof value === "object" && !Array.isArray(value) ? value : null;
   const [currency, setCurrency] = useState<CurrencyCode>(money?.currency ?? "USD");
   const [draft, setDraft] = useState(money ? formatFieldMoneyInput(money.amountMinor, money.currency) : "");

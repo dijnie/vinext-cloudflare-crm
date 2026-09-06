@@ -1,3 +1,5 @@
+import { assertQueryLimits } from "@/lib/db/query-limits";
+import { fieldConditionQuery } from "../custom-fields/field-condition-query";
 import { customFieldSort } from "../custom-fields/field-sort";
 import type { RequestContext } from "@/lib/http/request-context";
 import { actionGuard, authorizedWrite, permissionError } from "../permissions/permission-policy";
@@ -38,7 +40,8 @@ export class DealRepository {
   async list(input: DealListInput) {
     await validateFieldFilters(this.db, "deal", input.fields);
     const fieldSort = await customFieldSort(this.db, "deal", input.sort, input.dir);
-    const where = this.where(input);
+    const conditions = await fieldConditionQuery(this.db, "deal", input.criteria);
+    const where = and(this.where(input), ...conditions)!;
     const rowsQuery = this.db
       .select({
         internalFieldSortValue: fieldSort?.value ?? sql`null`,
@@ -82,7 +85,8 @@ export class DealRepository {
       .select({ total: sql<number>`count(*)` })
       .from(deal)
       .where(where);
-    const facetWhere = this.where({ ...input, owner: [], company: [], stage: [], fields: {} });
+    const facetWhere = and(this.where({ ...input, owner: [], company: [], stage: [], fields: {} }), ...conditions)!;
+    assertQueryLimits(rowsQuery, countQuery);
     const [rows, [{ total }], facets] = await Promise.all([
       rowsQuery,
       countQuery,

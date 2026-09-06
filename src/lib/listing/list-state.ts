@@ -47,6 +47,6 @@ export function changeListState(search: URLSearchParams, changes: Record<string,
     if (Array.isArray(value)) { next.delete(key); value.forEach(item => next.append(key, item)); }
     else if (value === null || value === "") next.delete(key); else next.set(key, value);
   }
-  if (Object.keys(changes).some(key => ["q", "sort", "dir", "archived", "owner", "industry", "company", "title", "stage", "fields", "view", "pageSize"].includes(key))) next.delete("page");
+  if (Object.keys(changes).some(key => ["q", "sort", "dir", "archived", "owner", "industry", "company", "title", "stage", "fields", "criteria", "view", "pageSize"].includes(key))) next.delete("page");
   return next.toString();
 }
