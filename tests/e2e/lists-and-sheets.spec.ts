@@ -26,14 +26,27 @@ async function create(path: string, data: object): Promise<{ id: string }> {
 async function settled(page: Page) { await expect(page.locator("section[aria-busy]")).toHaveAttribute("aria-busy", "false"); }
 async function query(page: Page, key: string, value: string | null) { await expect.poll(() => new URL(page.url()).searchParams.get(key)).toBe(value); }
 
+function trackCompanyRequests(page: Page) {
+  const requests = { lists: [] as string[], foregroundPages: [] as string[], recordPages: [] as string[] };
+  page.on("request", req => {
+    if (req.method() !== "GET") return;
+    const url = new URL(req.url());
+    if (url.pathname === "/api/crm/companies") requests.lists.push(req.url());
+    if (url.pathname !== "/en/crm/companies") return;
+    if (url.searchParams.has("recordId")) requests.recordPages.push(req.url());
+    const headers = req.headers();
+    // Sidebar prefetch is independent of the foreground query navigation.
+    if (headers["next-router-prefetch"] !== "1" && headers["next-router-segment-prefetch"] !== "1") requests.foregroundPages.push(req.url());
+  });
+  return requests;
+}
+
 test("SSR list avoids a duplicate fetch and refreshes after mutation and query navigation", async ({ page }) => {
   const labels = getCrmDictionary("en");
   const prefix = `snapshot-${Date.now()}`;
   const company = await create("companies", { name: `${prefix}-before` });
-  const listRequests: string[] = [];
-  page.on("request", req => {
-    if (req.method() === "GET" && new URL(req.url()).pathname === "/api/crm/companies") listRequests.push(req.url());
-  });
+  const requests = trackCompanyRequests(page);
+  const listRequests = requests.lists;
   await page.goto(`/en/crm/companies?q=${prefix}`);
   await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toBeVisible();
   // Opening a client-only control proves hydration completed before counting requests.
@@ -51,16 +64,94 @@ test("SSR list avoids a duplicate fetch and refreshes after mutation and query n
   await expect(page.getByRole("link", { name: `${prefix}-after`, exact: true })).toBeVisible();
   await settled(page);
   expect(listRequests).toHaveLength(1);
+  requests.foregroundPages.length = 0;
 
+  const searched = page.waitForResponse(res => new URL(res.url()).pathname === "/api/crm/companies" && new URL(res.url()).searchParams.get("q") === `${prefix}-missing`);
   await page.getByRole("textbox", { name: labels.search, exact: true }).fill(`${prefix}-missing`);
   await page.getByRole("button", { name: labels.search, exact: true }).click();
   await query(page, "q", `${prefix}-missing`);
+  expect((await searched).ok()).toBe(true);
   await settled(page);
+  expect(listRequests).toHaveLength(2);
+  expect(requests.foregroundPages).toEqual([]);
+  expect(requests.recordPages).toEqual([]);
   await expect(page.getByRole("link", { name: `${prefix}-after`, exact: true })).toHaveCount(0);
   await page.goBack();
   await query(page, "q", prefix);
   await expect(page.getByRole("link", { name: `${prefix}-after`, exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toHaveCount(0);
+  await settled(page);
+  expect(listRequests).toHaveLength(3);
+  await page.goForward();
+  await query(page, "q", `${prefix}-missing`);
+  await settled(page);
+  await expect(page.getByRole("link", { name: `${prefix}-after`, exact: true })).toHaveCount(0);
+  expect(listRequests).toHaveLength(4);
+  expect(requests.foregroundPages).toEqual([]);
+  expect(requests.recordPages).toEqual([]);
+});
+
+test("record sheets and tabs preserve the list without page requests or record prefetch", async ({ page }) => {
+  const labels = getCrmDictionary("en");
+  const name = `sheet-navigation-${Date.now()}`;
+  const company = await create("companies", { name });
+  const requests = trackCompanyRequests(page);
+  await page.goto(`/en/crm/companies?q=${name}&sort=name&columns=name,domain`);
+  const trigger = page.getByRole("link", { name, exact: true });
+  await expect(trigger).toBeVisible();
+  await trigger.hover();
+  requests.foregroundPages.length = 0;
+  const detail = page.waitForResponse(res => new URL(res.url()).pathname === `/api/crm/companies/${company.id}`);
+  await trigger.click();
+  expect((await detail).ok()).toBe(true);
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByRole("heading", { name, exact: true })).toBeFocused();
+  for (const tab of ["activities", "fields", "details"] as const) {
+    const button = sheet.getByRole("navigation").getByRole("button", { name: labels[tab], exact: true });
+    await button.click();
+    await query(page, "tab", tab);
+    await expect(button).toHaveAttribute("aria-current", "page");
+  }
+  await sheet.getByRole("button", { name: labels.close, exact: true }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await query(page, "recordId", null);
+  await page.goBack();
+  await query(page, "recordId", company.id);
+  await expect(sheet.getByRole("heading", { name, exact: true })).toBeVisible();
+  await page.goBack();
+  await query(page, "tab", "fields");
+  await expect(sheet.getByRole("navigation").getByRole("button", { name: labels.fields, exact: true })).toHaveAttribute("aria-current", "page");
+  await page.goForward();
+  await query(page, "tab", "details");
+  await page.goForward();
+  await expect(sheet).toHaveCount(0);
+  await settled(page);
+  await query(page, "q", name);
+  await query(page, "columns", "name,domain");
+  expect(requests.lists).toEqual([]);
+  expect(requests.foregroundPages).toEqual([]);
+  expect(requests.recordPages).toEqual([]);
+});
+
+test("modified record click opens a working deep link in another tab", async ({ page, context }) => {
+  const name = `modified-link-${Date.now()}`;
+  const company = await create("companies", { name });
+  await page.goto(`/en/crm/companies?q=${name}`);
+  const trigger = page.getByRole("link", { name, exact: true });
+  await expect(trigger).toBeVisible();
+  const originalUrl = page.url();
+  const opened = context.waitForEvent("page");
+  await trigger.click({ modifiers: ["ControlOrMeta"] });
+  const otherPage = await opened;
+  try {
+    await otherPage.waitForLoadState("domcontentloaded");
+    await query(otherPage, "recordId", company.id);
+    await query(otherPage, "q", name);
+    await expect(otherPage.getByRole("dialog").getByRole("heading", { name, exact: true })).toBeVisible();
+    expect(page.url()).toBe(originalUrl);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  } finally { await otherPage.close(); }
 });
 
 test("sidebar navigation announces pending while the destination response is held", async ({ page }) => {
@@ -90,6 +181,10 @@ test("Back refreshes a cached company list after invalidation on another page", 
   const company = await create("companies", { name: `${prefix}-before` });
   await page.goto(`/en/crm/companies?q=${prefix}`);
   await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: labels.search, exact: true }).fill(`${prefix}-`);
+  await page.getByRole("button", { name: labels.search, exact: true }).click();
+  await query(page, "q", `${prefix}-`);
+  await settled(page);
   await page.locator("aside").getByRole("link", { name: labels.contact, exact: true }).click();
   await expect(page.locator("[data-list-heading]")).toHaveText(labels.contact);
   await settled(page);
@@ -98,7 +193,7 @@ test("Back refreshes a cached company list after invalidation on another page", 
   await page.evaluate(() => window.dispatchEvent(new Event("crm:invalidate")));
   await settled(page);
   await page.goBack();
-  await query(page, "q", prefix);
+  await query(page, "q", `${prefix}-`);
   await expect(page.getByRole("link", { name: `${prefix}-after`, exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toHaveCount(0);
 });
@@ -258,6 +353,8 @@ for (const locale of ["vi", "en"] as const) {
     await page.goForward();
     await expect(sheet.getByRole("heading", { name: `${prefix}-deal`, exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    // History can restore content before the sheet entrance animation finishes.
+    await sheet.evaluate(async element => { await Promise.all(element.getAnimations().map(animation => animation.finished)); });
     const box = await sheet.boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(375);

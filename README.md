@@ -220,6 +220,12 @@ For shareable list state and stable record-sheet links, start with
 [list contract](src/modules/crm/contracts/list-contract.ts). Direct record entry points
 are owned by [DirectRecordPage](src/components/crm/entity-list-page.tsx), and
 sheet navigation by [the record-sheet components](src/components/crm/record-sheet).
+Same-page filters, pagination, saved views, and record-sheet URL changes use
+[client history navigation](src/components/crm/list-navigation.ts). List and
+record data still come from the existing guarded APIs; initial server rendering
+and cross-path Vinext navigation remain in place. Record links retain deep URLs
+and modified-click behavior without speculative prefetch. This behavior does
+not establish a production latency improvement.
 
 Open a record sheet's Activities tab for manual activity logging, tasks, and
 deal stage history. Start with [ActivityTimeline](src/components/crm/activity-timeline.tsx)

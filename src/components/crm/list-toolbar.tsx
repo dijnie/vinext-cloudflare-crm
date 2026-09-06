@@ -1,5 +1,6 @@
 "use client";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { pushListQuery } from "./list-navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { changeListState, entityColumns, type EntityType } from "@/modules/crm/list-state";
@@ -10,8 +11,8 @@ import { FieldFilters } from "./fields/field-filters";
 
 export const selectClass = "min-h-11 max-w-full rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 export function ListToolbar({ entity, labels, facets, columns, customFields = [], fieldFacets }: { entity: EntityType; labels: CrmDictionary; facets?: Record<string, Facet[]>; columns: readonly string[]; customFields?: FieldDefinition[]; fieldFacets?: Record<string, Facet[]> }) {
-  const router = useRouter(); const path = usePathname(); const search = useSearchParams();
-  function change(changes: Record<string, string | string[] | null>) { router.push(`${path}?${changeListState(new URLSearchParams(search.toString()), changes)}`, { scroll: false }); }
+  const path = usePathname(); const search = useSearchParams();
+  function change(changes: Record<string, string | string[] | null>) { pushListQuery(`${path}?${changeListState(new URLSearchParams(search.toString()), changes)}`); }
   const sortKeys = entity === "company" ? ["name", "domain", "industry", "createdAt", "lastActivityAt", "archivedAt"] : entity === "contact" ? ["firstName", "lastName", "email", "title", "createdAt", "lastActivityAt", "archivedAt"] : ["name", "stage", "amount", "expectedCloseAt", "createdAt", "lastActivityAt", "archivedAt"];
   const filterKeys = entity === "company" ? ["owner", "industry"] : entity === "contact" ? ["owner", "company", "title"] : ["owner", "company", "stage"];
   const selectedFields: Record<string, string[]> = JSON.parse(search.get("fields") ?? "{}");
