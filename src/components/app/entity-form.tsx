@@ -31,8 +31,9 @@ import { ChevronDown } from "@carbon/icons-react";
 import { OwnerPicker, type OwnerOption } from "./owner-picker";
 import { CURRENCIES } from "@/lib/services/currencies/currency-catalog";
 import type { CurrencySettings } from "@/lib/services/currencies/currency-contracts";
+import type { LayoutSettings } from "@/lib/services/layouts/layout-contracts";
 
-export function EntityForm({ entity, record, labels, onSaved, onCancel, readOnly, initialValues, submitCreate, beforeSubmit, submitLabel, extraFields, prepareInput, renderBuiltin, onConflict }: { entity: EntityType; onConflict?: () => void; extraFields?: ReactNode; prepareInput?: (data: Record<string, unknown>) => Record<string, unknown>; renderBuiltin?: (args: { key: string; id: string; initial: string; required: boolean; disabled: boolean }) => ReactNode | undefined; record?: CrmRecord; readOnly?: boolean; initialValues?: Record<string, unknown>; submitCreate?: (data: Record<string, unknown>) => Promise<{ id: string }>; beforeSubmit?: (data: Record<string, unknown>) => Promise<boolean>; submitLabel?: string; labels: CrmDictionary; onSaved: (id: string) => void; onCancel: () => void }) {
+export function EntityForm({ entity, record, labels, onSaved, onCancel, readOnly, initialValues, initialLayout, submitCreate, beforeSubmit, submitLabel, extraFields, prepareInput, renderBuiltin, onConflict }: { entity: EntityType; onConflict?: () => void; extraFields?: ReactNode; prepareInput?: (data: Record<string, unknown>) => Record<string, unknown>; renderBuiltin?: (args: { key: string; id: string; initial: string; required: boolean; disabled: boolean }) => ReactNode | undefined; record?: CrmRecord; readOnly?: boolean; initialValues?: Record<string, unknown>; initialLayout?: LayoutSettings; submitCreate?: (data: Record<string, unknown>) => Promise<{ id: string }>; beforeSubmit?: (data: Record<string, unknown>) => Promise<boolean>; submitLabel?: string; labels: CrmDictionary; onSaved: (id: string) => void; onCancel: () => void }) {
   const params = useParams();
   const locale = params.locale === "vi" ? "vi" : "en";
   const leadLabels = getLeadDictionary(locale);
@@ -51,7 +52,7 @@ export function EntityForm({ entity, record, labels, onSaved, onCancel, readOnly
   const stageCatalog = useDealStages();
   const { isEnabled } = useModules();
   const moduleEnabled = isEnabled(entity) && !readOnly;
-  const { layout, error: layoutError, reload: reloadLayout } = useRecordLayout(entity);
+  const { layout, error: layoutError, reload: reloadLayout } = useRecordLayout(entity, initialLayout);
   const [customValues, setCustomValues] = useState<Record<string, FieldValue>>(() => initialValues?.customFields as Record<string, FieldValue> ?? {});
   const [customChanged, setCustomChanged] = useState<Record<string, FieldValue>>(() => initialValues?.customFields as Record<string, FieldValue> ?? {});
   const [customReady, setCustomReady] = useState(!record);
@@ -135,7 +136,7 @@ export function EntityForm({ entity, record, labels, onSaved, onCancel, readOnly
     {entity === "deal" && stageCatalog.unavailable && <p role="alert">{stageCatalog.labels.unavailable}<Button type="button" variant="outline" onClick={stageCatalog.refresh}>{labels.retry}</Button></p>}
     {optionsError && <p role="alert" className="text-sm text-destructive">{labels.error}</p>}
     {(layoutError || customError) && <p role="alert">{labels.error}<Button type="button" variant="outline" onClick={() => { if (customError) { setCustomError(false); setLoadRevision(value => value + 1); } reloadLayout(); }}>{labels.retry}</Button></p>}
-    {!layout || !customReady || needsDraft && !draftId ? !(layoutError || customError) && <p role="status">{labels.loading}</p> : visibleFields.map(entry => {
+    {!layout || !customReady ? !(layoutError || customError) && <p role="status">{labels.loading}</p> : visibleFields.map(entry => {
       if (entry.kind === "custom") {
         const field = layout.definitions.find(item => item.key === entry.key)!;
         const initial = customValues[field.key] ?? null;

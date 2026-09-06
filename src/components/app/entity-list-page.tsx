@@ -29,8 +29,11 @@ export async function EntityListPage({ entity, params, searchParams }: EntityPag
   }
   let state; try { state = parseListState(entity, query); } catch { const labels = getCrmDictionary(locale); return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}/${entityPaths[entity]}?page=1`}>{labels.reset}</Link></div>; }
   try {
-    const initialData = entity === "company" ? await root.companies.list(context, state.list as CompanyListInput) : entity === "contact" ? await root.contacts.list(context, state.list as ContactListInput) : entity === "lead" ? await root.leads.list(context, state.list as LeadListInput) : entity === "product" ? await root.products.list(context, state.list as ProductListInput) : entity === "order" ? await root.orders.list(context, state.list as OrderListInput) : await root.deals.list(context, state.list as DealListInput);
-    return <EntityList entity={entity} initialData={initialData} initialQueryKey={`${entity}:${JSON.stringify(state.list)}`} locale={locale} />;
+    const [initialData, initialLayout] = await Promise.all([
+      entity === "company" ? root.companies.list(context, state.list as CompanyListInput) : entity === "contact" ? root.contacts.list(context, state.list as ContactListInput) : entity === "lead" ? root.leads.list(context, state.list as LeadListInput) : entity === "product" ? root.products.list(context, state.list as ProductListInput) : entity === "order" ? root.orders.list(context, state.list as OrderListInput) : root.deals.list(context, state.list as DealListInput),
+      root.layouts.get(context, { entity }),
+    ]);
+    return <EntityList entity={entity} initialData={initialData} initialQueryKey={`${entity}:${JSON.stringify(state.list)}`} initialLayout={initialLayout} locale={locale} />;
   } catch (error) {
     if (!isHttpError(error) || error.status !== 400) throw error;
     const labels = getCrmDictionary(locale);

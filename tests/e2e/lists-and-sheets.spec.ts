@@ -28,11 +28,12 @@ async function settled(page: Page) { await expect(page.locator("section[aria-bus
 async function query(page: Page, key: string, value: string | null) { await expect.poll(() => new URL(page.url()).searchParams.get(key)).toBe(value); }
 
 function trackCompanyRequests(page: Page) {
-  const requests = { lists: [] as string[], foregroundPages: [] as string[], recordPages: [] as string[] };
+  const requests = { lists: [] as string[], layouts: [] as string[], foregroundPages: [] as string[], recordPages: [] as string[] };
   page.on("request", req => {
     if (req.method() !== "GET") return;
     const url = new URL(req.url());
     if (url.pathname === "/api/crm/companies") requests.lists.push(req.url());
+    if (url.pathname === "/api/crm/layouts") requests.layouts.push(req.url());
     if (url.pathname !== "/en/crm/companies") return;
     if (url.searchParams.has("recordId")) requests.recordPages.push(req.url());
     const headers = req.headers();
@@ -56,6 +57,8 @@ test("SSR list avoids a duplicate fetch and refreshes after mutation and query n
   // Opening a client-only control proves hydration completed before counting requests.
   await page.getByRole("button", { name: labels.add, exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("dialog").locator("#record-name")).toBeVisible();
+  expect(requests.layouts).toEqual([]);
   await page.getByRole("dialog").getByRole("button", { name: labels.cancel, exact: true }).click();
   await settled(page);
   expect(listRequests).toHaveLength(0);
@@ -92,6 +95,24 @@ test("SSR list avoids a duplicate fetch and refreshes after mutation and query n
   expect(listRequests).toHaveLength(4);
   expect(requests.foregroundPages).toEqual([]);
   expect(requests.recordPages).toEqual([]);
+});
+
+test("order form renders while its required creation reservation is prepared", async ({ page }) => {
+  const labels = getCrmDictionary("en");
+  let drafts = 0;
+  await page.route("**/api/crm/record-drafts", async route => {
+    drafts += 1;
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await route.continue();
+  });
+  await page.goto("/en/crm/orders");
+  await page.getByRole("button", { name: labels.add, exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const submit = dialog.locator('button[type="submit"]');
+  await expect(dialog.locator("#record-name")).toBeVisible();
+  await expect(submit).toBeDisabled();
+  await expect.poll(() => drafts).toBe(1);
+  await expect(submit).toBeEnabled();
 });
 
 test("record sheets and tabs preserve the list without page requests or record prefetch", async ({ page }) => {

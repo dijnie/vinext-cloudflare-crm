@@ -15,14 +15,15 @@ export function visibleLayoutFields(layout: LayoutSettings, surface: LayoutSurfa
     return position(a) - position(b);
   });
 }
-export function useRecordLayout(entity: EntityType) {
-  const [layout, setLayout] = useState<LayoutSettings | null>(null);
+export function useRecordLayout(entity: EntityType, initialLayout?: LayoutSettings) {
+  const [layout, setLayout] = useState<LayoutSettings | null>(() => initialLayout?.entity === entity ? initialLayout : null);
   const [error, setError] = useState(false);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
+    if (revision === 0 && initialLayout?.entity === entity) { setLayout(initialLayout); setError(false); return; }
     const controller = new AbortController(); setLayout(previous => previous?.entity === entity ? previous : null); setError(false);
     void crmRequest<LayoutSettings>(`/api/crm/layouts?entity=${entity}`, { signal: controller.signal }).then(data => { if (!controller.signal.aborted) setLayout(data); }).catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
-  }, [entity, revision]);
+  }, [entity, initialLayout, revision]);
   return { layout, error, reload: () => setRevision(value => value + 1) };
 }
