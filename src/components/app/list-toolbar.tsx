@@ -22,7 +22,7 @@ import { pushListQuery } from "./list-navigation";
 
 export const selectClass = "h-8 max-w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 export function listSortKeys(entity: EntityType, customFields: FieldDefinition[] = []): string[] {
-  const builtIn = entity === "product" ? ["name", "createdAt", "updatedAt", "lastActivityAt", "archivedAt"] : entity === "company" ? ["name", "domain", "industry", "createdAt", "lastActivityAt", "archivedAt"] : entity === "contact" || entity === "lead" ? ["firstName", "lastName", "email", "title", "createdAt", "lastActivityAt", "archivedAt"] : ["name", "stage", "amount", "expectedCloseAt", "createdAt", "lastActivityAt", "archivedAt"];
+  const builtIn = entity === "product" ? ["name", "createdAt", "updatedAt", "lastActivityAt", "archivedAt"] : entity === "order" ? ["name", "number", "createdAt", "updatedAt", "lastActivityAt", "archivedAt"] : entity === "company" ? ["name", "domain", "industry", "createdAt", "lastActivityAt", "archivedAt"] : entity === "contact" || entity === "lead" ? ["firstName", "lastName", "email", "title", "createdAt", "lastActivityAt", "archivedAt"] : ["name", "stage", "amount", "expectedCloseAt", "createdAt", "lastActivityAt", "archivedAt"];
   return [...builtIn, ...customFields.filter(field => !field.archivedAt && isSortableFieldType(field.type)).map(field => `field:${field.key}`)];
 }
 
@@ -45,7 +45,7 @@ export function ListToolbar({ entity, labels, facets, columns, customFields = []
     // Read current history so delayed typing never restores stale filters or sheet state.
     pushListQuery(`${path}?${changeListState(new URLSearchParams(window.location.search), changes)}`);
   }
-  const filterKeys = entity === "product" ? ["owner", "kind", "category"] : entity === "lead" ? ["owner", "company", "source", "status", "collaborator"] : entity === "company" ? ["owner", "industry"] : entity === "contact" ? ["owner", "company", "title"] : ["owner", "company", "stage"];
+  const filterKeys = entity === "product" ? ["owner", "kind", "category"] : entity === "order" ? ["owner", "contact", "state"] : entity === "lead" ? ["owner", "company", "source", "status", "collaborator"] : entity === "company" ? ["owner", "industry"] : entity === "contact" ? ["owner", "company", "title"] : ["owner", "company", "stage"];
   const selectedFields: Record<string, string[]> = JSON.parse(search.get("fields") ?? "{}");
   const availableColumns = [...entityColumns[entity], ...customFields.filter(field => !field.archivedAt).map(field => `field:${field.key}`)];
   const filterFields = customFields.filter(field => !field.archivedAt && field.showOnFilter && ["select", "user", "multiselect", "customer"].includes(field.type));

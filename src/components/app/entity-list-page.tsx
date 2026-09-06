@@ -8,6 +8,7 @@ import { entityPaths, parseListState, type EntityType } from "@/lib/listing/list
 import type { CompanyListInput } from "@/lib/services/companies/company-contract";
 import type { ContactListInput } from "@/lib/services/contacts/contact-contract";
 import type { DealListInput } from "@/lib/services/deals/deal-contract";
+import type { OrderListInput } from "@/lib/services/orders/order-contract";
 import { stableIdSchema } from "@/lib/listing/list-contract";
 import { getPageContext } from "@/lib/http/page-context";
 import { isHttpError } from "@/lib/http/http-errors";
@@ -28,7 +29,7 @@ export async function EntityListPage({ entity, params, searchParams }: EntityPag
   }
   let state; try { state = parseListState(entity, query); } catch { const labels = getCrmDictionary(locale); return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}/${entityPaths[entity]}?page=1`}>{labels.reset}</Link></div>; }
   try {
-    const initialData = entity === "company" ? await root.companies.list(context, state.list as CompanyListInput) : entity === "contact" ? await root.contacts.list(context, state.list as ContactListInput) : entity === "lead" ? await root.leads.list(context, state.list as LeadListInput) : entity === "product" ? await root.products.list(context, state.list as ProductListInput) : await root.deals.list(context, state.list as DealListInput);
+    const initialData = entity === "company" ? await root.companies.list(context, state.list as CompanyListInput) : entity === "contact" ? await root.contacts.list(context, state.list as ContactListInput) : entity === "lead" ? await root.leads.list(context, state.list as LeadListInput) : entity === "product" ? await root.products.list(context, state.list as ProductListInput) : entity === "order" ? await root.orders.list(context, state.list as OrderListInput) : await root.deals.list(context, state.list as DealListInput);
     return <EntityList entity={entity} initialData={initialData} initialQueryKey={`${entity}:${JSON.stringify(state.list)}`} locale={locale} />;
   } catch (error) {
     if (!isHttpError(error) || error.status !== 400) throw error;

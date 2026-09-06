@@ -76,7 +76,7 @@ describe.sequential("lead contact conversion", () => {
   beforeEach(async () => {
     await env.DB.batch([
       env.DB.prepare("UPDATE module_setting SET enabled=1"),
-      env.DB.prepare("UPDATE lead_mapping SET mappings_json=?,revision=revision+1 WHERE id='contact'").bind(JSON.stringify(defaultMappings)),
+      env.DB.prepare("UPDATE lead_mapping SET mappings_json=?,auto_order=0,revision=revision+1 WHERE id='contact'").bind(JSON.stringify(defaultMappings)),
     ]);
   });
   it("prepares contacts without commits, normalizes phone keys and previews real duplicates", async () => {
@@ -107,6 +107,33 @@ describe.sequential("lead contact conversion", () => {
     expect(await conversions.apply(context, source.id, input)).toEqual(first);
     await expect(conversions.apply(context, source.id, { ...input, target: { mode: "create", contact: { firstName: "Different" } } })).rejects.toMatchObject({ status: 409 });
   });
+  it("creates the contact and configured draft order atomically without cash or stock effects", async () => {
+    const { services, context, conversions, mapping } = fixture;
+    const catalog = await services.products.create(context, { name: "Conversion service", kind: "service", initialVariant: { label: "Standard", priceMinor: 12500, currency: "USD", durationMinutes: 60 } });
+    if (!catalog) throw new Error("Expected catalog record");
+    const product = await services.products.byId(context, catalog.id), variant = product.variants[0]!;
+    const configuration = await mapping.get(context);
+    await mapping.update(context, { revision: configuration.revision, mappings: defaultMappings, autoOrder: true, autoDeal: false });
+    const source = await leadRecord({ email: `${crypto.randomUUID()}@example.com` });
+    const contactDraft = await services.drafts.create(context, { entity: "contact" });
+    const orderDraft = await services.drafts.create(context, { entity: "order" });
+    const order = { draftId: orderDraft.id, name: "Converted sale", currency: "USD" as const, lines: [{ variantId: variant.id, expectedVariantRevision: variant.revision, expectedProductRevision: product.revision, quantity: 2, discountMinor: 500 }], discountMinor: 1000, surchargeMinor: 250, taxMinor: 100 };
+    const preview = await conversions.preview(context, source.id, { contact: { firstName: "Converted buyer" }, order });
+    expect(preview).toMatchObject({ autoOrder: true, errors: [], orderPreview: { goodsMinor: 24500, originalMinor: 23850 } });
+    const input: LeadConversionRequest = { operationKey: crypto.randomUUID(), expectedLeadRevision: preview.leadRevision, expectedLeadValueRevision: preview.leadValueRevision, expectedMappingRevision: preview.mappingRevision, expectedLeadFieldRevision: preview.leadFieldRevision, expectedContactFieldRevision: preview.contactFieldRevision, target: { mode: "create", contact: { firstName: "Converted buyer" }, draftId: contactDraft.id }, order };
+    await env.DB.exec("CREATE TRIGGER reject_auto_order_conversion BEFORE INSERT ON lead_conversion BEGIN SELECT RAISE(ABORT,'forced_conversion_failure'); END;");
+    try { await expect(conversions.apply(context, source.id, input)).rejects.toThrow(); }
+    finally { await env.DB.exec("DROP TRIGGER reject_auto_order_conversion;"); }
+    expect(await env.DB.prepare("SELECT id FROM contact WHERE id=?").bind(contactDraft.id).first()).toBeNull();
+    expect(await env.DB.prepare("SELECT id FROM sales_order WHERE id=?").bind(orderDraft.id).first()).toBeNull();
+    expect((await env.DB.prepare("SELECT id,consumed_at FROM record_draft WHERE id IN (?,?) ORDER BY id").bind(contactDraft.id, orderDraft.id).all()).results.every(row => row.consumed_at === null)).toBe(true);
+    const saved = await conversions.apply(context, source.id, input);
+    expect(saved).toMatchObject({ contactId: contactDraft.id, orderId: orderDraft.id });
+    expect(await conversions.apply(context, source.id, input)).toEqual(saved);
+    expect(await env.DB.prepare("SELECT contact_id,lead_id,state,original_minor,collected_minor,refunded_minor FROM sales_order WHERE id=?").bind(orderDraft.id).first()).toEqual({ contact_id: contactDraft.id, lead_id: source.id, state: "draft", original_minor: 23850, collected_minor: 0, refunded_minor: 0 });
+    expect((await env.DB.prepare("SELECT id FROM order_payment WHERE order_id=?").bind(orderDraft.id).all()).results).toEqual([]);
+    expect((await env.DB.prepare("SELECT id FROM inventory_movement WHERE order_id=?").bind(orderDraft.id).all()).results).toEqual([]);
+  });
   it("links without changing any contact columns, values, ownership or timestamps", async () => {
     const { services, context, conversions } = fixture;
     const target = await services.contacts.create(context, { firstName: "Existing", ownerMembershipId: fixture.actor.id });
@@ -135,7 +162,8 @@ describe.sequential("lead contact conversion", () => {
     await expect(mapping.update(context, { revision: config.revision, autoOrder: false, autoDeal: false, mappings: [{ source: "builtin:firstName", target: `custom:${formula.id}` }] })).rejects.toMatchObject({ status: 400 });
     const raced = new LeadMappingService(interceptBatch(services.db, () => env.DB.prepare("UPDATE lead_mapping SET revision=revision+1").run()));
     await expect(raced.update(context, { ...valid, revision: config.revision })).rejects.toMatchObject({ status: 409 });
-    await expect(mapping.update(context, { ...valid, revision: (await mapping.get(context)).revision, autoOrder: true } as never)).rejects.toMatchObject({ status: 400 });
+    const automatic = await mapping.update(context, { ...valid, revision: (await mapping.get(context)).revision, autoOrder: true });
+    expect(automatic.autoOrder).toBe(true);
   });
   it("rolls back real contact/custom writes and draft consumption on a stale mapping", async () => {
     const { services, context } = fixture;

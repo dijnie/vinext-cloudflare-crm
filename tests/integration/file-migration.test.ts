@@ -38,8 +38,8 @@ it("preserves populated field history, conversion state and current triggers whi
   await applyD1Migrations(db, env.TEST_MIGRATIONS.slice(11));
   for (const [index, table] of tables.entries()) {
     const rows = (await db.prepare(`SELECT * FROM ${table} ORDER BY 1`).all()).results;
-    const retained = ["field_configuration_revision","custom_field_definition"].includes(table) ? rows.filter(row => row.entity !== "lead" && row.entity !== "product") : table === "field_value_revision" ? rows.filter(row => row.field_id !== "7dd843dc-6df2-4c33-a8f8-8f45cc0e5762") : rows;
-    const expected = table === "custom_field_value" ? snapshots[index].results.map(row => ({ ...row, lead_id: null, product_id: null })) : snapshots[index].results;
+    const retained = ["field_configuration_revision","custom_field_definition"].includes(table) ? rows.filter(row => row.entity !== "lead" && row.entity !== "product" && row.entity !== "order") : table === "field_value_revision" ? rows.filter(row => row.field_id !== "7dd843dc-6df2-4c33-a8f8-8f45cc0e5762") : rows;
+    const expected = table === "custom_field_value" ? snapshots[index].results.map(row => ({ ...row, lead_id: null, product_id: null, order_id: null })) : snapshots[index].results;
     expect(retained, table).toEqual(expected);
   }
   const after = (await db.prepare("SELECT name,sql FROM sqlite_master WHERE type='trigger'").all<{name: string; sql: string}>()).results;

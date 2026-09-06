@@ -3,6 +3,11 @@ import type { LayoutField, LayoutSurface } from "./layout-contracts";
 
 // Detail keys use their stored input identity; renderers map owner/stage/amount labels.
 export const DEFAULT_LAYOUT_KEYS: Record<FieldEntity, Record<LayoutSurface, readonly string[]>> = {
+  order: {
+    create: ["name", "contactId", "companyId", "ownerMembershipId", "currency", "source", "description"],
+    edit: ["name", "contactId", "companyId", "ownerMembershipId", "currency", "source", "description"],
+    detail: ["number", "name", "contactId", "companyId", "ownerMembershipId", "currency", "state", "source", "description", "createdAt", "updatedAt"],
+  },
   product: {
     create: ["name", "kind", "categoryId", "description", "ownerMembershipId"],
     edit: ["name", "categoryId", "description", "ownerMembershipId"],
@@ -34,9 +39,9 @@ export function layoutCatalog(entity: FieldEntity, definitions: FieldDefinition[
   const defaults = DEFAULT_LAYOUT_KEYS[entity];
   const surfaces: LayoutSurface[] = ["create", "edit", "detail"];
   const keys = [...new Set(surfaces.flatMap(surface => defaults[surface]))];
-  const required = new Set(entity === "product" ? ["name", "kind"] : entity === "contact" || entity === "lead" ? ["firstName"] : entity === "deal" ? ["name", "companyId", "ownerMembershipId", "stageId", "currency"] : ["name"]);
+  const required = new Set(entity === "product" ? ["name", "kind"] : entity === "contact" || entity === "lead" ? ["firstName"] : entity === "deal" ? ["name", "companyId", "ownerMembershipId", "stageId", "currency"] : entity === "order" ? ["name", "contactId", "currency"] : ["name"]);
   return [
-    ...keys.map(key => ({ key, kind: "builtin" as const, visible: true, required: required.has(key), readOnly: entity === "product" && key === "kind" || key === "createdAt" || key === "updatedAt", surfaces: surfaces.filter(surface => defaults[surface].includes(key)) })),
+    ...keys.map(key => ({ key, kind: "builtin" as const, visible: true, required: required.has(key), readOnly: entity === "product" && key === "kind" || entity === "order" && ["number", "state"].includes(key) || key === "createdAt" || key === "updatedAt", surfaces: surfaces.filter(surface => defaults[surface].includes(key)) })),
     ...definitions.filter(field => !field.archivedAt).sort((a, b) => a.position - b.position || a.id.localeCompare(b.id)).map(field => ({ key: field.key, kind: "custom" as const, visible: field.showOnSheet, required: field.required, readOnly: field.type === "formula", surfaces: [...surfaces], label: field.label })),
   ];
 }

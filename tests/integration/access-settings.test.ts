@@ -7,7 +7,7 @@ import { company, operationConditionGuard, singletonMembership } from "@/lib/db/
 import type { AuthEmailAdapter, AuthEmailMessage } from "@/lib/email/email-adapter";
 import { requireRequestContext, type RequestContext } from "@/lib/http/request-context";
 import { SINGLETON_WORKSPACE_ID } from "@/lib/services/members/singleton-workspace";
-import { DEFAULT_PROFILE_ID, PERMISSIONS, type Permission } from "@/lib/services/permissions/access-contracts";
+import { DEFAULT_MEMBER_GRANTS, DEFAULT_PROFILE_ID, type Permission } from "@/lib/services/permissions/access-contracts";
 import { actionGuard, permissionError, requirePermission } from "@/lib/services/permissions/permission-policy";
 import { currencyError } from "@/lib/services/currencies/currency-service";
 import { companyListInputSchema } from "@/lib/services/companies/company-contract";
@@ -140,7 +140,7 @@ describe.sequential("access settings and service authorization", () => {
     const owner = await actor(), member = await actor("member");
     const service = root().access;
     const initial = await service.settings(owner.context);
-    expect(initial.profiles.find(p => p.id === DEFAULT_PROFILE_ID)?.grants.sort()).toEqual(PERMISSIONS.filter(p => !p.endsWith(".export")).sort());
+    expect(initial.profiles.find(p => p.id === DEFAULT_PROFILE_ID)?.grants.sort()).toEqual([...DEFAULT_MEMBER_GRANTS].sort());
     expect(initial.members.find(m => m.membershipId === member.userId)?.profileId).toBe(DEFAULT_PROFILE_ID);
     const restricted = await profile(owner.context, ["company.create"]);
     const updated = await service.mutate(owner.context, { action: "update-profile", id: restricted.id, name: "Restricted", grants: ["company.update", "contact.create"] });

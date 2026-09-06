@@ -5,10 +5,21 @@ export const PERMISSIONS = [
   "contact.create", "contact.update", "contact.archive", "contact.restore", "contact.assign", "contact.export",
   "deal.create", "deal.update", "deal.archive", "deal.restore", "deal.assign", "deal.export",
   "product.create", "product.update", "product.archive", "product.restore", "product.assign", "product.export",
+  "order.create", "order.update", "order.archive", "order.restore", "order.assign", "order.export",
+  "order.confirm", "order.complete", "order.cancel", "order.collect", "order.refund", "order.adjust", "order.backdate",
+  "inventory.configure", "inventory.adjust", "inventory.return", "entitlement.use", "entitlement.restore",
   "lead.create", "lead.update", "lead.archive", "lead.restore", "lead.assign", "lead.export", "lead.convert",
   "activity.create", "activity.update", "field.configure", "view.create", "view.update", "view.delete",
 ] as const;
 export type Permission = typeof PERMISSIONS[number];
+const OWNER_ONLY_OPERATION_PERMISSIONS = new Set<Permission>([
+  "order.collect", "order.refund", "order.adjust", "order.backdate",
+  "inventory.configure", "inventory.adjust", "inventory.return",
+  "entitlement.use", "entitlement.restore",
+]);
+export const DEFAULT_MEMBER_GRANTS = PERMISSIONS.filter(permission =>
+  !permission.endsWith(".export") && !OWNER_ONLY_OPERATION_PERMISSIONS.has(permission)
+);
 export const DEFAULT_PROFILE_ID = "standard-member";
 export const idSchema = z.string().trim().min(1).max(255);
 const nameSchema = z.string().trim().min(1).max(120);

@@ -1,6 +1,7 @@
 "use client";
 import { getCatalogDictionary } from "@/lib/i18n/catalog-dictionary";
 import { getLeadDictionary } from "@/lib/i18n/lead-dictionary";
+import { getOrderDictionary } from "@/lib/i18n/order-dictionary";
 import { DealStageRefreshStatus } from "./deal-stage-provider";
 import { getDealStageDictionary } from "@/lib/i18n/deal-stage-dictionary";
 import { getLayoutDictionary } from "@/lib/i18n/layout-dictionary";
@@ -11,6 +12,7 @@ import Partnership from "@carbon/icons-react/es/Partnership";
 import Settings from "@carbon/icons-react/es/Settings";
 import UserMultiple from "@carbon/icons-react/es/UserMultiple";
 import UserAvatar from "@carbon/icons-react/es/UserAvatar";
+import ShoppingCart from "@carbon/icons-react/es/ShoppingCart";
 import Menu from "@carbon/icons-react/es/Menu";
 import Logout from "@carbon/icons-react/es/Logout";
 import Light from "@carbon/icons-react/es/Light";
@@ -54,6 +56,8 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
   const links = [
     { href: base, label: currency.dashboard, icon: Dashboard },
     { href: `${base}/products`, label: `${crm.product}${modules.isEnabled("product") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },
+    { href: `${base}/orders`, label: `${crm.order}${modules.isEnabled("order") ? "" : ` · ${modules.labels.disabled}`}`, icon: ShoppingCart },
+    { href: `${base}/inventory`, label: getOrderDictionary(locale).inventory, icon: Building },
     { href: `${base}/leads`, label: `${crm.lead}${modules.isEnabled("lead") ? "" : ` · ${modules.labels.disabled}`}`, icon: UserMultiple },
     { href: `${base}/companies`, label: `${dictionary.navigation.companies}${modules.isEnabled("company") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },
     { href: `${base}/contacts`, label: `${crm.contact}${modules.isEnabled("contact") ? "" : ` · ${modules.labels.disabled}`}`, icon: UserMultiple },

@@ -4,18 +4,20 @@ import { contactListInputSchema } from "../services/contacts/contact-contract";
 import { dealListInputSchema } from "../services/deals/deal-contract";
 import { productListInputSchema } from "../services/catalog/product-contract";
 import { leadListInputSchema } from "../services/leads/lead-contract";
+import { orderListInputSchema } from "../services/orders/order-contract";
 import { stableIdSchema } from "./list-contract";
 
-export const entityTypeSchema = z.enum(["company", "contact", "deal", "lead", "product"]);
+export const entityTypeSchema = z.enum(["company", "contact", "deal", "lead", "product", "order"]);
 export type EntityType = z.infer<typeof entityTypeSchema>;
-export const entityPaths = { company: "companies", contact: "contacts", deal: "deals", lead: "leads", product: "products" } as const;
-export const listSchemas = { company: companyListInputSchema, contact: contactListInputSchema, deal: dealListInputSchema, lead: leadListInputSchema, product: productListInputSchema };
+export const entityPaths = { company: "companies", contact: "contacts", deal: "deals", lead: "leads", product: "products", order: "orders" } as const;
+export const listSchemas = { company: companyListInputSchema, contact: contactListInputSchema, deal: dealListInputSchema, lead: leadListInputSchema, product: productListInputSchema, order: orderListInputSchema };
 export const entityColumns = {
   product: ["name", "kind", "sku", "priceMinor", "currency", "category", "owner", "createdAt"],
   lead: ["firstName", "lastName", "email", "phone", "source", "status", "company", "owner", "createdAt"],
   company: ["name", "domain", "industry", "owner", "createdAt"],
   contact: ["firstName", "lastName", "email", "title", "company", "owner", "createdAt"],
   deal: ["name", "company", "owner", "stage", "amount", "currency", "expectedCloseAt", "createdAt"],
+  order: ["number", "name", "contact", "owner", "state", "originalMinor", "collectedMinor", "balanceMinor", "currency", "createdAt"],
 } as const;
 const navigationSchema = z.object({
   recordType: entityTypeSchema.optional(), recordId: stableIdSchema.optional(),
@@ -25,7 +27,7 @@ const navigationSchema = z.object({
   if (Boolean(value.recordType) !== Boolean(value.recordId)) ctx.addIssue({ code: "custom", message: "Record type and ID must be paired" });
 });
 const navigationKeys = ["recordType", "recordId", "tab", "columns", "view"];
-const arrayKeys = ["owner", "industry", "company", "title", "stage", "source", "status", "collaborator", "kind", "category"];
+const arrayKeys = ["owner", "industry", "company", "contact", "title", "stage", "state", "source", "status", "collaborator", "kind", "category"];
 export function parseListState(entity: EntityType, search: URLSearchParams) {
   const query: Record<string, unknown> = {};
   const navigation: Record<string, unknown> = {};
@@ -51,6 +53,6 @@ export function changeListState(search: URLSearchParams, changes: Record<string,
     if (Array.isArray(value)) { next.delete(key); value.forEach(item => next.append(key, item)); }
     else if (value === null || value === "") next.delete(key); else next.set(key, value);
   }
-  if (Object.keys(changes).some(key => ["q", "sort", "dir", "archived", "owner", "industry", "company", "title", "stage", "source", "status", "collaborator", "kind", "category", "fields", "criteria", "view", "pageSize"].includes(key))) next.delete("page");
+  if (Object.keys(changes).some(key => ["q", "sort", "dir", "archived", "owner", "industry", "company", "contact", "title", "stage", "state", "source", "status", "collaborator", "kind", "category", "fields", "criteria", "view", "pageSize"].includes(key))) next.delete("page");
   return next.toString();
 }

@@ -13,6 +13,7 @@ import { contactUpdateInputSchema } from "@/lib/services/contacts/contact-contra
 import { productUpdateInputSchema } from "@/lib/services/catalog/product-contract";
 import { leadUpdateInputSchema } from "@/lib/services/leads/lead-contract";
 import { dealUpdateInputSchema } from "@/lib/services/deals/deal-contract";
+import { orderUpdateInputSchema } from "@/lib/services/orders/order-contract";
 import { crmRequest, requestError } from "../record-types";
 
 export function InlineRecordField({ entity, recordId, field, value, label, labels, expectedRevision, readOnly }: { entity: EntityType; readOnly?: boolean; expectedRevision?: number; recordId: string; field: string; value: string; label: string; labels: CrmDictionary }) {
@@ -31,8 +32,8 @@ export function InlineRecordField({ entity, recordId, field, value, label, label
     if (committing.current || !moduleEnabled) return;
     const next = draft.trim();
     if (next === value) { setEditing(false); return; }
-    const schema = { company: companyUpdateInputSchema, contact: contactUpdateInputSchema, deal: dealUpdateInputSchema, lead: leadUpdateInputSchema, product: productUpdateInputSchema }[entity];
-    const parsed = schema.safeParse({ action: "update", data: { [field]: next || null, ...(["lead", "product"].includes(entity) ? { expectedRevision: editRevision.current } : {}) } });
+    const schema = { company: companyUpdateInputSchema, contact: contactUpdateInputSchema, deal: dealUpdateInputSchema, lead: leadUpdateInputSchema, product: productUpdateInputSchema, order: orderUpdateInputSchema }[entity];
+    const parsed = schema.safeParse({ action: "update", data: { [field]: next || null, ...(["lead", "product", "order"].includes(entity) ? { expectedRevision: editRevision.current } : {}) } });
     if (!parsed.success) { setError(labels.invalid); return; }
     committing.current = true; setBusy(true); setError("");
     try { await crmRequest(`/api/crm/${entityPaths[entity]}/${recordId}`, { method: "PATCH", body: JSON.stringify(parsed.data) }); setEditing(false); invalidateCrm(entity); control.current?.focus(); }

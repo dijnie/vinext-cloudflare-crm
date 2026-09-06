@@ -4,7 +4,7 @@ import type { RequestContext } from "@/lib/http/request-context";
 import { actionGuard, permissionError } from "../permissions/permission-policy";
 import { and, desc, eq, getTableColumns, isNotNull, isNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
-import { activity, company, contact, deal, lead, product, user } from "@/lib/db/schema";
+import { activity, company, contact, deal, lead, product, salesOrder, user } from "@/lib/db/schema";
 import type { TimelineInput } from "@/lib/services/activities/activity-contract";
 
 export class ActivityRepository {
@@ -45,6 +45,7 @@ export class ActivityRepository {
       this.db.update(deal).set({ lastActivityAt: sql`max(coalesce(${deal.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(deal.id, values.dealId ?? "")),
       this.db.update(lead).set({ lastActivityAt: sql`max(coalesce(${lead.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(lead.id, values.leadId ?? "")),
       this.db.update(product).set({ lastActivityAt: sql`max(coalesce(${product.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(product.id, values.productId ?? "")),
+      this.db.update(salesOrder).set({ lastActivityAt: sql`max(coalesce(${salesOrder.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(salesOrder.id, values.orderId ?? "")),
       op.end,
     ]); } catch (error) { permissionError(error); }
     return (await this.byId(values.id))!;
@@ -52,13 +53,14 @@ export class ActivityRepository {
 
   async complete(id: string, completed: boolean, context: RequestContext) {
     const now = new Date();
-    const stamp = (column: typeof activity.companyId | typeof activity.contactId | typeof activity.dealId | typeof activity.leadId | typeof activity.productId) => sql`(select ${column} from ${activity} where ${activity.id} = ${id} and ${activity.type} = 'task')`;
+    const stamp = (column: typeof activity.companyId | typeof activity.contactId | typeof activity.dealId | typeof activity.leadId | typeof activity.productId | typeof activity.orderId) => sql`(select ${column} from ${activity} where ${activity.id} = ${id} and ${activity.type} = 'task')`;
     const op = actionGuard(this.db, context, ["activity.update"], false, sql`exists (select 1 from activity a where a.id=${id}
       and (a.company_id is null or ${modulesEnabledPredicate(["company"])})
       and (a.contact_id is null or ${modulesEnabledPredicate(["contact"])})
       and (a.deal_id is null or ${modulesEnabledPredicate(["deal"])})
       and (a.lead_id is null or ${modulesEnabledPredicate(["lead"])})
-      and (a.product_id is null or ${modulesEnabledPredicate(["product"])}))`);
+      and (a.product_id is null or ${modulesEnabledPredicate(["product"])})
+      and (a.order_id is null or ${modulesEnabledPredicate(["order"])}))`);
     try {
     const [, rows] = await this.db.batch([
       op.begin,
@@ -68,6 +70,7 @@ export class ActivityRepository {
       this.db.update(deal).set({ lastActivityAt: sql`max(coalesce(${deal.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(deal.id, stamp(activity.dealId))),
       this.db.update(lead).set({ lastActivityAt: sql`max(coalesce(${lead.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(lead.id, stamp(activity.leadId))),
       this.db.update(product).set({ lastActivityAt: sql`max(coalesce(${product.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(product.id, stamp(activity.productId))),
+      this.db.update(salesOrder).set({ lastActivityAt: sql`max(coalesce(${salesOrder.lastActivityAt}, 0), ${now.getTime()})`, updatedAt: now }).where(eq(salesOrder.id, stamp(activity.orderId))),
       op.end,
     ]);
     return rows.length ? this.byId(id) : undefined;

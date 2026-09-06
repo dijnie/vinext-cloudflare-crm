@@ -17,7 +17,7 @@ export function ActivityTimeline({ entity, recordId, companyId, locale, labels }
   const stageCatalog = useDealStages();
   const modules = useModules();
   const canCompose = modules.isEnabled(entity) && (entity === "lead" || !companyId || modules.isEnabled("company"));
-  const canChange = (entry: ActivityEntry) => (!entry.companyId || modules.isEnabled("company")) && (!entry.contactId || modules.isEnabled("contact")) && (!entry.dealId || modules.isEnabled("deal")) && (!entry.leadId || modules.isEnabled("lead")) && (!entry.productId || modules.isEnabled("product"));
+  const canChange = (entry: ActivityEntry) => (!entry.companyId || modules.isEnabled("company")) && (!entry.contactId || modules.isEnabled("contact")) && (!entry.dealId || modules.isEnabled("deal")) && (!entry.leadId || modules.isEnabled("lead")) && (!entry.productId || modules.isEnabled("product")) && (!entry.orderId || modules.isEnabled("order"));
   const [filter, setFilter] = useState<TimelineInput["filter"]>("all");
   const [cursor, setCursor] = useState<string>(); const [revision, setRevision] = useState(0);
   const [data, setData] = useState<{ key: string; entries: ActivityEntry[]; nextCursor: string | null }>({ key: "", entries: [], nextCursor: null });

@@ -73,12 +73,12 @@ describe.sequential("module settings",()=>{
     const before=await db.prepare("SELECT * FROM company WHERE id='module-upgrade'").first();
     await applyD1Migrations(db,env.TEST_MIGRATIONS.slice(12));
     expect(await db.prepare("SELECT * FROM company WHERE id='module-upgrade'").first()).toEqual(before);
-    expect((await db.prepare("SELECT entity,enabled,revision FROM module_setting ORDER BY entity").all()).results).toEqual(["company","contact","deal","lead","product"].map(entity=>({entity,enabled:1,revision:0})));
+    expect((await db.prepare("SELECT entity,enabled,revision FROM module_setting ORDER BY entity").all()).results).toEqual(["company","contact","deal","lead","order","product"].map(entity=>({entity,enabled:1,revision:0})));
     expect((await db.prepare("PRAGMA foreign_key_check").all()).results).toEqual([]);
   });
   it("allows active reads and owner revisions while denying members and stale updates",async()=>{
     const actor=await owner(),member=await session(`module-member-${crypto.randomUUID()}@example.com`);
-    const initial=await successful(await get(actor.cookie));expect(initial.canManage).toBe(true);expect(initial.modules).toEqual(["company","contact","deal","lead","product"].map(entity=>({entity,enabled:true,revision:0})));
+    const initial=await successful(await get(actor.cookie));expect(initial.canManage).toBe(true);expect(initial.modules).toEqual(["company","contact","deal","lead","order","product"].map(entity=>({entity,enabled:true,revision:0})));
     expect((await successful(await get(member.cookie))).canManage).toBe(false);
     expect((await update(member.cookie,{entity:"company",enabled:false,revision:0})).status).toBe(403);
     const changed=await successful(await update(actor.cookie,{entity:"company",enabled:false,revision:0}));expect(changed.modules[0]).toEqual({entity:"company",enabled:false,revision:1});

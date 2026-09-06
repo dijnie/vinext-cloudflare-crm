@@ -174,6 +174,7 @@ export const dealContact = sqliteTable(
 export const activity = sqliteTable(
   "activity",
   {
+    orderId: text("order_id").references(() => salesOrder.id, { onDelete: "cascade" }),
     productId: text("product_id").references(() => product.id, { onDelete: "cascade" }),
     leadId: text("lead_id").references(() => lead.id, { onDelete: "cascade" }),
     id: text("id").primaryKey(),
@@ -201,6 +202,7 @@ export const activity = sqliteTable(
     ...timestamps,
   },
   (table) => [
+    index("activity_order_created_idx").on(table.orderId, table.createdAt, table.id),
     index("activity_product_created_idx").on(table.productId, table.createdAt, table.id),
     index("activity_lead_created_idx").on(table.leadId, table.createdAt, table.id),
     index("activity_company_created_idx").on(table.companyId, table.createdAt, table.id),
@@ -214,7 +216,7 @@ export const activity = sqliteTable(
     ),
     check(
       "activity_anchor_check",
-      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null) + (${table.leadId} is not null) + (${table.productId} is not null)) >= 1`,
+      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null) + (${table.leadId} is not null) + (${table.productId} is not null) + (${table.orderId} is not null)) >= 1`,
     ),
     check(
       "activity_metadata_json_check",
@@ -251,7 +253,7 @@ export const memberOperationGuard = sqliteTable(
 );
 
 export const fieldConfigurationRevision = sqliteTable("field_configuration_revision", {
-  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product"] }).primaryKey().notNull(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product", "order"] }).primaryKey().notNull(),
   revision: integer("revision").default(0).notNull(),
 });
 
@@ -259,7 +261,7 @@ export const customFieldDefinition = sqliteTable(
   "custom_field_definition",
   {
     id: text("id").primaryKey(),
-    entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product"] }).notNull(),
+    entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product", "order"] }).notNull(),
     key: text("key").notNull(),
     label: text("label").notNull(),
     type: text("type", {
@@ -297,7 +299,7 @@ export const customFieldDefinition = sqliteTable(
     index("custom_field_entity_position_idx").on(table.entity, table.position),
     check(
       "custom_field_entity_check",
-      sql`${table.entity} in ('company', 'contact', 'deal', 'lead', 'product')`,
+      sql`${table.entity} in ('company', 'contact', 'deal', 'lead', 'product', 'order')`,
     ),
     check(
       "custom_field_type_check",
@@ -327,6 +329,7 @@ export const customFieldOption = sqliteTable(
 export const customFieldValue = sqliteTable(
   "custom_field_value",
   {
+    orderId: text("order_id").references(() => salesOrder.id, { onDelete: "cascade" }),
     productId: text("product_id").references(() => product.id, { onDelete: "cascade" }),
     leadId: text("lead_id").references(() => lead.id, { onDelete: "cascade" }),
     id: text("id").primaryKey(),
@@ -360,6 +363,7 @@ export const customFieldValue = sqliteTable(
     uniqueIndex("custom_field_contact_unique").on(table.fieldId, table.contactId),
     uniqueIndex("custom_field_deal_unique").on(table.fieldId, table.dealId),
     uniqueIndex("custom_field_lead_unique").on(table.fieldId, table.leadId),
+    uniqueIndex("custom_field_order_unique").on(table.fieldId, table.orderId),
     uniqueIndex("custom_field_product_unique").on(table.fieldId, table.productId),
     index("custom_field_value_text_idx").on(table.fieldId, table.textValue),
     index("custom_field_value_number_idx").on(table.fieldId, table.numberValue),
@@ -369,7 +373,7 @@ export const customFieldValue = sqliteTable(
     check("custom_field_json_value_check", sql`${table.jsonValue} is null or json_valid(${table.jsonValue})`),
     check(
       "custom_field_value_one_record_check",
-      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null) + (${table.leadId} is not null) + (${table.productId} is not null)) = 1`,
+      sql`((${table.companyId} is not null) + (${table.contactId} is not null) + (${table.dealId} is not null) + (${table.leadId} is not null) + (${table.productId} is not null) + (${table.orderId} is not null)) = 1`,
     ),
   ],
 );
@@ -378,7 +382,7 @@ export const savedView = sqliteTable(
   "saved_view",
   {
     id: text("id").primaryKey(),
-    entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product"] }).notNull(),
+    entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product", "order"] }).notNull(),
     name: text("name").notNull(),
     shared: integer("shared", { mode: "boolean" }).default(false).notNull(),
     stateJson: text("state_json").notNull(),
@@ -399,7 +403,7 @@ export const savedView = sqliteTable(
     index("saved_view_entity_shared_idx").on(table.entity, table.shared),
     check(
       "saved_view_entity_check",
-      sql`${table.entity} in ('company', 'contact', 'deal', 'lead', 'product')`,
+      sql`${table.entity} in ('company', 'contact', 'deal', 'lead', 'product', 'order')`,
     ),
     check("saved_view_state_json_check", sql`json_valid(${table.stateJson})`),
   ],
@@ -407,12 +411,12 @@ export const savedView = sqliteTable(
 
 export const savedViewDefault = sqliteTable("saved_view_default", {
   userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product"] }).notNull(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product", "order"] }).notNull(),
   viewId: text("view_id").notNull().references(() => savedView.id, { onDelete: "cascade" }),
 }, table => [
   primaryKey({ columns: [table.userId, table.entity] }),
   index("saved_view_default_view_idx").on(table.viewId),
-  check("saved_view_default_entity_check", sql`${table.entity} in ('company','contact','deal','lead','product')`),
+  check("saved_view_default_entity_check", sql`${table.entity} in ('company','contact','deal','lead','product','order')`),
 ]);
 
 export const exchangeRate = sqliteTable(
@@ -524,7 +528,7 @@ export const dealConversion = sqliteTable("deal_conversion", {
 export const crmFile = sqliteTable("crm_file", {
   id: text("id").primaryKey(),
   objectKey: text("object_key").notNull(),
-  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product"] }).notNull(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product", "order"] }).notNull(),
   recordId: text("record_id").notNull(),
   fieldId: text("field_id").notNull(),
   uploaderId: text("uploader_id").notNull(),
@@ -538,7 +542,7 @@ export const crmFile = sqliteTable("crm_file", {
   uniqueIndex("crm_file_object_key_unique").on(table.objectKey),
   index("crm_file_anchor_idx").on(table.entity, table.recordId, table.fieldId),
   index("crm_file_cleanup_idx").on(table.status, table.createdAt),
-  check("crm_file_entity_check", sql`${table.entity} in ('company','contact','deal','lead','product')`),
+  check("crm_file_entity_check", sql`${table.entity} in ('company','contact','deal','lead','product','order')`),
   check("crm_file_status_check", sql`${table.status} in ('pending','ready','failed','cleaning')`),
   check("crm_file_name_check", sql`length(${table.fileName}) between 1 and 255`),
   check("crm_file_size_check", sql`typeof(${table.size}) = 'integer' and ${table.size} between 0 and 10485760`),
@@ -546,31 +550,31 @@ export const crmFile = sqliteTable("crm_file", {
 ]);
 
 export const moduleSetting = sqliteTable("module_setting", {
-  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product"] }).primaryKey(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product", "order"] }).primaryKey(),
   enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
   revision: integer("revision").default(0).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 }, table => [
-  check("module_setting_entity_check", sql`${table.entity} in ('company','contact','deal','lead','product')`),
+  check("module_setting_entity_check", sql`${table.entity} in ('company','contact','deal','lead','product','order')`),
   check("module_setting_enabled_check", sql`${table.enabled} in (0,1)`),
   check("module_setting_revision_check", sql`typeof(${table.revision}) = 'integer' and ${table.revision} >= 0`),
 ]);
 
 export const recordLayout = sqliteTable("record_layout", {
-  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product"] }).primaryKey(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product", "order"] }).primaryKey(),
   revision: integer("revision").notNull().default(0),
   fieldsJson: text("fields_json").notNull().default("null"),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
-}, table => [check("record_layout_entity", sql`${table.entity} in ('company','contact','deal','lead','product')`), check("record_layout_revision", sql`${table.revision} >= 0`), check("record_layout_json", sql`json_valid(${table.fieldsJson})`)]);
+}, table => [check("record_layout_entity", sql`${table.entity} in ('company','contact','deal','lead','product','order')`), check("record_layout_revision", sql`${table.revision} >= 0`), check("record_layout_json", sql`json_valid(${table.fieldsJson})`)]);
 
 export const recordDraft = sqliteTable("record_draft", {
   id: text("id").primaryKey(),
-  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product"] }).notNull(),
+  entity: text("entity", { enum: ["company", "contact", "deal", "lead", "product", "order"] }).notNull(),
   userId: text("user_id").notNull(),
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   consumedAt: integer("consumed_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-}, table => [check("record_draft_entity", sql`${table.entity} in ('company','contact','deal','lead','product')`), check("record_draft_expiry", sql`${table.expiresAt} > ${table.createdAt}`)]);
+}, table => [check("record_draft_entity", sql`${table.entity} in ('company','contact','deal','lead','product','order')`), check("record_draft_expiry", sql`${table.expiresAt} > ${table.createdAt}`)]);
 
 export const dealStageCatalogRevision = sqliteTable("deal_stage_catalog_revision", {
   id: text("id").primaryKey(),
@@ -616,7 +620,7 @@ export const leadMapping = sqliteTable("lead_mapping", {
   id: text("id", { enum: ["contact"] }).primaryKey().notNull(), revision: integer("revision").notNull().default(0),
   mappingsJson: text("mappings_json").notNull().default("[]"), autoOrder: integer("auto_order", { mode: "boolean" }).notNull().default(false),
   autoDeal: integer("auto_deal", { mode: "boolean" }).notNull().default(false), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
-}, table => [check("lead_mapping_singleton", sql`${table.id} = 'contact'`), check("lead_mapping_revision", sql`${table.revision} >= 0`), check("lead_mapping_json", sql`json_valid(${table.mappingsJson})`), check("lead_mapping_order_disabled", sql`${table.autoOrder} = 0`), check("lead_mapping_deal_disabled", sql`${table.autoDeal} = 0`)]);
+}, table => [check("lead_mapping_singleton", sql`${table.id} = 'contact'`), check("lead_mapping_revision", sql`${table.revision} >= 0`), check("lead_mapping_json", sql`json_valid(${table.mappingsJson})`), check("lead_mapping_order_boolean", sql`${table.autoOrder} in (0,1)`), check("lead_mapping_deal_disabled", sql`${table.autoDeal} = 0`)]);
 export const leadConversion = sqliteTable("lead_conversion", {
   id: text("id").primaryKey().notNull(), leadId: text("lead_id").notNull().unique().references(() => lead.id, { onDelete: "restrict" }),
   operationKey: text("operation_key").notNull().unique(), fingerprint: text("fingerprint").notNull(),
@@ -654,3 +658,27 @@ export const productSku=sqliteTable("product_sku",{
 export const productPackageComponent=sqliteTable("product_package_component",{
  packageProductId:text("package_product_id").notNull().references(()=>product.id,{onDelete:"restrict"}),componentVariantId:text("component_variant_id").notNull().references(()=>productVariant.id,{onDelete:"restrict"}),quantity:integer("quantity").notNull(),
 },table=>[primaryKey({columns:[table.packageProductId,table.componentVariantId]}),index("package_component_variant_idx").on(table.componentVariantId),check("package_component_quantity",sql`typeof(${table.quantity})='integer' and ${table.quantity} between 1 and 1000000`)]);
+
+export const salesOrder = sqliteTable("sales_order", {
+ id:text("id").primaryKey().notNull(),number:integer("number").notNull().unique(),name:text("name").notNull(),contactId:text("contact_id").notNull().references(()=>contact.id,{onDelete:"restrict"}),
+ companyId:text("company_id").references(()=>company.id,{onDelete:"restrict"}),leadId:text("lead_id").references(()=>lead.id,{onDelete:"restrict"}),dealId:text("deal_id").references(()=>deal.id,{onDelete:"restrict"}),
+ ownerMembershipId:text("owner_membership_id").references(()=>singletonMembership.userId,{onDelete:"set null"}),creatorUserId:text("creator_user_id").notNull().references(()=>user.id,{onDelete:"restrict"}),
+ currency:text("currency").notNull().default("USD"),state:text("state",{enum:["draft","confirmed","completed","cancelled"]}).notNull().default("draft"),source:text("source"),description:text("description"),
+ revision:integer("revision").notNull().default(0),policyVersion:integer("policy_version").notNull().default(1),creationFingerprint:text("creation_fingerprint").notNull(),creationResultJson:text("creation_result_json").notNull(),linesJson:text("lines_json").notNull(),
+ goodsMinor:integer("goods_minor").notNull(),discountMinor:integer("discount_minor").notNull().default(0),surchargeMinor:integer("surcharge_minor").notNull().default(0),taxMinor:integer("tax_minor").notNull().default(0),originalMinor:integer("original_minor").notNull(),
+ goodsRemainingMinor:integer("goods_remaining_minor").notNull(),surchargeRemainingMinor:integer("surcharge_remaining_minor").notNull(),taxRemainingMinor:integer("tax_remaining_minor").notNull(),collectedMinor:integer("collected_minor").notNull().default(0),refundedMinor:integer("refunded_minor").notNull().default(0),
+ confirmedAt:integer("confirmed_at",{mode:"timestamp_ms"}),completedAt:integer("completed_at",{mode:"timestamp_ms"}),cancelledAt:integer("cancelled_at",{mode:"timestamp_ms"}),confirmedDate:text("confirmed_date"),completedDate:text("completed_date"),cancelledDate:text("cancelled_date"),businessTimeZone:text("business_time_zone"),
+ archivedAt:integer("archived_at",{mode:"timestamp_ms"}),lastActivityAt:integer("last_activity_at",{mode:"timestamp_ms"}),...timestamps,
+},table=>[index("sales_order_contact_idx").on(table.contactId,table.createdAt),index("sales_order_owner_idx").on(table.ownerMembershipId),index("sales_order_state_idx").on(table.state,table.completedAt),
+ check("sales_order_state",sql`${table.state} in ('draft','confirmed','completed','cancelled')`),check("sales_order_lines",sql`json_valid(${table.linesJson}) and json_type(${table.linesJson})='array'`),
+ check("sales_order_money",sql`${table.goodsMinor}>=0 and ${table.discountMinor} between 0 and ${table.goodsMinor} and ${table.surchargeMinor}>=0 and ${table.taxMinor}>=0 and ${table.originalMinor}=${table.goodsMinor}-${table.discountMinor}+${table.surchargeMinor}+${table.taxMinor} and ${table.originalMinor}<=99999999999999`),
+ check("sales_order_remaining",sql`${table.goodsRemainingMinor} between 0 and ${table.goodsMinor}-${table.discountMinor} and ${table.surchargeRemainingMinor} between 0 and ${table.surchargeMinor} and ${table.taxRemainingMinor} between 0 and ${table.taxMinor}`),
+ check("sales_order_collection",sql`${table.collectedMinor} between 0 and 99999999999999 and ${table.refundedMinor} between 0 and ${table.collectedMinor}`)]);
+export const orderSequence=sqliteTable("order_sequence",{id:text("id").primaryKey(),nextNumber:integer("next_number").notNull()});
+export const orderOperation=sqliteTable("order_operation",{id:text("id").primaryKey().notNull(),orderId:text("order_id").notNull().references(()=>salesOrder.id,{onDelete:"restrict"}),action:text("action").notNull(),fingerprint:text("fingerprint").notNull(),resultJson:text("result_json").notNull(),actorId:text("actor_id").notNull().references(()=>user.id,{onDelete:"restrict"}),businessDate:text("business_date").notNull(),timeZone:text("time_zone").notNull(),reason:text("reason"),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull()},t=>[index("order_operation_order_idx").on(t.orderId,t.createdAt),check("order_operation_result",sql`json_valid(${t.resultJson})`)]);
+export const orderPayment=sqliteTable("order_payment",{id:text("id").primaryKey().notNull(),orderId:text("order_id").notNull().references(()=>salesOrder.id,{onDelete:"restrict"}),operationId:text("operation_id").notNull().unique().references(()=>orderOperation.id,{onDelete:"restrict"}),kind:text("kind",{enum:["collection","refund"]}).notNull(),amountMinor:integer("amount_minor").notNull(),currency:text("currency").notNull(),method:text("method").notNull(),reference:text("reference"),actorId:text("actor_id").notNull(),businessDate:text("business_date").notNull(),timeZone:text("time_zone").notNull(),reason:text("reason"),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull()},t=>[index("order_payment_order_idx").on(t.orderId,t.createdAt),check("order_payment_amount",sql`typeof(${t.amountMinor})='integer' and ${t.amountMinor} between 1 and 99999999999999`),check("order_payment_kind",sql`${t.kind} in ('collection','refund')`)]);
+export const orderAdjustment=sqliteTable("order_adjustment",{id:text("id").primaryKey().notNull(),orderId:text("order_id").notNull().references(()=>salesOrder.id,{onDelete:"restrict"}),operationId:text("operation_id").notNull().unique().references(()=>orderOperation.id,{onDelete:"restrict"}),goodsMinor:integer("goods_minor").notNull(),surchargeMinor:integer("surcharge_minor").notNull(),taxMinor:integer("tax_minor").notNull(),reason:text("reason").notNull(),businessDate:text("business_date").notNull(),timeZone:text("time_zone").notNull(),actorId:text("actor_id").notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull()});
+export const variantFulfillment=sqliteTable("variant_fulfillment",{variantId:text("variant_id").primaryKey().notNull().references(()=>productVariant.id,{onDelete:"restrict"}),stockTracked:integer("stock_tracked",{mode:"boolean"}).notNull().default(false),sessionUnits:integer("session_units").notNull().default(0),expiryDays:integer("expiry_days"),onHand:integer("on_hand").notNull().default(0),revision:integer("revision").notNull().default(0)},t=>[check("variant_fulfillment_stock",sql`${t.stockTracked} in (0,1)`),check("variant_fulfillment_units",sql`${t.sessionUnits} between 0 and 1000000`),check("variant_fulfillment_expiry",sql`${t.expiryDays} between 1 and 36500`),check("variant_fulfillment_balance",sql`typeof(${t.onHand})='integer' and ${t.onHand} between 0 and 1000000000000`)]);
+export const inventoryMovement=sqliteTable("inventory_movement",{id:text("id").primaryKey().notNull(),variantId:text("variant_id").notNull().references(()=>productVariant.id,{onDelete:"restrict"}),orderId:text("order_id").references(()=>salesOrder.id,{onDelete:"restrict"}),kind:text("kind",{enum:["receipt","adjustment","sale","return"]}).notNull(),quantity:integer("quantity").notNull(),operationKey:text("operation_key").notNull(),fingerprint:text("fingerprint").notNull(),resultJson:text("result_json").notNull().default("{}"),actorId:text("actor_id").notNull(),reason:text("reason").notNull(),businessDate:text("business_date").notNull(),timeZone:text("time_zone").notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull()},t=>[uniqueIndex("inventory_operation_variant_unique").on(t.operationKey,t.variantId),index("inventory_variant_idx").on(t.variantId,t.createdAt)]);
+export const serviceEntitlement=sqliteTable("service_entitlement",{id:text("id").primaryKey().notNull(),orderId:text("order_id").notNull().references(()=>salesOrder.id,{onDelete:"restrict"}),contactId:text("contact_id").notNull().references(()=>contact.id,{onDelete:"restrict"}),variantId:text("variant_id").notNull().references(()=>productVariant.id,{onDelete:"restrict"}),label:text("label").notNull(),granted:integer("granted").notNull(),remaining:integer("remaining").notNull(),used:integer("used").notNull().default(0),revoked:integer("revoked").notNull().default(0),revision:integer("revision").notNull().default(0),expiresAt:integer("expires_at",{mode:"timestamp_ms"}),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull()},t=>[uniqueIndex("entitlement_order_variant_unique").on(t.orderId,t.variantId),index("entitlement_contact_idx").on(t.contactId),check("entitlement_balance",sql`${t.granted}>0 and ${t.remaining}>=0 and ${t.used}>=0 and ${t.revoked}>=0 and ${t.granted}=${t.remaining}+${t.used}+${t.revoked}`)]);
+export const entitlementMovement=sqliteTable("entitlement_movement",{id:text("id").primaryKey().notNull(),entitlementId:text("entitlement_id").notNull().references(()=>serviceEntitlement.id,{onDelete:"restrict"}),kind:text("kind",{enum:["grant","use","restore","revoke"]}).notNull(),quantity:integer("quantity").notNull(),operationKey:text("operation_key").notNull(),fingerprint:text("fingerprint").notNull(),resultJson:text("result_json").notNull().default("{}"),actorId:text("actor_id").notNull(),reason:text("reason").notNull(),businessDate:text("business_date").notNull(),timeZone:text("time_zone").notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull()},t=>[uniqueIndex("entitlement_operation_unique").on(t.operationKey,t.entitlementId)]);

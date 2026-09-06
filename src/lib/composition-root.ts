@@ -1,5 +1,10 @@
 import { ProductService } from "@/lib/services/catalog/product-service";
 import { ProductCategoryService } from "@/lib/services/catalog/product-category-service";
+import { OrderService } from "@/lib/services/orders/order-service";
+import { OrderCommandService } from "@/lib/services/orders/order-command-service";
+import { PaymentService } from "@/lib/services/payments/payment-service";
+import { InventoryService } from "@/lib/services/inventory/inventory-service";
+import { EntitlementService } from "@/lib/services/entitlements/entitlement-service";
 import { LeadService } from "@/lib/services/leads/lead-service";
 import { LeadSettingsService } from "@/lib/services/leads/lead-settings-service";
 import { LeadConversionService } from "@/lib/services/conversions/lead-conversion-service";
@@ -63,6 +68,11 @@ export function createCompositionRoot(
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
   return {
+    orders: new OrderService(db),
+    orderCommands: new OrderCommandService(db),
+    payments: new PaymentService(db),
+    inventory: new InventoryService(db),
+    entitlements: new EntitlementService(db),
     products: new ProductService(db),
     productCategories: new ProductCategoryService(db),
     leads: new LeadService(db),

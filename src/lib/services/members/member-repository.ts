@@ -9,6 +9,7 @@ import {
   deal,
   lead,
   product,
+  salesOrder,
   leadCollaborator,
   memberOperationGuard,
   savedView,
@@ -144,6 +145,7 @@ export class MemberRepository {
       dealOwnershipUpdate,
       this.db.update(product).set({ ownerMembershipId: replacement, revision: sql`${product.revision}+1`, updatedAt: new Date(now) }).where(eq(product.ownerMembershipId, targetMembershipId)),
       this.db.update(lead).set({ ownerMembershipId: replacement, revision: sql`${lead.revision}+1`, updatedAt: new Date(now) }).where(eq(lead.ownerMembershipId, targetMembershipId)),
+      this.db.update(salesOrder).set({ ownerMembershipId: replacement, revision: sql`${salesOrder.revision}+1`, updatedAt: new Date(now) }).where(eq(salesOrder.ownerMembershipId, targetMembershipId)),
       this.db.delete(leadCollaborator).where(eq(leadCollaborator.membershipId, targetMembershipId)),
       this.db
         .update(customFieldValue)

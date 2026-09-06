@@ -4,7 +4,7 @@ import { requirePermission } from "../permissions/permission-policy";
 import type { Permission } from "../permissions/access-contracts";
 import { eq } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
-import { company, contact, deal, lead, product } from "@/lib/db/schema";
+import { company, contact, deal, lead, product, salesOrder } from "@/lib/db/schema";
 import { stageChangeMetadataSchema, type ActivityCreateInput, type TimelineInput } from "@/lib/services/activities/activity-contract";
 import { toIso } from "@/lib/listing/list-contract";
 import { relationError } from "@/lib/services/shared/service-utils";
@@ -18,22 +18,24 @@ export class ActivityService {
   private guard(context: RequestContext, permissions: Permission[] = []) { return requirePermission(this.db, context, permissions); }
   async create(context: RequestContext, input: ActivityCreateInput) {
     await this.guard(context, ["activity.create"]);
-    if (input.leadId && (input.companyId || input.contactId || input.dealId || input.productId)) throw new HttpError(400, "validation_failed", "Lead activities have a single lead anchor");
+    if (input.leadId && (input.companyId || input.contactId || input.dealId || input.productId || input.orderId)) throw new HttpError(400, "validation_failed", "Lead activities have a single lead anchor");
     if (input.leadId && !(await this.db.select({ id: lead.id }).from(lead).where(eq(lead.id, input.leadId)).get())) throw new HttpError(404, "not_found", "Activity lead was not found");
-    if (input.productId && (input.companyId || input.contactId || input.dealId || input.leadId)) throw new HttpError(400, "validation_failed", "Product activities have a single product anchor");
+    if (input.productId && (input.companyId || input.contactId || input.dealId || input.leadId || input.orderId)) throw new HttpError(400, "validation_failed", "Product activities have a single product anchor");
     if (input.productId && !(await this.db.select({ id: product.id }).from(product).where(eq(product.id, input.productId)).get())) throw new HttpError(404, "not_found", "Activity product was not found");
+    if (input.orderId && (input.companyId || input.contactId || input.dealId || input.leadId || input.productId)) throw new HttpError(400, "validation_failed", "Order activities have a single order anchor");
+    if (input.orderId && !(await this.db.select({ id: salesOrder.id }).from(salesOrder).where(eq(salesOrder.id, input.orderId)).get())) throw new HttpError(404, "not_found", "Activity order was not found");
     const contactRow = input.contactId ? await this.db.select().from(contact).where(eq(contact.id, input.contactId)).get() : undefined;
     const dealRow = input.dealId ? await this.db.select().from(deal).where(eq(deal.id, input.dealId)).get() : undefined;
     if ((input.contactId && !contactRow) || (input.dealId && !dealRow)) throw new HttpError(404, "not_found", "Activity record was not found");
     const companyId = input.companyId ?? dealRow?.companyId ?? contactRow?.companyId ?? null;
     if (companyId && !(await this.db.select({ id: company.id }).from(company).where(eq(company.id, companyId)).get())) throw new HttpError(404, "not_found", "Activity company was not found");
     if ((contactRow && companyId && contactRow.companyId !== companyId) || (dealRow && dealRow.companyId !== companyId)) throw new HttpError(409, "conflict", "Activity records must belong to the same company");
-    await requireModulesEnabled(this.db, activityModules({ companyId, contactId: input.contactId, dealId: input.dealId, leadId: input.leadId, productId: input.productId }));
+    await requireModulesEnabled(this.db, activityModules({ companyId, contactId: input.contactId, dealId: input.dealId, leadId: input.leadId, productId: input.productId, orderId: input.orderId }));
     const now = new Date();
     try {
       const row = await this.repository.create({
         id: crypto.randomUUID(), type: input.type, subject: input.subject || null, content: input.content || null,
-        companyId, contactId: input.contactId ?? null, dealId: input.dealId ?? null, leadId: input.leadId ?? null, productId: input.productId ?? null, authorUserId: context.userId,
+        companyId, contactId: input.contactId ?? null, dealId: input.dealId ?? null, leadId: input.leadId ?? null, productId: input.productId ?? null, orderId: input.orderId ?? null, authorUserId: context.userId,
         occurredAt: input.occurredAt ? new Date(input.occurredAt) : now, dueAt: input.dueAt ? new Date(input.dueAt) : null,
         completedAt: null, metadataJson: null, createdAt: now, updatedAt: now,
       }, context);
@@ -62,7 +64,7 @@ export class ActivityService {
   private serialize(row: NonNullable<Awaited<ReturnType<ActivityRepository["byId"]>>>) {
     return {
       id: row.id, type: row.type, subject: row.subject, content: row.content,
-      companyId: row.companyId, contactId: row.contactId, dealId: row.dealId, leadId: row.leadId, productId: row.productId,
+      companyId: row.companyId, contactId: row.contactId, dealId: row.dealId, leadId: row.leadId, productId: row.productId, orderId: row.orderId,
       author: { id: row.authorUserId, name: row.authorName, email: row.authorEmail },
       metadata: row.type === "stage_change" ? stageChangeMetadataSchema.parse(JSON.parse(row.metadataJson ?? "null")) : null,
       occurredAt: toIso(row.occurredAt), dueAt: toIso(row.dueAt), completedAt: toIso(row.completedAt),

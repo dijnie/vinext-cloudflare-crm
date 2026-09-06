@@ -1,0 +1,11 @@
+import {z} from "zod";
+import {businessCommandShape} from "../orders/order-command-contract";
+export const inventoryConfigureInputSchema=z.object({expectedRevision:z.number().int().nonnegative(),stockTracked:z.boolean(),sessionUnits:z.number().int().min(0).max(1_000_000).default(0),expiryDays:z.number().int().min(1).max(36500).nullable().default(null)}).strict();
+export const inventoryRecordInputSchema=z.object({...businessCommandShape,kind:z.enum(["receipt","adjustment","return"]),quantity:z.number().int().min(-1_000_000).max(1_000_000).refine(n=>n!==0),reason:z.string().trim().min(1).max(2000),orderId:z.uuid().optional()}).strict();
+export const inventoryListInputSchema=z.object({q:z.string().max(200).default(""),pageSize:z.coerce.number().int().min(1).max(100).default(30)}).strict();
+export const inventoryVariantOutputSchema=z.object({variantId:z.uuid(),productId:z.uuid(),productName:z.string(),label:z.string(),kind:z.enum(["product","service","package"]),stockTracked:z.boolean(),sessionUnits:z.number().int(),expiryDays:z.number().int().nullable(),onHand:z.number().int(),revision:z.number().int()});
+export const inventoryListOutputSchema=z.object({rows:z.array(inventoryVariantOutputSchema)});
+export const inventoryResultOutputSchema=z.object({variantId:z.uuid(),revision:z.number().int(),onHand:z.number().int(),operationKey:z.uuid().optional()});
+export const inventoryConfigureOutputSchema=inventoryResultOutputSchema;
+export type InventoryConfigureInput=z.infer<typeof inventoryConfigureInputSchema>;export type InventoryRecordInput=z.infer<typeof inventoryRecordInputSchema>;
+export const inventoryHistoryOutputSchema=z.object({rows:z.array(z.object({id:z.uuid(),variantId:z.uuid(),orderId:z.uuid().nullable(),kind:z.enum(["receipt","adjustment","sale","return"]),quantity:z.number().int(),operationKey:z.uuid(),actorId:z.string(),actorName:z.string().nullable(),reason:z.string(),businessDate:z.string(),timeZone:z.string(),createdAt:z.iso.datetime()}))});
