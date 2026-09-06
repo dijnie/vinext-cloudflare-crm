@@ -1,5 +1,6 @@
 import type { EntityType } from "./list-state";
 export const mutationSurfaces = {
+  product: ["records", "lists", "facets", "timeline", "dashboard", "settings"],
   lead: ["records", "lists", "facets", "timeline", "dashboard", "settings"],
   stages: ["records", "lists", "facets", "settings", "timeline", "dashboard"],
   modules: ["records", "lists", "facets", "settings", "timeline", "dashboard"],

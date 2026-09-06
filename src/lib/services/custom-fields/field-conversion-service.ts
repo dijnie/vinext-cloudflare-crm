@@ -55,7 +55,7 @@ export class FieldConversionService {
         if (reason) {
           result.rejected++;
           if (!result.reasons.includes(reason)) result.reasons.push(reason);
-          if (result.examples.length < 5) result.examples.push({ recordId: row.companyId ?? row.contactId ?? row.dealId ?? row.leadId!, reason });
+          if (result.examples.length < 5) result.examples.push({ recordId: row.companyId ?? row.contactId ?? row.dealId ?? row.leadId ?? row.productId!, reason });
         } else result.convertible++;
       }
       if (rows.length < 100) break;

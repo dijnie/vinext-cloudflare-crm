@@ -1,3 +1,5 @@
+import { ProductService } from "@/lib/services/catalog/product-service";
+import { ProductCategoryService } from "@/lib/services/catalog/product-category-service";
 import { LeadService } from "@/lib/services/leads/lead-service";
 import { LeadSettingsService } from "@/lib/services/leads/lead-settings-service";
 import { LeadConversionService } from "@/lib/services/conversions/lead-conversion-service";
@@ -61,6 +63,8 @@ export function createCompositionRoot(
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
   return {
+    products: new ProductService(db),
+    productCategories: new ProductCategoryService(db),
     leads: new LeadService(db),
     leadSettings: new LeadSettingsService(db),
     leadConversions: new LeadConversionService(db),

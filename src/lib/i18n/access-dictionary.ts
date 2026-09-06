@@ -34,6 +34,7 @@ const vi: typeof en = {
 };
 const permissions: Record<AppLocale, Record<Permission, string>> = {
   en: {
+    "product.create": "Create catalog records", "product.update": "Edit catalog records", "product.archive": "Archive catalog records", "product.restore": "Restore catalog records", "product.assign": "Assign catalog records", "product.export": "Export catalog records",
     "lead.create": "Create leads", "lead.update": "Edit leads", "lead.archive": "Archive leads", "lead.restore": "Restore leads", "lead.assign": "Assign leads", "lead.export": "Export leads", "lead.convert": "Convert leads",
     "company.create": "Create companies", "company.update": "Edit companies", "company.archive": "Archive companies", "company.restore": "Restore companies", "company.assign": "Assign companies", "company.export": "Export companies",
     "contact.create": "Create contacts", "contact.update": "Edit contacts", "contact.archive": "Archive contacts", "contact.restore": "Restore contacts", "contact.assign": "Assign contacts", "contact.export": "Export contacts",
@@ -41,6 +42,7 @@ const permissions: Record<AppLocale, Record<Permission, string>> = {
     "activity.create": "Create activities", "activity.update": "Edit activities", "field.configure": "Configure custom fields", "view.create": "Create saved views", "view.update": "Edit saved views", "view.delete": "Delete saved views",
   },
   vi: {
+    "product.create": "Tạo danh mục", "product.update": "Sửa danh mục", "product.archive": "Lưu trữ danh mục", "product.restore": "Khôi phục danh mục", "product.assign": "Phân công danh mục", "product.export": "Xuất danh mục",
     "lead.create": "Tạo tiềm năng", "lead.update": "Sửa tiềm năng", "lead.archive": "Lưu trữ tiềm năng", "lead.restore": "Khôi phục tiềm năng", "lead.assign": "Phân công tiềm năng", "lead.export": "Xuất tiềm năng", "lead.convert": "Chuyển đổi tiềm năng",
     "company.create": "Tạo công ty", "company.update": "Sửa công ty", "company.archive": "Lưu trữ công ty", "company.restore": "Khôi phục công ty", "company.assign": "Phân công công ty", "company.export": "Xuất công ty",
     "contact.create": "Tạo liên hệ", "contact.update": "Sửa liên hệ", "contact.archive": "Lưu trữ liên hệ", "contact.restore": "Khôi phục liên hệ", "contact.assign": "Phân công liên hệ", "contact.export": "Xuất liên hệ",

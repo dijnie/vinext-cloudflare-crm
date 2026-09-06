@@ -41,6 +41,7 @@ describe("CRM baseline migration", () => {
       { name: "0014_record_forms.sql" },
       { name: "0015_deal_stage_configuration.sql" },
       { name: "0016_leads_and_conversion_history.sql" },
+      { name: "0017_catalog.sql" },
     ]);
   });
 

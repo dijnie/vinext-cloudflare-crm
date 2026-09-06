@@ -10,13 +10,14 @@ import { entityPaths } from "@/lib/listing/list-state";
 import { invalidateCrm } from "@/lib/listing/invalidation";
 import { companyUpdateInputSchema } from "@/lib/services/companies/company-contract";
 import { contactUpdateInputSchema } from "@/lib/services/contacts/contact-contract";
+import { productUpdateInputSchema } from "@/lib/services/catalog/product-contract";
 import { leadUpdateInputSchema } from "@/lib/services/leads/lead-contract";
 import { dealUpdateInputSchema } from "@/lib/services/deals/deal-contract";
 import { crmRequest, requestError } from "../record-types";
 
-export function InlineRecordField({ entity, recordId, field, value, label, labels, expectedRevision }: { entity: EntityType; expectedRevision?: number; recordId: string; field: string; value: string; label: string; labels: CrmDictionary }) {
+export function InlineRecordField({ entity, recordId, field, value, label, labels, expectedRevision, readOnly }: { entity: EntityType; readOnly?: boolean; expectedRevision?: number; recordId: string; field: string; value: string; label: string; labels: CrmDictionary }) {
   const { isEnabled } = useModules();
-  const moduleEnabled = isEnabled(entity);
+  const moduleEnabled = isEnabled(entity) && !readOnly;
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -30,8 +31,8 @@ export function InlineRecordField({ entity, recordId, field, value, label, label
     if (committing.current || !moduleEnabled) return;
     const next = draft.trim();
     if (next === value) { setEditing(false); return; }
-    const schema = { company: companyUpdateInputSchema, contact: contactUpdateInputSchema, deal: dealUpdateInputSchema, lead: leadUpdateInputSchema }[entity];
-    const parsed = schema.safeParse({ action: "update", data: { [field]: next || null, ...(entity === "lead" ? { expectedRevision: editRevision.current } : {}) } });
+    const schema = { company: companyUpdateInputSchema, contact: contactUpdateInputSchema, deal: dealUpdateInputSchema, lead: leadUpdateInputSchema, product: productUpdateInputSchema }[entity];
+    const parsed = schema.safeParse({ action: "update", data: { [field]: next || null, ...(["lead", "product"].includes(entity) ? { expectedRevision: editRevision.current } : {}) } });
     if (!parsed.success) { setError(labels.invalid); return; }
     committing.current = true; setBusy(true); setError("");
     try { await crmRequest(`/api/crm/${entityPaths[entity]}/${recordId}`, { method: "PATCH", body: JSON.stringify(parsed.data) }); setEditing(false); invalidateCrm(entity); control.current?.focus(); }

@@ -45,6 +45,8 @@ export function relationError(error: unknown, fallback: string): never {
     throw new HttpError(403, "membership_required", "Active membership is required");
   }
   if (
+    message.includes("catalog_owner_inactive") ||
+    message.includes("lead_owner_inactive") ||
     message.includes("activity anchor mismatch") ||
     message.includes("deal contact company mismatch") ||
     message.includes("contact company conflicts with a deal") ||

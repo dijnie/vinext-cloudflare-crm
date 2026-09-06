@@ -17,7 +17,7 @@ export class OwnershipService {
     if (input.ownerMembershipId && !(await this.db.select({ id: singletonMembership.userId }).from(singletonMembership).where(and(eq(singletonMembership.userId, input.ownerMembershipId), eq(singletonMembership.status, "active"))).get())) throw new HttpError(400, "validation_failed", "Owner must be an active member");
     const table = recordTables[input.entity];
     try {
-      const rows = await authorizedWrite(this.db, context, [`${input.entity}.assign`], this.db.update(table).set({ ownerMembershipId: input.ownerMembershipId, updatedAt: new Date(), ...(input.entity === "lead" ? { revision: sql`revision+1` } : {}) }).where(inJsonArray(table.id, input.ids)).returning({ id: table.id }));
+      const rows = await authorizedWrite(this.db, context, [`${input.entity}.assign`], this.db.update(table).set({ ownerMembershipId: input.ownerMembershipId, updatedAt: new Date(), ...(["lead", "product"].includes(input.entity) ? { revision: sql`revision+1` } : {}) }).where(inJsonArray(table.id, input.ids)).returning({ id: table.id }));
       return { requested: input.ids.length, succeeded: rows.length, failed: input.ids.length - rows.length };
     } catch (error) { relationError(error, "Ownership relationships changed"); }
   }

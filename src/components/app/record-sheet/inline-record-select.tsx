@@ -10,10 +10,10 @@ import { crmRequest, requestError, type CrmRecord } from "../record-types";
 import { OwnerPicker } from "../owner-picker";
 import { FormSelect } from "./form-select";
 
-export function InlineRecordSelect({ entity, record, field, shown, labels }: { entity: EntityType; record: CrmRecord; field: "owner" | "stage"; shown: string; labels: CrmDictionary }) {
+export function InlineRecordSelect({ entity, record, field, shown, labels, readOnly }: { entity: EntityType; readOnly?: boolean; record: CrmRecord; field: "owner" | "stage"; shown: string; labels: CrmDictionary }) {
   const stageCatalog = useDealStages();
   const { isEnabled } = useModules();
-  const moduleEnabled = isEnabled(entity);
+  const moduleEnabled = isEnabled(entity) && !readOnly;
 
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -21,7 +21,7 @@ export function InlineRecordSelect({ entity, record, field, shown, labels }: { e
   async function save(value: string | null) {
     if (!moduleEnabled) return;
     setBusy(true); setError("");
-    try { await crmRequest(`/api/crm/${entityPaths[entity]}/${record.id}`, { method: "PATCH", body: JSON.stringify({ action: "update", data: { ...(entity === "lead" ? { expectedRevision: record.revision } : {}), [field === "owner" ? "ownerMembershipId" : "stageId"]: value } }) }); setEditing(false); invalidateCrm(entity); if (field === "owner") invalidateCrm("ownership"); }
+    try { await crmRequest(`/api/crm/${entityPaths[entity]}/${record.id}`, { method: "PATCH", body: JSON.stringify({ action: "update", data: { ...(["lead", "product"].includes(entity) ? { expectedRevision: record.revision } : {}), [field === "owner" ? "ownerMembershipId" : "stageId"]: value } }) }); setEditing(false); invalidateCrm(entity); if (field === "owner") invalidateCrm("ownership"); }
     catch (reason) { setError(requestError(reason, labels)); }
     finally { setBusy(false); }
   }

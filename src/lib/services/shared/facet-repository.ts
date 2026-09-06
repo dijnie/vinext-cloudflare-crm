@@ -4,7 +4,7 @@ import type { AppDatabase } from "@/lib/db/database";
 import { company, contact, deal, dealStage, user } from "@/lib/db/schema";
 import type { EntityType } from "../../listing/list-state";
 
-export async function listFacets(db: AppDatabase, entity: Exclude<EntityType, "lead">, where: SQL) {
+export async function listFacets(db: AppDatabase, entity: Exclude<EntityType, "lead" | "product">, where: SQL) {
   // Keep positional select results: D1 batch collapses duplicate SQL column names.
   const table = entity === "company" ? company : entity === "contact" ? contact : deal;
   const ownerQuery = db.select({ value: sql<string>`coalesce(${table.ownerMembershipId}, 'unassigned')`, label: sql<string>`coalesce(${user.name}, '')`, count: sql<number>`count(*)` }).from(table).leftJoin(user, eq(user.id, table.ownerMembershipId)).where(where).groupBy(table.ownerMembershipId, user.name).orderBy(asc(user.name)).limit(100);

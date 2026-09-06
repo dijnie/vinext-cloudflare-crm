@@ -5,7 +5,7 @@
 A CRM rebuild on Vinext, Shadcn UI, Cloudflare Workers, and D1. The current
 foundation provides verified email/password auth, race-safe singleton membership,
 the CRM database baseline, a Vietnamese/English application shell, owner-only
-member settings, and guarded lead, company, contact, and deal APIs.
+member settings, and guarded lead, company, contact, deal, and catalog APIs.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/dijnie/vinext-cloudflare-crm.git)
 
@@ -19,10 +19,10 @@ member settings, and guarded lead, company, contact, and deal APIs.
 - 🌐 Vietnamese and English sign-up, sign-in, verification, and password-reset routes
 - 🧭 Protected localized application shell with canonical cosmetic workspace URLs
 - 👤 Owner-only localized member management
-- 🏢 Localized lead, company, contact, and deal lists with stable record sheets
+- 🏢 Localized lead, company, contact, deal, and catalog lists with stable record sheets
 - 📝 Manual activities, tasks, deal stage history, and record ownership
 - 🧩 Custom fields and private/shared saved list views
-- 🔗 Guarded lead, company, contact, and deal APIs with archive/restore workflows
+- 🔗 Guarded lead, company, contact, deal, and catalog APIs with archive/restore workflows
 - 🚀 Deploy to Cloudflare Workers
 - 📦 Powered by Cloudflare D1 database
 - ✨ Clean, responsive interface
@@ -252,7 +252,7 @@ shared UI primitives in `src/components/ui`.
 The shared layout follows the Cloudflare CRM reference: `src/lib/auth`, `db`,
 `email`, `http`, `i18n`, and `listing` hold infrastructure and list contracts.
 Business services live under `src/lib/services`, grouped into activities,
-companies, contacts, conversions, currencies, custom-fields, dashboard, deals, leads, members,
+catalog, companies, contacts, conversions, currencies, custom-fields, dashboard, deals, leads, members,
 saved-views, and shared helpers. `src/lib/composition-root.ts` wires the services.
 Vinext routing and runtime conventions remain unchanged.
 
@@ -467,7 +467,7 @@ R2 and do not create that bucket remotely. Before an authorized release, provisi
 or select the intended bucket and verify the binding with public access disabled.
 Changing source configuration alone is not proof of a production bucket or upload.
 
-Owners manage lead, company, contact and deal availability at
+Owners manage lead, company, contact, deal and catalog availability at
 `/{locale}/{workspaceSlug}/settings/modules`. Disabling a module preserves historical
 records, relations, files and exports while blocking its record mutations, including
 owner writes and uploads already in progress. Re-enabling restores editing. Settings
@@ -566,3 +566,30 @@ and [conversion contracts](src/lib/services/conversions/lead-conversion-contract
 After lead writes, older three-entity application versions are incompatible; preserve
 records and apply a forward fix. Local validation does not authorize remote schema
 changes or deployment.
+
+
+The catalog at `/{locale}/{workspaceSlug}/products` stores products, services and
+packages. Every record starts with a real default variant; variants carry SKU,
+price, optional cost, currency, duration and named attributes. The UI accepts
+normal currency amounts and the API stores exact integer minor units. Editing a
+variant requires its revision; competing edits fail without overwriting changes.
+Active SKU matching trims ASCII spaces and ignores ASCII case. Archiving releases its
+active SKU reservation; restoring fails atomically if another active variant now
+uses that SKU. Default variant identity remains stable.
+
+Owners manage retained categories at `/settings/catalog`. Package composition
+references real variants and rejects cycles; inactive historical references remain
+readable. Composition metadata does not consume inventory or service sessions.
+Catalog records share custom fields, saved views, layouts, activities, assignment
+permissions and disabled-module historical reads. The seeded `catalog_images`
+file field uses private R2 uploads and record drafts; image bytes are not stored in
+D1 or exposed through a public bucket. Catalog creation consumes its draft,
+initial variant and custom values atomically.
+
+Catalog HTTP contracts are owned by [product contracts](src/lib/services/catalog/product-contract.ts)
+and [category contracts](src/lib/services/catalog/product-category-contract.ts).
+Routes include `/api/crm/products`, per-product `/variants`, the variant lookup
+`/api/crm/products/variants`, and `/api/crm/product-categories`. Order, payment,
+stock consumption and package-use workflows are not yet available. After catalog
+writes, older four-entity application versions are incompatible; retain the schema
+and use forward fixes. No remote migration or R2 provisioning is implied.

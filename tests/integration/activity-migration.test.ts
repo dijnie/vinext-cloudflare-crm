@@ -26,7 +26,7 @@ it("upgrades existing activity history without losing rows or visibility", async
     await db.prepare("INSERT INTO activity (id,type,subject,content,occurred_at,due_at,completed_at,company_id,contact_id,deal_id,author_user_id,metadata_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(...values).run();
     await db.prepare("INSERT INTO activity_visibility (activity_id,membership_id) VALUES (?, 'upgrade-owner'), (?, 'upgrade-member')").bind(values[0], values[0]).run();
   }
-  const beforeActivities = (await db.prepare("SELECT * FROM activity ORDER BY id").all()).results.map(row => ({ ...row, lead_id: null }));
+  const beforeActivities = (await db.prepare("SELECT * FROM activity ORDER BY id").all()).results.map(row => ({ ...row, lead_id: null, product_id: null }));
   const beforeVisibility = (await db.prepare("SELECT * FROM activity_visibility ORDER BY activity_id,membership_id").all()).results;
   expect(beforeActivities).toHaveLength(3);
   expect(beforeVisibility).toHaveLength(6);
@@ -53,6 +53,7 @@ it("upgrades existing activity history without losing rows or visibility", async
       { name: "0014_record_forms.sql" },
       { name: "0015_deal_stage_configuration.sql" },
       { name: "0016_leads_and_conversion_history.sql" },
+      { name: "0017_catalog.sql" },
   ]);
   expect((await db.prepare("PRAGMA foreign_key_check").all()).results).toEqual([]);
   expect((await db.prepare("PRAGMA foreign_key_list(activity_visibility)").all()).results).toContainEqual(expect.objectContaining({ table: "activity", from: "activity_id", on_delete: "CASCADE" }));

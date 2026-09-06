@@ -13,7 +13,7 @@ import type { FieldValue } from "./field-contracts";
 import { HttpError } from "@/lib/http/http-errors";
 
 const tables = recordTables;
-const anchors = { company: value.companyId, contact: value.contactId, deal: value.dealId, lead: value.leadId };
+const anchors = { company: value.companyId, contact: value.contactId, deal: value.dealId, lead: value.leadId, product: value.productId };
 type Filters = Record<string, string[]>;
 const customer = alias(contact, "field_customer");
 
@@ -91,7 +91,7 @@ export async function fieldListData(db: AppDatabase, entity: EntityType, ids: st
   const fieldsByRecord: Record<string, Record<string, FieldValue>> = {};
   for (const row of values) {
     const field = byId.get(row.fieldId)!;
-    const recordId = row.companyId ?? row.contactId ?? row.dealId ?? row.leadId!;
+    const recordId = row.companyId ?? row.contactId ?? row.dealId ?? row.leadId ?? row.productId!;
     const scalar = storedFieldValue(field.type, row);
     (fieldsByRecord[recordId] ??= {})[field.key] = scalar;
   }

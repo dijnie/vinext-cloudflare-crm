@@ -33,6 +33,7 @@ const defaultGroups = [
   ["record-layouts"],
   ["deal-stage-settings"],
   ["leads"],
+  ["catalog"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();

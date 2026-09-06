@@ -2,7 +2,7 @@ import { z } from "zod";
 import { CURRENCY_CODES, MAX_AMOUNT_MINOR } from "../currencies/currency-catalog";
 
 export const FIELD_TYPES = ["text", "long_text", "number", "date", "checkbox", "select", "url", "email", "phone", "user", "money", "multiselect", "multivalue", "rating", "customer", "formula", "file"] as const;
-export const fieldEntitySchema = z.enum(["company", "contact", "deal", "lead"]);
+export const fieldEntitySchema = z.enum(["company", "contact", "deal", "lead", "product"]);
 export const fieldTypeSchema = z.enum(FIELD_TYPES);
 export type FieldEntity = z.infer<typeof fieldEntitySchema>;
 export type FieldType = z.infer<typeof fieldTypeSchema>;

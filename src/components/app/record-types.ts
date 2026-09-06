@@ -1,3 +1,4 @@
+import { getCatalogDictionary } from "@/lib/i18n/catalog-dictionary";
 import { leadChoiceLabel } from "@/lib/i18n/lead-dictionary";
 import type { CrmDictionary } from "@/lib/i18n/crm-dictionary";
 import type { FieldDefinition, FieldValue } from "@/lib/services/custom-fields/field-contracts";
@@ -18,6 +19,9 @@ export interface ListData { rows: CrmRecord[]; total: number; facets?: Record<st
 export function recordName(row: CrmRecord) { return row.name || [row.firstName, row.lastName].filter(Boolean).join(" ") || row.id; }
 export function fieldLabel(key: string, labels: CrmDictionary) { return labels.labels[key as keyof CrmDictionary["labels"]] ?? key; }
 export function displayValue(row: CrmRecord, key: string, locale: string, labels: CrmDictionary): string {
+  if (key === "kind") return getCatalogDictionary(locale === "vi" ? "vi" : "en")[row.kind as "product" | "service" | "package"] ?? "—";
+  if (key === "category" || key === "categoryId") return typeof row.categoryLabel === "string" ? row.categoryLabel : "—";
+  if (key === "priceMinor" && typeof row.priceMinor === "number" && typeof row.currency === "string") return formatMinor(row.priceMinor, row.currency, locale);
   if (["source", "sourceId", "status", "statusId"].includes(key)) { const prefix = key.startsWith("source") ? "source" : "status"; return leadChoiceLabel({ id: String(row[`${prefix}Id`] ?? ""), label: typeof row[`${prefix}Label`] === "string" ? row[`${prefix}Label`] as string : null }, locale === "vi" ? "vi" : "en"); }
   if (key === "collaboratorMembershipIds" && Array.isArray(row[key])) return (row[key] as string[]).map(id => (row.collaboratorLabels as Record<string, string> | undefined)?.[id] ?? id).join(", ") || "—";
   if (key === "owner") return row.owner?.name || row.owner?.email || "—";

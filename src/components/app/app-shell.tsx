@@ -1,4 +1,5 @@
 "use client";
+import { getCatalogDictionary } from "@/lib/i18n/catalog-dictionary";
 import { getLeadDictionary } from "@/lib/i18n/lead-dictionary";
 import { DealStageRefreshStatus } from "./deal-stage-provider";
 import { getDealStageDictionary } from "@/lib/i18n/deal-stage-dictionary";
@@ -49,9 +50,10 @@ export function AppShell({ children, dictionary, locale, role, slug, user }: {
   const [dark, setDark] = useState(false);
   useEffect(() => { setDark(document.documentElement.classList.contains("dark")); }, []);
   const base = `/${locale}/${slug}`; const crm = getCrmDictionary(locale); const currency = getCurrencyDictionary(locale); const copy = getShellInterfaceDictionary(locale);
-  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, { href: `${base}/settings/general`, label: getBusinessSettingsDictionary(locale).title }, ...(role === "owner" ? [{ href: `${base}/settings/leads`, label: getLeadDictionary(locale).title }, { href: `${base}/settings/lead-conversion`, label: getLeadDictionary(locale).mapping }, { href: `${base}/settings/deal-stages`, label: getDealStageDictionary(locale).title }, { href: `${base}/settings/layouts`, label: getLayoutDictionary(locale).title }, { href: `${base}/settings/modules`, label: modules.labels.title },{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
+  const settings = [{ href: `${base}/settings/currencies`, label: currency.currencies }, { href: `${base}/settings/general`, label: getBusinessSettingsDictionary(locale).title }, ...(role === "owner" ? [{ href: `${base}/settings/catalog`, label: getCatalogDictionary(locale).categories }, { href: `${base}/settings/leads`, label: getLeadDictionary(locale).title }, { href: `${base}/settings/lead-conversion`, label: getLeadDictionary(locale).mapping }, { href: `${base}/settings/deal-stages`, label: getDealStageDictionary(locale).title }, { href: `${base}/settings/layouts`, label: getLayoutDictionary(locale).title }, { href: `${base}/settings/modules`, label: modules.labels.title },{ href: `${base}/settings/members`, label: dictionary.navigation.members }, { href: `${base}/settings/access`, label: getAccessDictionary(locale).title }] : [])];
   const links = [
     { href: base, label: currency.dashboard, icon: Dashboard },
+    { href: `${base}/products`, label: `${crm.product}${modules.isEnabled("product") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },
     { href: `${base}/leads`, label: `${crm.lead}${modules.isEnabled("lead") ? "" : ` · ${modules.labels.disabled}`}`, icon: UserMultiple },
     { href: `${base}/companies`, label: `${dictionary.navigation.companies}${modules.isEnabled("company") ? "" : ` · ${modules.labels.disabled}`}`, icon: Building },
     { href: `${base}/contacts`, label: `${crm.contact}${modules.isEnabled("contact") ? "" : ` · ${modules.labels.disabled}`}`, icon: UserMultiple },
