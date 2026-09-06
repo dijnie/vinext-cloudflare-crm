@@ -10,6 +10,7 @@ import type { CrmDictionary } from "@/lib/i18n/crm-dictionary";
 import { FormSelect } from "../record-sheet/form-select";
 import { OwnerPicker } from "../owner-picker";
 import { CustomerFieldPicker } from "./customer-field-picker";
+import { FieldDateTimeEditor } from "./field-datetime-editor";
 import { MoneyEditor } from "./field-editor";
 
 type Draft = { id: number; criterion: FieldCriterion };
@@ -46,11 +47,17 @@ export function FieldConditionsDialog({ fields, initial, labels, onApply, onClos
 
 function ConditionValue({ id, field, criterion, labels, onChange }: { id: string; field: FieldDefinition; criterion: FieldCriterion; labels: CrmDictionary; onChange: (value: FieldCriterion["value"]) => void }) {
   const value = criterion.value;
+  if (field.type === "date") return <DateConditionValue id={id} value={typeof value === "string" ? value : undefined} timeZone={field.calendar?.timeZone ?? "UTC"} labels={labels} onChange={onChange} />;
   if (field.type === "money") return <MoneyEditor id={id} required value={value && typeof value === "object" ? value : null} onChange={next => onChange(next && typeof next === "object" && !Array.isArray(next) ? next : undefined)} labels={labels} />;
   if (field.type === "customer") return <CustomerFieldPicker id={id} value={typeof value === "string" ? value : null} onChange={next => onChange(next ?? undefined)} labels={labels} required allowArchived />;
   if (field.type === "user") return <OwnerPicker id={id} value={typeof value === "string" ? { membershipId: value, name: null, email: null } : null} onChange={next => onChange(next?.membershipId)} labels={labels} required />;
   if (field.type === "select" || field.type === "multiselect") return <FormSelect id={id} required value={typeof value === "string" ? value : ""} onValueChange={onChange} options={field.options.map(option => ({ value: option.id, label: `${option.label}${option.archivedAt ? ` · ${labels.archived}` : ""}` }))} />;
   if (field.type === "checkbox") return <FormSelect id={id} required value={typeof value === "boolean" ? String(value) : ""} onValueChange={next => onChange(next === "true")} options={[{ value: "true", label: labels.custom.yes }, { value: "false", label: labels.custom.no }]} />;
   const numeric = ["number", "rating", "formula"].includes(field.type);
-  return <div className="space-y-1"><Input id={id} required type={numeric ? "number" : field.type === "date" ? "date" : "text"} step={numeric ? "any" : undefined} maxLength={255} value={typeof value === "string" || typeof value === "number" ? value : ""} onChange={event => onChange(event.currentTarget.value === "" ? undefined : numeric ? Number(event.currentTarget.value) : event.currentTarget.value)} />{field.type === "date" && <p className="text-xs text-muted-foreground">{labels.custom.conditionDateHelp}</p>}</div>;
+  return <div className="space-y-1"><Input id={id} required type={numeric ? "number" : "text"} step={numeric ? "any" : undefined} maxLength={255} value={typeof value === "string" || typeof value === "number" ? value : ""} onChange={event => onChange(event.currentTarget.value === "" ? undefined : numeric ? Number(event.currentTarget.value) : event.currentTarget.value)} /></div>;
+}
+
+function DateConditionValue({ id, value, timeZone, labels, onChange }: { id: string; value?: string; timeZone: string; labels: CrmDictionary; onChange: (value: string | undefined) => void }) {
+  const [mode, setMode] = useState(value?.includes("T") ? "instant" : "day");
+  return <div className="space-y-2"><label className="block space-y-1 text-xs">{labels.custom.dateComparison}<FormSelect id={`${id}-mode`} value={mode} onValueChange={next => { setMode(next); onChange(undefined); }} options={[{ value: "day", label: labels.custom.calendarDay }, { value: "instant", label: labels.custom.exactInstant }]} /></label>{mode === "instant" ? <FieldDateTimeEditor key={`instant-${timeZone}`} id={id} value={value ?? null} timeZone={timeZone} labels={labels} required onChange={next => onChange(next ?? undefined)} /> : <div className="space-y-1"><Input id={id} type="date" required value={value ?? ""} onChange={event => onChange(event.currentTarget.value || undefined)} /><p className="text-xs text-muted-foreground">{labels.custom.conditionDateHelp}</p></div>}</div>;
 }

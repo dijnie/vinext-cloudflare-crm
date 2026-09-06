@@ -1,11 +1,18 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { inJsonArray } from "@/lib/db/sql-filters";
 import type { AppDatabase } from "@/lib/db/database";
-import { fieldConfigurationRevision, customFieldDefinition as definition, customFieldOption as option, customFieldValue as value } from "@/lib/db/schema";
+import { crmSetting, fieldConfigurationRevision, customFieldDefinition as definition, customFieldOption as option, customFieldValue as value } from "@/lib/db/schema";
+import { fieldConfig } from "./field-storage";
 import type { FieldEntity } from "./field-contracts";
 
 export class FieldRepository {
   constructor(readonly db: AppDatabase) {}
+  async calendar(fields: (typeof definition.$inferSelect)[]) {
+    if (!fields.some(field => field.type === "date" && fieldConfig(field.configJson).dateTime)) return undefined;
+    const row = await this.db.select({ timeZone: crmSetting.timeZone, revision: crmSetting.calendarRevision }).from(crmSetting).where(eq(crmSetting.id, "settings")).get();
+    if (!row) throw new Error("Business settings unavailable");
+    return row;
+  }
   async configuration(entity: FieldEntity) {
     const [revisions, fields] = await this.db.batch([
       this.db.select().from(fieldConfigurationRevision).where(eq(fieldConfigurationRevision.entity, entity)),

@@ -33,6 +33,6 @@ export function isValidFieldCriterion(type: FieldType, criterion: FieldCriterion
   if (["number", "rating", "formula"].includes(type)) return typeof value === "number" && Number.isFinite(value);
   if (type === "checkbox") return typeof value === "boolean";
   if (type === "money") return moneyFieldValueSchema.safeParse(value).success;
-  if (type === "date") return typeof value === "string" && z.iso.date().safeParse(value).success;
+  if (type === "date") return typeof value === "string" && (z.iso.date().safeParse(value).success || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) && z.iso.datetime().safeParse(value).success);
   return typeof value === "string" && value.length > 0;
 }

@@ -419,7 +419,21 @@ collections. Text containment is literal and case-sensitive. Missing values,
 empty text and empty arrays match **empty**; zero, false and zero money do not.
 Ordinary comparisons exclude missing values. Money always matches the selected
 currency before comparing minor units, including inequality. Date-only conditions
-compare UTC calendar days, consistent with the existing date display, including
-timestamps within that day. Formula conditions use the same computed null rules
+compare UTC calendar days, including timestamps within that day. Explicit UTC
+instant conditions compare exact milliseconds, independently of display settings. Formula conditions use the same computed null rules
 as displayed values. Over-complex query combinations are rejected before their
 statements exceed database limits; no conditions are silently discarded.
+
+
+Date fields can opt into time editing with `config.dateTime`. Existing date-only
+fields keep UTC-day editing and display. Changing the flag never rewrites stored
+values. Time-enabled fields expose the business calendar's timezone and revision
+in `calendar` metadata, display that zone explicitly, and store UTC ISO instants
+with millisecond precision. Nonexistent local times are rejected; repeated local
+times require choosing an offset. Unchanged values retain their original instant.
+
+The values API continues accepting absolute UTC instants. Time-enabled fields
+reject date-only writes. UI requests include `calendarRevision`; a settings change
+before the atomic write returns a conflict so the editor can reload. Direct API
+clients that already own an absolute instant can omit that optional revision.
+Saved UTC-day conditions retain their meaning when date display settings change.

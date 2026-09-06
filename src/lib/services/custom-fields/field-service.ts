@@ -35,9 +35,9 @@ export class FieldService {
   constructor(private readonly db: AppDatabase) { this.repository = new FieldRepository(db); }
   private guard(context: RequestContext) { return requirePermission(this.db, context); }
   private async existing(id: string, deleted = false) { const row = await this.repository.byId(id, deleted); if (!row) throw new HttpError(404, "not_found", "Field not found"); return row; }
-  private serialize(row: DefinitionRow, options: OptionRow[]): FieldDefinition { return { id: row.id, entity: row.entity, key: row.key, label: row.label, type: row.type, config: fieldConfig(row.configJson), required: row.required, showOnSheet: row.showOnSheet, showOnTable: row.showOnTable, showOnFilter: row.showOnFilter, position: row.position, archivedAt: row.archivedAt?.toISOString() ?? null, options: options.filter(item => item.fieldId === row.id).map(item => ({ id: item.id, label: item.label, position: item.position, archivedAt: item.archivedAt?.toISOString() ?? null })) }; }
-  async list(context: RequestContext, input: { entity: FieldEntity; includeArchived?: boolean }) { await this.guard(context); const rows = await this.repository.list(input.entity, input.includeArchived); const options = await this.repository.options(rows.map(row => row.id)); return rows.map(row => this.serialize(row, options)); }
-  async byId(context: RequestContext, id: string) { await this.guard(context); const row = await this.existing(id); return this.serialize(row, await this.repository.options([id])); }
+  private serialize(row: DefinitionRow, options: OptionRow[], calendar?: FieldDefinition["calendar"]): FieldDefinition { return { id: row.id, entity: row.entity, key: row.key, label: row.label, type: row.type, config: fieldConfig(row.configJson), ...(row.type === "date" && fieldConfig(row.configJson).dateTime ? { calendar } : {}), required: row.required, showOnSheet: row.showOnSheet, showOnTable: row.showOnTable, showOnFilter: row.showOnFilter, position: row.position, archivedAt: row.archivedAt?.toISOString() ?? null, options: options.filter(item => item.fieldId === row.id).map(item => ({ id: item.id, label: item.label, position: item.position, archivedAt: item.archivedAt?.toISOString() ?? null })) }; }
+  async list(context: RequestContext, input: { entity: FieldEntity; includeArchived?: boolean }) { await this.guard(context); const rows = await this.repository.list(input.entity, input.includeArchived); const options = await this.repository.options(rows.map(row => row.id)); const calendar = await this.repository.calendar(rows); return rows.map(row => this.serialize(row, options, calendar)); }
+  async byId(context: RequestContext, id: string) { await this.guard(context); const row = await this.existing(id); return this.serialize(row, await this.repository.options([id]), await this.repository.calendar([row])); }
   previewConversion(context: RequestContext, id: string, type: FieldType, config: FieldConfig) { return new FieldConversionService(this.db).preview(context, id, type, config); }
   async applyConversion(context: RequestContext, id: string, token: string) { await new FieldConversionService(this.db).apply(context, id, token); return this.byId(context, id); }
   private configurationGuard(entity: FieldEntity, revision: number) {
@@ -69,7 +69,7 @@ export class FieldService {
   }
   private validateOptions(type: string, options: { label: string }[]) { if (["select", "multiselect"].includes(type) && options.length === 0) invalid("Select needs an option"); if (!["select", "multiselect"].includes(type) && options.length) invalid("Only select fields have options"); if (new Set(options.map(item => item.label.toLocaleLowerCase())).size !== options.length) invalid("Option labels must be unique"); }
   private validateConfig(type: string, config: FieldConfig) {
-    if (!fieldConfigSchema.safeParse(config).success || type !== "rating" && config.ratingMax !== undefined || type !== "formula" && config.expression !== undefined || type === "formula" && !config.expression) invalid("Configuration is not supported for this type");
+    if (!fieldConfigSchema.safeParse(config).success || type !== "date" && config.dateTime !== undefined || type !== "rating" && config.ratingMax !== undefined || type !== "formula" && config.expression !== undefined || type === "formula" && !config.expression) invalid("Configuration is not supported for this type");
   }
   async update(context: RequestContext, id: string, input: FieldUpdateData) {
     await requirePermission(this.db, context, ["field.configure"]);
@@ -108,7 +108,7 @@ export class FieldService {
     const [total, filled] = await Promise.all([this.db.select({ count: count() }).from(table).get(), this.db.select({ count: count() }).from(value).where(and(eq(value.fieldId, id), sql`coalesce(${value.textValue}, ${value.numberValue}, ${value.dateValue}, ${value.booleanValue}, ${value.optionId}, ${value.userMembershipId}, ${value.jsonValue}, ${value.customerReferenceId}) is not null`)).get()]); return { total: total?.count ?? 0, filled: filled?.count ?? 0 }; }
   private async record(entity: FieldEntity, id: string) { const table = entity === "company" ? company : entity === "contact" ? contact : deal; if (!(await this.db.select({ id: table.id }).from(table).where(eq(table.id, id)).get())) throw new HttpError(404, "not_found", "Record not found"); }
   async values(context: RequestContext, input: { entity: FieldEntity; recordId: string }) { await this.guard(context); await this.record(input.entity, input.recordId); const fields = await this.repository.list(input.entity); const values = await this.repository.values(input.entity, input.recordId); const stored = Object.fromEntries(fields.map(field => { const row = values.find(item => item.fieldId === field.id); return [field.key, storedFieldValue(field.type, row)]; })) as Record<string, FieldValue>; return { ...stored, ...formulaEvaluator(fields)(stored) }; }
-  async writeValues(context: RequestContext, input: { entity: FieldEntity; recordId: string; values: Record<string, FieldValue> }) {
+  async writeValues(context: RequestContext, input: { entity: FieldEntity; recordId: string; values: Record<string, FieldValue>; calendarRevision?: number }) {
     await requirePermission(this.db, context, [`${input.entity}.update`]); await this.record(input.entity, input.recordId); const fields = await this.repository.list(input.entity); const options = await this.repository.options(fields.map(field => field.id));
     const writes = [];
     for (const [key, raw] of Object.entries(input.values)) {
@@ -140,7 +140,7 @@ export class FieldService {
         else if (field.type === "number") { if (typeof raw !== "number" || !Number.isFinite(raw)) invalid("Expected number"); data.numberValue = raw; }
         else if (field.type === "checkbox") { if (typeof raw !== "boolean") invalid("Expected boolean"); data.booleanValue = raw; }
         else { if (typeof raw !== "string") invalid("Expected text"); const text = raw.trim();
-          if (field.type === "date") { if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(text) || !Number.isFinite(Date.parse(text)) || new Date(text).toISOString().slice(0, 10) !== text.slice(0, 10)) invalid("Expected ISO date"); data.dateValue = new Date(text); }
+          if (field.type === "date") { if (fieldConfig(field.configJson).dateTime && !text.includes("T")) invalid("Expected explicit UTC instant"); if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(text) || !Number.isFinite(Date.parse(text)) || new Date(text).toISOString().slice(0, 10) !== text.slice(0, 10)) invalid("Expected ISO date"); data.dateValue = new Date(text); }
           else if (field.type === "select") { if (!options.some(item => item.fieldId === field.id && item.id === text && !item.archivedAt)) invalid("Invalid option"); data.optionId = text; }
           else if (field.type === "user") { if (!(await this.db.select({ id: singletonMembership.userId }).from(singletonMembership).where(and(eq(singletonMembership.userId, text), eq(singletonMembership.status, "active"))).get())) invalid("Expected active member"); data.userMembershipId = text; }
           else { if (field.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) invalid("Expected email"); if (field.type === "url") { try { if (!["https:", "http:"].includes(new URL(text).protocol)) invalid("Expected HTTP URL"); } catch { invalid("Expected URL"); } } data.textValue = text; }
@@ -162,7 +162,7 @@ export class FieldService {
             where not exists (select 1 from custom_field_definition as f
               where f.id=json_extract(wanted.value,'$.id') and f.type=json_extract(wanted.value,'$.type')
                 and f.required=json_extract(wanted.value,'$.required') and f.config_json is json_extract(wanted.value,'$.config') and f.archived_at is null and f.deleted_at is null)
-          ) and exists (select 1 from singleton_membership where user_id=${context.membershipId} and status='active') then 1 else 0 end` }),
+          ) and ${input.calendarRevision === undefined ? sql`1=1` : sql`exists (select 1 from crm_setting where id='settings' and calendar_revision=${input.calendarRevision})`} and exists (select 1 from singleton_membership where user_id=${context.membershipId} and status='active') then 1 else 0 end` }),
           ...writes,
           this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, operationId)),
         ]);

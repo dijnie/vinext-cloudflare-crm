@@ -27,6 +27,7 @@ const defaultGroups = [
   ["field-conversion"],
   ["field-sorting"],
   ["field-conditions"],
+  ["field-datetime"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();

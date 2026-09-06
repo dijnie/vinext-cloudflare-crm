@@ -39,7 +39,7 @@ export class FieldConversionService {
     let blocked: string | null = null;
     if (field.archivedAt) blocked = "inactive_field";
     else if (!supportsConversion(field.type, type)) blocked = "unsupported_conversion";
-    else if (!fieldConfigSchema.safeParse(config).success || config.expression !== undefined || type !== "rating" && config.ratingMax !== undefined) blocked = "invalid_configuration";
+    else if (!fieldConfigSchema.safeParse(config).success || config.expression !== undefined || type !== "date" && config.dateTime !== undefined || type !== "rating" && config.ratingMax !== undefined) blocked = "invalid_configuration";
     if (!blocked) {
       try { validateFormulaGraph(snapshot.fields.map(item => item.id === id ? { ...item, type, configJson: JSON.stringify(config) } : item), field.key, false); }
       catch { blocked = "formula_dependency"; }

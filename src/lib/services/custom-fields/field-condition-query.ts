@@ -22,6 +22,7 @@ export async function fieldConditionQuery(db: AppDatabase, entity: FieldEntity, 
     if (operator === "contains") return field.type === "multiselect" || field.type === "multivalue"
       ? sql`exists(select 1 from json_each(${expression}) item where item.value=${value})`
       : sql`instr(${expression},${value})>0`;
+    if (field.type === "date" && typeof value === "string" && value.includes("T")) return sql`${expression} ${sql.raw(comparison[operator])} ${Date.parse(value)}`;
     if (field.type === "date") {
       const start = Date.parse(`${value}T00:00:00.000Z`), end = start + 86400000;
       if (operator === "eq") return sql`${expression} between ${start} and ${end - 1}`;

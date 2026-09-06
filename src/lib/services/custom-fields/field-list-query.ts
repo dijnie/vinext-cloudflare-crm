@@ -1,3 +1,4 @@
+import { FieldRepository } from "./field-repository";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
@@ -73,7 +74,8 @@ export async function fieldListData(db: AppDatabase, entity: EntityType, ids: st
     ]) : Promise.resolve([[], []] as [typeof option.$inferSelect[], typeof value.$inferSelect[]]),
     filterIds.length ? facetQuery : Promise.resolve([]),
   ]);
-  const customFields = definitions.map(field => ({ id: field.id, entity: field.entity, key: field.key, label: field.label, type: field.type, config: fieldConfig(field.configJson), required: field.required, showOnSheet: field.showOnSheet, showOnTable: field.showOnTable, showOnFilter: field.showOnFilter, position: field.position, archivedAt: null, options: options.filter(item => item.fieldId === field.id).map(item => ({ id: item.id, label: item.label, position: item.position, archivedAt: item.archivedAt?.toISOString() ?? null })) }));
+  const calendar = await new FieldRepository(db).calendar(definitions);
+  const customFields = definitions.map(field => ({ id: field.id, entity: field.entity, key: field.key, label: field.label, type: field.type, config: fieldConfig(field.configJson), ...(field.type === "date" && fieldConfig(field.configJson).dateTime ? { calendar } : {}), required: field.required, showOnSheet: field.showOnSheet, showOnTable: field.showOnTable, showOnFilter: field.showOnFilter, position: field.position, archivedAt: null, options: options.filter(item => item.fieldId === field.id).map(item => ({ id: item.id, label: item.label, position: item.position, archivedAt: item.archivedAt?.toISOString() ?? null })) }));
   const byId = new Map(definitions.map(field => [field.id, field]));
   const memberIds = [...new Set(values.flatMap(row => row.userMembershipId ? [row.userMembershipId] : []))];
   const members = memberIds.length ? await db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(inJsonArray(user.id, memberIds)) : [];

@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CURRENCY_CODES, type CurrencyCode } from "@/lib/services/currencies/currency-catalog";
 import { formatFieldMoneyInput, parseFieldMoneyInput } from "./field-money-input";
+import { FieldDateTimeEditor } from "./field-datetime-editor";
 import { CustomerFieldPicker } from "./customer-field-picker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +18,8 @@ export function FieldEditor({ field, value, onChange, labels, disabled }: { fiel
   const text = value == null ? "" : String(value);
   const unavailable = field.type === "select" && value != null && !field.options.some(option => option.id === value && !option.archivedAt);
   return <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-2"><label htmlFor={id} className="truncate pt-2 text-xs text-muted-foreground">{field.label}{field.required ? " *" : ""}</label>
-    {field.type === "formula" ? <div className="space-y-1"><output id={id} aria-label={field.label} aria-describedby={`${id}-formula-help`} className="block py-2 text-xs tabular-nums">{typeof value === "number" ? String(value) : "—"}</output><p id={`${id}-formula-help`} className="text-xs text-muted-foreground">{labels.custom.formulaReadOnly}</p></div>
+    {field.type === "date" && field.config?.dateTime ? field.calendar ? <FieldDateTimeEditor key={`${id}-${field.calendar.timeZone}`} id={id} value={typeof value === "string" ? value : null} timeZone={field.calendar.timeZone} labels={labels} required={field.required} disabled={disabled} onChange={onChange} /> : <p role="alert" className="text-xs text-destructive">{labels.custom.calendarStale}</p>
+      : field.type === "formula" ? <div className="space-y-1"><output id={id} aria-label={field.label} aria-describedby={`${id}-formula-help`} className="block py-2 text-xs tabular-nums">{typeof value === "number" ? String(value) : "—"}</output><p id={`${id}-formula-help`} className="text-xs text-muted-foreground">{labels.custom.formulaReadOnly}</p></div>
       : field.type === "money" ? <MoneyEditor id={id} value={value} onChange={onChange} labels={labels} required={field.required} disabled={disabled} />
       : field.type === "customer" ? <CustomerFieldPicker id={id} value={typeof value === "string" ? value : null} onChange={onChange} labels={labels} required={field.required} disabled={disabled} />
       : field.type === "multiselect" ? <fieldset id={id} aria-label={field.label} disabled={disabled} className="space-y-2 py-1">{field.options.filter(option => !option.archivedAt || Array.isArray(value) && value.includes(option.id)).map(option => <label key={option.id} className="flex items-center gap-2 text-xs"><input type="checkbox" className="size-4 accent-primary" checked={Array.isArray(value) && value.includes(option.id)} onChange={event => { const selected = Array.isArray(value) ? value : []; onChange(event.currentTarget.checked ? [...selected, option.id] : selected.filter(id => id !== option.id)); }} />{option.label}{option.archivedAt ? ` · ${labels.archived}` : ""}</label>)}</fieldset>
