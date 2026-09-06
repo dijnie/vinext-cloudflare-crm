@@ -6,6 +6,8 @@ import { HttpError } from "@/lib/http/http-errors";
 import { relationError } from "@/lib/services/shared/service-utils";
 import type { RequestContext } from "@/lib/http/request-context";
 import { fieldKeyFromLabel, type FieldCreateInput, type FieldDefinition, type FieldEntity, type FieldUpdateData, type FieldValue } from "./field-contracts";
+import { formulaExpression } from "./formula-query";
+import { formulaEvaluator, validateFormulaGraph } from "./field-formula";
 import { fieldConfig, storedFieldValue } from "./field-storage";
 import { moneyFieldValueSchema, fieldConfigSchema, type FieldConfig } from "./field-contracts";
 import { FieldRepository, recordColumn } from "./field-repository";
@@ -34,34 +36,56 @@ export class FieldService {
   private serialize(row: DefinitionRow, options: OptionRow[]): FieldDefinition { return { id: row.id, entity: row.entity, key: row.key, label: row.label, type: row.type, config: fieldConfig(row.configJson), required: row.required, showOnSheet: row.showOnSheet, showOnTable: row.showOnTable, showOnFilter: row.showOnFilter, position: row.position, archivedAt: row.archivedAt?.toISOString() ?? null, options: options.filter(item => item.fieldId === row.id).map(item => ({ id: item.id, label: item.label, position: item.position, archivedAt: item.archivedAt?.toISOString() ?? null })) }; }
   async list(context: RequestContext, input: { entity: FieldEntity; includeArchived?: boolean }) { await this.guard(context); const rows = await this.repository.list(input.entity, input.includeArchived); const options = await this.repository.options(rows.map(row => row.id)); return rows.map(row => this.serialize(row, options)); }
   async byId(context: RequestContext, id: string) { await this.guard(context); const row = await this.existing(id); return this.serialize(row, await this.repository.options([id])); }
+  private configurationGuard(entity: FieldEntity, revision: number) {
+    const id = crypto.randomUUID();
+    return {
+      begin: this.db.insert(operationConditionGuard).values({ id, authorized: sql<number>`case when exists (select 1 from field_configuration_revision where entity=${entity} and revision=${revision}) then 1 else 0 end` }),
+      end: this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, id)),
+    };
+  }
+  private graph(fields: DefinitionRow[], changed: { key: string; type: string; configJson: string | null; archivedAt: Date | null; deletedAt: Date | null }, strict: boolean) {
+    try { validateFormulaGraph([...fields.filter(field => field.key !== changed.key), changed], changed.key, strict); }
+    catch (error) { invalid(error instanceof Error ? error.message : "Invalid formula graph"); }
+  }
   async create(context: RequestContext, input: FieldCreateInput) {
     await requirePermission(this.db, context, ["field.configure"]);
     if (input.options.some(item => item.id)) invalid("New options cannot provide IDs");
     this.validateOptions(input.type, input.options);
     this.validateConfig(input.type, input.config ?? {});
     const key = fieldKeyFromLabel(input.label);
-    const reserved = await this.db.select({ key: definition.key }).from(definition).where(eq(definition.entity, input.entity));
+    const snapshot = await this.repository.configuration(input.entity);
+    const reserved = snapshot.fields;
     if (reserved.some(row => row.key === key)) conflict("Field key is already reserved");
+    if (input.type === "formula" && input.required) invalid("Computed fields cannot be required inputs");
     const id = crypto.randomUUID(), now = new Date(); const { options, config, ...data } = input;
-    try { await authorizedBatch(this.db, context, ["field.configure"], [this.db.insert(definition).values({ ...data, configJson: config ? JSON.stringify(config) : null, id, key, position: await this.repository.nextPosition(input.entity), createdAt: now, updatedAt: now }), ...options.map((item, position) => this.db.insert(option).values({ id: crypto.randomUUID(), fieldId: id, label: item.label, position }))]); } catch (error) { translateWriteError(error, "Field changed during creation"); }
+    this.graph(snapshot.fields, { key, type: input.type, configJson: config ? JSON.stringify(config) : null, archivedAt: null, deletedAt: null }, input.type === "formula");
+    const configuration = this.configurationGuard(input.entity, snapshot.revision);
+    try { await authorizedBatch(this.db, context, ["field.configure"], [configuration.begin, this.db.insert(definition).values({ ...data, configJson: config ? JSON.stringify(config) : null, id, key, position: await this.repository.nextPosition(input.entity), createdAt: now, updatedAt: now }), ...options.map((item, position) => this.db.insert(option).values({ id: crypto.randomUUID(), fieldId: id, label: item.label, position })), configuration.end]); } catch (error) { translateWriteError(error, "Field changed during creation"); }
     return this.byId(context, id);
   }
   private validateOptions(type: string, options: { label: string }[]) { if (["select", "multiselect"].includes(type) && options.length === 0) invalid("Select needs an option"); if (!["select", "multiselect"].includes(type) && options.length) invalid("Only select fields have options"); if (new Set(options.map(item => item.label.toLocaleLowerCase())).size !== options.length) invalid("Option labels must be unique"); }
   private validateConfig(type: string, config: FieldConfig) {
-    if (!fieldConfigSchema.safeParse(config).success || type !== "rating" && config.ratingMax !== undefined) invalid("Configuration is not supported for this type");
+    if (!fieldConfigSchema.safeParse(config).success || type !== "rating" && config.ratingMax !== undefined || type !== "formula" && config.expression !== undefined || type === "formula" && !config.expression) invalid("Configuration is not supported for this type");
   }
   async update(context: RequestContext, id: string, input: FieldUpdateData) {
-    await requirePermission(this.db, context, ["field.configure"]); const row = await this.existing(id); const existing = await this.repository.options([id]);
+    await requirePermission(this.db, context, ["field.configure"]);
+    const initial = await this.existing(id), snapshot = await this.repository.configuration(initial.entity);
+    const row = snapshot.fields.find(field => field.id === id && !field.deletedAt);
+    if (!row) throw new HttpError(404, "not_found", "Field not found");
+    const existing = await this.repository.options([id]);
     const type = input.type ?? row.type;
     const config = input.config ?? (type === row.type ? fieldConfig(row.configJson) : {});
     this.validateConfig(type, config);
+    if (type === "formula" && (input.required ?? row.required)) invalid("Computed fields cannot be required inputs");
+    this.graph(snapshot.fields, { ...row, type, configJson: JSON.stringify(config) }, type === "formula" && (input.config?.expression !== undefined || type !== row.type));
+    const configuration = this.configurationGuard(row.entity, snapshot.revision);
     if (type !== row.type && await this.repository.hasValues(id)) conflict("A field with stored values cannot change type");
     this.validateOptions(type, input.options ?? (["select", "multiselect"].includes(type) ? existing.filter(item => !item.archivedAt) : []));
     if (input.options) { const ids = input.options.flatMap(item => item.id ? [item.id] : []); if (new Set(ids).size !== ids.length || ids.some(optionId => !existing.some(item => item.id === optionId))) invalid("Option does not belong to this field"); }
     const { options, config: ignoredConfig, ...data } = input; const now = new Date();
     const mutations = [this.db.update(definition).set({ ...data, ...(input.config !== undefined || type !== row.type ? { configJson: JSON.stringify(config) } : {}), updatedAt: now }).where(and(eq(definition.id, id), isNull(definition.deletedAt)))];
     const optionWrites = options && ["select", "multiselect"].includes(type) ? [this.db.update(option).set({ archivedAt: now }).where(eq(option.fieldId, id)), ...options.map((item, position) => item.id ? this.db.update(option).set({ label: item.label, position, archivedAt: null }).where(and(eq(option.id, item.id), eq(option.fieldId, id))) : this.db.insert(option).values({ id: crypto.randomUUID(), fieldId: id, label: item.label, position }))] : [];
-    try { await authorizedBatch(this.db, context, ["field.configure"], [mutations[0]!, ...optionWrites]); } catch (error) { translateWriteError(error, "Field changed during update"); }
+    try { await authorizedBatch(this.db, context, ["field.configure"], [configuration.begin, mutations[0]!, ...optionWrites, configuration.end]); } catch (error) { translateWriteError(error, "Field changed during update"); }
     return this.byId(context, id);
   }
   async reorder(context: RequestContext, input: { entity: FieldEntity; ids: string[] }) { await requirePermission(this.db, context, ["field.configure"]); const rows = await this.repository.list(input.entity, true); if (input.ids.length !== rows.length || new Set(input.ids).size !== rows.length || input.ids.some(id => !rows.some(row => row.id === id))) invalid("Order must contain all fields on this entity"); const updates = input.ids.map((id, position) => this.db.update(definition).set({ position, updatedAt: new Date() }).where(and(eq(definition.id, id), eq(definition.entity, input.entity), isNull(definition.deletedAt)))); if (updates.length) await authorizedBatch(this.db, context, ["field.configure"], [updates[0]!, ...updates.slice(1)]); return this.list(context, { entity: input.entity, includeArchived: true }); }
@@ -70,14 +94,21 @@ export class FieldService {
   restore(context: RequestContext, id: string) { return this.lifecycle(context, id, "restore"); }
   recover(context: RequestContext, id: string) { return this.lifecycle(context, id, "recover"); }
   async delete(context: RequestContext, id: string, confirmation: string) { await requirePermission(this.db, context, ["field.configure"]); const row = await this.existing(id); if (confirmation !== row.key) invalid("Confirmation must match the stable field key"); await authorizedWrite(this.db, context, ["field.configure"], this.db.update(definition).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(definition.id, id), isNull(definition.deletedAt)))); return { id }; }
-  async coverage(context: RequestContext, id: string) { await this.guard(context); const row = await this.existing(id); const table = row.entity === "company" ? company : row.entity === "contact" ? contact : deal; const [total, filled] = await Promise.all([this.db.select({ count: count() }).from(table).get(), this.db.select({ count: count() }).from(value).where(and(eq(value.fieldId, id), sql`coalesce(${value.textValue}, ${value.numberValue}, ${value.dateValue}, ${value.booleanValue}, ${value.optionId}, ${value.userMembershipId}, ${value.jsonValue}, ${value.customerReferenceId}) is not null`)).get()]); return { total: total?.count ?? 0, filled: filled?.count ?? 0 }; }
+  async coverage(context: RequestContext, id: string) { await this.guard(context); const row = await this.existing(id); const table = row.entity === "company" ? company : row.entity === "contact" ? contact : deal; if (row.type === "formula") {
+      const fields = (await this.repository.configuration(row.entity)).fields;
+      const expression = formulaExpression(fields, row.key, row.entity, sql`${table.id}`);
+      const result = await this.db.select({ total: count(), filled: sql<number>`coalesce(sum(case when ${expression} is not null then 1 else 0 end),0)` }).from(table).get();
+      return result ?? { total: 0, filled: 0 };
+    }
+    const [total, filled] = await Promise.all([this.db.select({ count: count() }).from(table).get(), this.db.select({ count: count() }).from(value).where(and(eq(value.fieldId, id), sql`coalesce(${value.textValue}, ${value.numberValue}, ${value.dateValue}, ${value.booleanValue}, ${value.optionId}, ${value.userMembershipId}, ${value.jsonValue}, ${value.customerReferenceId}) is not null`)).get()]); return { total: total?.count ?? 0, filled: filled?.count ?? 0 }; }
   private async record(entity: FieldEntity, id: string) { const table = entity === "company" ? company : entity === "contact" ? contact : deal; if (!(await this.db.select({ id: table.id }).from(table).where(eq(table.id, id)).get())) throw new HttpError(404, "not_found", "Record not found"); }
-  async values(context: RequestContext, input: { entity: FieldEntity; recordId: string }) { await this.guard(context); await this.record(input.entity, input.recordId); const fields = await this.repository.list(input.entity); const values = await this.repository.values(input.entity, input.recordId); return Object.fromEntries(fields.map(field => { const row = values.find(item => item.fieldId === field.id); return [field.key, storedFieldValue(field.type, row)]; })) as Record<string, FieldValue>; }
+  async values(context: RequestContext, input: { entity: FieldEntity; recordId: string }) { await this.guard(context); await this.record(input.entity, input.recordId); const fields = await this.repository.list(input.entity); const values = await this.repository.values(input.entity, input.recordId); const stored = Object.fromEntries(fields.map(field => { const row = values.find(item => item.fieldId === field.id); return [field.key, storedFieldValue(field.type, row)]; })) as Record<string, FieldValue>; return { ...stored, ...formulaEvaluator(fields)(stored) }; }
   async writeValues(context: RequestContext, input: { entity: FieldEntity; recordId: string; values: Record<string, FieldValue> }) {
     await requirePermission(this.db, context, [`${input.entity}.update`]); await this.record(input.entity, input.recordId); const fields = await this.repository.list(input.entity); const options = await this.repository.options(fields.map(field => field.id));
     const writes = [];
     for (const [key, raw] of Object.entries(input.values)) {
       const field = fields.find(item => item.key === key); if (!field) invalid("Unknown or archived field");
+      if (field.type === "formula") invalid("Computed fields are read-only");
       const data = { jsonValue: null as string | null, customerReferenceId: null as string | null, textValue: null as string | null, numberValue: null as number | null, dateValue: null as Date | null, booleanValue: null as boolean | null, optionId: null as string | null, userMembershipId: null as string | null, updatedAt: new Date() };
       const blank = raw === null || ["multiselect", "multivalue"].includes(field.type) && Array.isArray(raw) && raw.length === 0 || typeof raw === "string" && raw.trim() === "";
       if (blank && field.required) invalid("Required field cannot be empty");

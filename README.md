@@ -368,5 +368,20 @@ Customer-linked records must be archived rather than hard-deleted while referenc
 These values extend the existing field definition/value tables without replacing
 IDs, timestamps, tombstones, options, user references or saved views. Member and
 customer names are returned in separate label maps. Multiselect and customer
-filters share list/count/facet predicates. Formula, file, conversion previews,
+filters share list/count/facet predicates. File, conversion previews,
 module lifecycle and configurable layouts remain work in the active rebuild plan.
+
+Formula fields compute numeric results at read time and never accept direct value
+writes or required-input settings. Expressions support arithmetic, parentheses,
+unary signs and `[stable_field_key]` references to number/rating/formula fields.
+Missing or archived dependencies, division by zero and non-finite results produce
+an empty result. Money is not implicitly converted into numeric formula operands.
+The [parser and graph validator](src/lib/services/custom-fields/field-formula.ts)
+reject executable syntax, cycles and overly complex dependency expansions.
+
+Field configuration snapshots and a database revision guard prevent concurrent
+edits from introducing a dependency cycle. Retained hidden definitions remain in
+the dependency graph, so restoring a field cannot reactivate a latent cycle.
+The [SQL expression compiler](src/lib/services/custom-fields/formula-query.ts)
+uses the same parsed operators for computed-value coverage; field keys and user
+expressions never become raw SQL syntax.

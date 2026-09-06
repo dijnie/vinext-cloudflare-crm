@@ -23,6 +23,7 @@ const defaultGroups = [
   ["business-settings"],
   ["default-saved-views"],
   ["extended-fields"],
+  ["formula-fields"],
 ];
 const selectors = process.argv.slice(2);
 const children = new Set();

@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { CURRENCY_CODES, MAX_AMOUNT_MINOR } from "../currencies/currency-catalog";
 
-export const FIELD_TYPES = ["text", "long_text", "number", "date", "checkbox", "select", "url", "email", "phone", "user", "money", "multiselect", "multivalue", "rating", "customer"] as const;
+export const FIELD_TYPES = ["text", "long_text", "number", "date", "checkbox", "select", "url", "email", "phone", "user", "money", "multiselect", "multivalue", "rating", "customer", "formula"] as const;
 export const fieldEntitySchema = z.enum(["company", "contact", "deal"]);
 export const fieldTypeSchema = z.enum(FIELD_TYPES);
 export type FieldEntity = z.infer<typeof fieldEntitySchema>;
 export type FieldType = z.infer<typeof fieldTypeSchema>;
-export const fieldConfigSchema = z.object({ ratingMax: z.number().int().min(1).max(10).optional() }).strict();
+export const fieldConfigSchema = z.object({ expression: z.string().trim().min(1).max(1000).optional(), ratingMax: z.number().int().min(1).max(10).optional() }).strict();
 export type FieldConfig = z.infer<typeof fieldConfigSchema>;
 export const moneyFieldValueSchema = z.object({ amountMinor: z.number().int().min(0).max(MAX_AMOUNT_MINOR), currency: z.enum(CURRENCY_CODES) }).strict();
 export const fieldValueSchema = z.union([z.string().max(50000), z.number().finite(), z.boolean(), z.array(z.string().min(1).max(2000)).max(100), moneyFieldValueSchema, z.null()]);

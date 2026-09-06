@@ -46,6 +46,7 @@ it("upgrades existing activity history without losing rows or visibility", async
       { name: "0007_business_calendar_settings.sql" },
       { name: "0008_personal_default_views.sql" },
       { name: "0009_structured_custom_fields.sql" },
+      { name: "0010_computed_custom_fields.sql" },
   ]);
   expect((await db.prepare("PRAGMA foreign_key_check").all()).results).toEqual([]);
   expect((await db.prepare("PRAGMA foreign_key_list(activity_visibility)").all()).results).toContainEqual(expect.objectContaining({ table: "activity", from: "activity_id", on_delete: "CASCADE" }));

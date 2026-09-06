@@ -242,6 +242,11 @@ export const memberOperationGuard = sqliteTable(
   ],
 );
 
+export const fieldConfigurationRevision = sqliteTable("field_configuration_revision", {
+  entity: text("entity", { enum: ["company", "contact", "deal"] }).primaryKey().notNull(),
+  revision: integer("revision").default(0).notNull(),
+});
+
 export const customFieldDefinition = sqliteTable(
   "custom_field_definition",
   {
@@ -260,7 +265,7 @@ export const customFieldDefinition = sqliteTable(
         "url",
         "email",
         "phone",
-        "user", "money", "multiselect", "multivalue", "rating", "customer",
+        "user", "money", "multiselect", "multivalue", "rating", "customer", "formula",
       ],
     }).notNull(),
     configJson: text("config_json"),
@@ -288,7 +293,7 @@ export const customFieldDefinition = sqliteTable(
     ),
     check(
       "custom_field_type_check",
-      sql`${table.type} in ('text', 'long_text', 'number', 'date', 'checkbox', 'select', 'url', 'email', 'phone', 'user', 'money', 'multiselect', 'multivalue', 'rating', 'customer')`,
+      sql`${table.type} in ('text', 'long_text', 'number', 'date', 'checkbox', 'select', 'url', 'email', 'phone', 'user', 'money', 'multiselect', 'multivalue', 'rating', 'customer', 'formula')`,
     ),
     check(
       "custom_field_config_json_check",

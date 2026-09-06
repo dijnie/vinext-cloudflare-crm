@@ -1,11 +1,18 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { inJsonArray } from "@/lib/db/sql-filters";
 import type { AppDatabase } from "@/lib/db/database";
-import { customFieldDefinition as definition, customFieldOption as option, customFieldValue as value } from "@/lib/db/schema";
+import { fieldConfigurationRevision, customFieldDefinition as definition, customFieldOption as option, customFieldValue as value } from "@/lib/db/schema";
 import type { FieldEntity } from "./field-contracts";
 
 export class FieldRepository {
   constructor(readonly db: AppDatabase) {}
+  async configuration(entity: FieldEntity) {
+    const [revisions, fields] = await this.db.batch([
+      this.db.select().from(fieldConfigurationRevision).where(eq(fieldConfigurationRevision.entity, entity)),
+      this.db.select().from(definition).where(eq(definition.entity, entity)),
+    ]);
+    return { revision: revisions[0]!.revision, fields };
+  }
   list(entity: FieldEntity, includeArchived = false) { return this.db.select().from(definition).where(and(eq(definition.entity, entity), isNull(definition.deletedAt), includeArchived ? undefined : isNull(definition.archivedAt))).orderBy(asc(definition.position), asc(definition.id)); }
   byId(id: string, includeDeleted = false) { return this.db.select().from(definition).where(and(eq(definition.id, id), includeDeleted ? undefined : isNull(definition.deletedAt))).get(); }
   options(ids: string[]) { return ids.length ? this.db.select().from(option).where(inJsonArray(option.fieldId, ids)).orderBy(asc(option.position), asc(option.id)) : Promise.resolve([]); }

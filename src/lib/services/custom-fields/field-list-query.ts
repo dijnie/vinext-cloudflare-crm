@@ -4,6 +4,7 @@ import { company, contact, deal, customFieldDefinition as definition, customFiel
 import type { EntityType } from "@/lib/listing/list-state";
 import { inJsonArray } from "@/lib/db/sql-filters";
 import { alias } from "drizzle-orm/sqlite-core";
+import { formulaEvaluator } from "./field-formula";
 import { fieldConfig, storedFieldValue } from "./field-storage";
 import type { FieldValue } from "./field-contracts";
 import { HttpError } from "@/lib/http/http-errors";
@@ -76,6 +77,8 @@ export async function fieldListData(db: AppDatabase, entity: EntityType, ids: st
     const scalar = storedFieldValue(field.type, row);
     (fieldsByRecord[recordId] ??= {})[field.key] = scalar;
   }
+  const compute = formulaEvaluator(definitions);
+  for (const id of ids) { const values = fieldsByRecord[id] ?? {}; fieldsByRecord[id] = { ...values, ...compute(values) }; }
   const fieldFacets: Record<string, { value: string; label: string; count: number }[]> = {};
   for (const row of facetRows) { const key = byId.get(row.fieldId)!.key; (fieldFacets[key] ??= []).push({ value: row.choiceId, label: row.label, count: row.count }); }
   return { customFields, fieldsByRecord, fieldFacets, fieldUserLabels, fieldCustomerLabels };
