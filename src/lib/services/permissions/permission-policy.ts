@@ -47,11 +47,6 @@ export async function authorizedWrite<T extends Parameters<AppDatabase["batch"]>
   } catch (error) { permissionError(error); }
 }
 
-export function preparedStatement(db: AppDatabase, statement: { toSQL(): { sql: string; params: unknown[] } }) {
-  const query = statement.toSQL();
-  return db.$client.prepare(query.sql).bind(...query.params);
-}
-
 export async function authorizedBatch(db: AppDatabase, context: RequestContext, permissions: readonly Permission[], statements: Parameters<AppDatabase["batch"]>[0]) {
   const guard = actionGuard(db, context, permissions);
   try { await db.batch([guard.begin, ...statements, guard.end]); }
