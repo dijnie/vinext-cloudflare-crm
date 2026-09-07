@@ -48,8 +48,8 @@ export function CurrencySettings({ initialData, locale }: { initialData: Setting
     finally { if (mounted.current) { setBusy(false); setRunning(false); } continueJob.current = false; }
   }
   const choices = data.catalog.map(item => ({ value: item.code, label: item.code }));
-  return <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-    <header className="space-y-2"><h1 className="text-2xl font-medium tracking-tight md:text-3xl">{labels.currencies}</h1><p className="text-sm text-muted-foreground">{labels.frozen}</p></header>
+  return <div className="crm-page">
+    <header className="space-y-2"><h1 className="crm-page-title">{labels.currencies}</h1><p className="text-sm text-muted-foreground">{labels.frozen}</p></header>
     {(error || notice || loading) && <div aria-live="polite" className="text-xs">{error && <p className="text-destructive" role="alert">{error}</p>}{notice && <p className="text-success" role="status">{notice}</p>}{loading && <p role="status">{labels.loading}</p>}</div>}
     <Card><CardHeader><CardTitle><h2>{labels.reporting}</h2></CardTitle><CardDescription>{copy.reportingDescription}</CardDescription></CardHeader><CardContent>
       <div className="flex flex-wrap items-start justify-between gap-4"><div className="space-y-1"><p className="text-xs font-medium">{labels.current}</p><p className="font-medium tabular-nums">{data.reportingCurrency}</p></div><p className="text-xs text-muted-foreground">{labels.version}: {data.activeVersion}</p></div>

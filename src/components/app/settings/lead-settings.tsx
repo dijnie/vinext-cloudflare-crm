@@ -62,15 +62,15 @@ export function LeadSettings({ initialData, locale }: { initialData: Catalog; lo
     } catch { setError(crm.error); } finally { setBusy(false); }
   }
 
-  return <section className="mx-auto w-full max-w-3xl space-y-5">
-    <h1 className="text-2xl font-medium">{labels.title}</h1>
+  return <section className="crm-page">
+    <h1 className="crm-page-title">{labels.title}</h1>
     <p className="text-sm text-muted-foreground">{labels.description}</p>
     <div className="flex flex-wrap gap-2" role="group" aria-label={labels.title}>
       {(["source", "status"] as const).map(value => <Button key={value} variant={kind === value ? "default" : "outline"} aria-pressed={kind === value} onClick={() => setKind(value)}>{value === "source" ? labels.sources : labels.statuses}</Button>)}
     </div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {saved && <p role="status" className="text-sm">{labels.settingsSaved}</p>}
-    <form className="space-y-3 rounded-md border p-4" onSubmit={event => {
+    <form className="crm-surface space-y-3 p-5" onSubmit={event => {
       event.preventDefault();
       void mutate(kind === "source" ? { action: "create", kind, label: newNames.source } : { action: "create", kind, label: newNames.status, meaning, requiresReason: meaning === "rejected" && requiresReason });
     }}>
@@ -93,7 +93,7 @@ export function LeadSettings({ initialData, locale }: { initialData: Catalog; lo
         const status = kind === "status" ? catalog.statuses.find(status => status.id === row.id) : undefined;
         const protectedChoice = kind === "source" ? row.id === catalog.defaultSourceId : [catalog.defaultStatusId, "converted"].includes(row.id);
         const seeded = kind === "source" ? row.id === "manual" : ["new", "contacted", "nurturing", "unqualified", "converted"].includes(row.id);
-        return <li key={draftKey} className="space-y-4 rounded-md border p-4" data-lead-choice-id={row.id}>
+        return <li key={draftKey} className="crm-surface space-y-4 p-5" data-lead-choice-id={row.id}>
           <form className="space-y-3" onSubmit={event => { event.preventDefault(); void mutate({ action: "relabel", kind, id: row.id, label: drafts[draftKey] ?? shown }); }}>
             <label className="block space-y-1 text-sm">{shown}<Input aria-label={`${labels.label}: ${shown}`} required maxLength={100} disabled={disabled} value={drafts[draftKey] ?? shown} onChange={event => { const value = event.currentTarget.value; setDrafts(previous => ({ ...previous, [draftKey]: value })); }} /></label>
             <p className="text-xs text-muted-foreground">{[status ? labels[status.meaning] : null, protectedChoice ? labels.defaultChoice : null, row.archivedAt ? crm.archived : null].filter(Boolean).join(" · ")}</p>

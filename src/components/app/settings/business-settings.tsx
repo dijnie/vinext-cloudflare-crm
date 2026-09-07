@@ -52,8 +52,8 @@ export function BusinessSettings({ initialData, locale }: { initialData: Setting
   }
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (data.canManage && !conflict) void request("save"); }
   const unchanged = timeZone.trim() === data.timeZone && countryCode.trim().toUpperCase() === data.countryCode;
-  return <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-    <header className="space-y-2"><h1 className="text-2xl font-medium tracking-tight md:text-3xl">{labels.title}</h1><p className="text-sm text-muted-foreground">{labels.description}</p></header>
+  return <div className="crm-page">
+    <header className="space-y-2"><h1 className="crm-page-title">{labels.title}</h1><p className="text-sm text-muted-foreground">{labels.description}</p></header>
     {error && <p ref={errorRef} role="alert" tabIndex={-1} className="text-xs text-destructive">{error}</p>}
     {notice && <p role="status" className="text-xs text-success">{notice}</p>}
     <Card><CardHeader><CardTitle><h2>{labels.calendar}</h2></CardTitle></CardHeader><CardContent>

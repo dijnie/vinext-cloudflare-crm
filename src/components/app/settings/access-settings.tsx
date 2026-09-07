@@ -57,8 +57,8 @@ export function AccessSettings({ initialData, locale }: { initialData: Settings;
   }
   const profileName = (profile: Settings["profiles"][number]) => profile.id === DEFAULT_PROFILE_ID ? labels.standard : profile.name;
   const title = !editor ? "" : editor.kind === "branch" ? editor.branch ? labels.renameBranch : labels.createBranch : editor.kind === "profile" ? editor.profile ? labels.editProfile : labels.createProfile : editor.kind === "member-profile" ? labels.assignProfile : editor.kind === "member-branches" ? labels.assignBranches : labels.confirm;
-  return <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-    <header className="space-y-2"><h1 ref={heading} tabIndex={-1} className="text-2xl font-medium tracking-tight md:text-3xl">{labels.title}</h1><p className="max-w-3xl text-sm text-muted-foreground">{labels.shared}</p></header>
+  return <div className="crm-page">
+    <header className="space-y-2"><h1 ref={heading} tabIndex={-1} className="crm-page-title">{labels.title}</h1><p className="max-w-3xl text-sm text-muted-foreground">{labels.shared}</p></header>
     {notice && <p role="status" className="text-xs text-success">{notice}</p>}
     {!editor && error && <p ref={errorRef} tabIndex={-1} role="alert" className="text-xs text-destructive">{error}</p>}
     <Card><CardHeader><CardTitle><h2>{labels.branches}</h2></CardTitle><CardDescription>{labels.branchHelp}</CardDescription></CardHeader><CardContent>
