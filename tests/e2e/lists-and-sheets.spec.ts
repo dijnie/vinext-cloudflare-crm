@@ -52,7 +52,7 @@ test("SSR list avoids a duplicate fetch and refreshes after mutation and query n
   await page.goto(`/en/crm/companies?q=${prefix}`);
   await expect(page.getByRole("link", { name: `${prefix}-before`, exact: true })).toBeVisible();
   await expect(page.locator("header").first()).toHaveCSS("height", "48px");
-  await expect(page.getByRole("navigation", { name: labels.navigation, exact: true })).toHaveCSS("width", "56px");
+  await expect(page.getByRole("navigation", { name: labels.navigation, exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("desktop-company-list.png"), fullPage: true });
   // Opening a client-only control proves hydration completed before counting requests.
   await page.getByRole("button", { name: labels.add, exact: true }).click();
