@@ -7,5 +7,5 @@ import type {ComponentType} from "react";
 const Swagger=SwaggerUI as unknown as ComponentType<{url:string;persistAuthorization:boolean;validatorUrl:null;tryItOutEnabled:boolean;docExpansion:"list";defaultModelsExpandDepth:number}>;
 
 export function SwaggerDocs(){
- return <Swagger url="/api/openapi.json" persistAuthorization={false} validatorUrl={null} tryItOutEnabled docExpansion="list" defaultModelsExpandDepth={1}/>;
+ return <Swagger url="/api/openapi" persistAuthorization={false} validatorUrl={null} tryItOutEnabled docExpansion="list" defaultModelsExpandDepth={1}/>;
 }

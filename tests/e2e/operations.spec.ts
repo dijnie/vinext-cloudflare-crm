@@ -292,7 +292,7 @@ test("Swagger exposes only the approved API and Try it out sends the workspace k
       },
     }),
   );
-  const document = await checked(await page.request.get("/api/openapi.json"));
+  const document = await checked(await page.request.get("/api/openapi"));
   expect(Object.keys(document.paths).sort()).toEqual(
     [
       "/api/integrations/v1/contacts",

@@ -90,7 +90,7 @@ attribution is in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 ## Third-party API
 
 Interactive Swagger documentation is available at `/api-docs`, backed by the
-OpenAPI document at `/api/openapi.json`. The public document contains only
+OpenAPI document at `/api/openapi`. The public document contains only
 `/api/integrations/v1/*` and `/api/public/*`; private cookie-authenticated
 `/api/crm/*` routes are intentionally excluded.
 
