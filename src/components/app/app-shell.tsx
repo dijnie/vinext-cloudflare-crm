@@ -129,11 +129,11 @@ export function AppShell({children,dictionary,locale,role,slug,user}:{children:R
           <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={copy.account}><span className="flex size-7 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-medium">{user?.image?<img alt={user.name} src={user.image} className="size-full object-cover"/>:initials||<UserAvatar size={20}/>}</span></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-64"><DropdownMenuLabel><span className="block truncate text-sm font-medium">{user?.name??copy.account}</span><span className="block truncate font-normal text-muted-foreground">{user?.email}</span></DropdownMenuLabel><DropdownMenuSeparator/><DropdownMenuItem onSelect={event=>{event.preventDefault();toggleTheme()}}>{dark?<Light/>:<Asleep/>}{dark?copy.light:copy.dark}</DropdownMenuItem><DropdownMenuSeparator/><DropdownMenuItem onSelect={()=>void signOut()}><Logout/>{dictionary.auth.signOut}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </div>
       </header>
-      <main aria-busy={navigationPending} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 py-6 sm:px-6 md:px-10 md:py-9" id="main-content" tabIndex={-1}>
+      <main aria-busy={navigationPending} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 py-6 sm:px-6 md:px-8 md:py-9" id="main-content" tabIndex={-1}>
         {inSettings&&<nav aria-label={copy.settings} className="-mx-4 -mt-6 mb-6 flex shrink-0 gap-1 overflow-x-auto border-b bg-background px-3 py-2 sm:-mx-6 sm:px-5 md:hidden">{settings.map(item=><Link key={item.href} prefetch={false} href={item.href} aria-current={isActive(item.href)?"page":undefined} onClick={event=>navigate(event,item.href)} className={cn("shrink-0 rounded-lg px-3 py-2 text-sm text-muted-foreground",isActive(item.href)&&"bg-muted font-medium text-foreground")}>{item.label}</Link>)}</nav>}
         <DealStageRefreshStatus/>
         {navigationPending&&<NavigationSkeleton label={crm.loading}/>}
-        <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-[1100px] flex-1 flex-col [&>div]:w-full" hidden={navigationPending} inert={navigationPending} style={navigationPending?{display:"none"}:undefined}>{children}</div>
+        <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-[1600px] flex-1 flex-col [&>div]:w-full" hidden={navigationPending} inert={navigationPending} style={navigationPending?{display:"none"}:undefined}>{children}</div>
       </main>
     </div>
     <RecordSheetHost locale={locale}/>

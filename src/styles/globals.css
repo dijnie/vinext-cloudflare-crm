@@ -227,7 +227,7 @@ button, [role="button"] { -webkit-tap-highlight-color: transparent; }
 @layer components {
 .crm-property-row { @apply grid grid-cols-[104px_minmax(0,1fr)] items-start gap-3 py-2 text-xs; }
 .crm-section-heading { @apply text-xs font-medium text-muted-foreground; }
-.crm-page { @apply mx-auto flex w-full max-w-[1100px] flex-col gap-6; }
+.crm-page { @apply mx-auto flex w-full max-w-[1600px] flex-col gap-6; }
 .crm-page-header { @apply flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between; }
 .crm-page-title { @apply text-2xl font-semibold tracking-tight md:text-3xl; }
 .crm-page-subtitle { @apply mt-1 text-sm text-muted-foreground; }
