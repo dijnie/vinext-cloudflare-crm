@@ -1,2 +1,3 @@
 BETTER_AUTH_SECRET=replace_with_at_least_32_random_characters
+WEBHOOK_ENCRYPTION_KEYS={"current":"replace_with_a_distinct_random_value_of_at_least_32_characters","previous":[],"write":"legacy"}
 AUTH_BASE_URL=https://localhost:8787

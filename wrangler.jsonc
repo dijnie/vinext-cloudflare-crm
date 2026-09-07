@@ -35,6 +35,7 @@
   "secrets": {
     "required": [
       "BETTER_AUTH_SECRET",
+      "WEBHOOK_ENCRYPTION_KEYS",
       "AUTH_BASE_URL"
     ]
   },

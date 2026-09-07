@@ -23,6 +23,7 @@ const crmTables = [
   "reporting_goal",
   "webform_config", "webform_submission", "webform_rate_bucket", "integration_app", "integration_app_audit", "integration_event", "integration_outbox", "webhook_endpoint", "email_template", "automation_rule", "automation_run", "customer_segment", "customer_segment_member", "ai_setting", "workspace_profile", "workspace_deletion_request", "workspace_deletion_object", "configuration_copy_audit", "workspace_deletion_guard",
   "saved_view",
+  "scheduled_due_fence",
 ];
 
 describe("CRM baseline migration", () => {
@@ -55,6 +56,7 @@ describe("CRM baseline migration", () => {
       { name: "0021_reporting_indexes.sql" },
       { name: "0022_integration_operations.sql" },
       { name: "0023_integration_api_keys.sql" },
+      { name: "0024_scheduled_due_outbox.sql" },
     ]);
   });
 
@@ -104,6 +106,7 @@ describe("CRM baseline migration", () => {
         "activity_company_created_idx",
         "custom_field_entity_position_idx",
         "saved_view_entity_shared_idx",
+        "integration_outbox_subject_state_idx",
         "exchange_rate_pair_idx",
       ]),
     );

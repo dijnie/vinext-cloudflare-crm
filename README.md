@@ -187,6 +187,22 @@ Cloudflare Email Service. Change the variable and binding sender restriction
 together when changing domains. Email delivery uses the native Worker binding;
 no Resend account or API key is required.
 
+Set `WEBHOOK_ENCRYPTION_KEYS` to JSON containing a distinct current key and up
+to five previous keys, each at least 32 characters, for example
+`{"current":"<random-secret>","previous":[],"write":"legacy"}`. First deploy
+the compatible reader with `write` set to `legacy`; this keeps rollback safe.
+Then create a reviewed Worker version with `write` set to `v1`. New endpoint
+secrets use the current key and the scheduled worker rewraps all old endpoints,
+including idle and disabled ones, in bounded batches. Keep old keys in
+`previous` until scheduled logs report zero remaining ciphertext and no failed
+rewraps. Untagged legacy ciphertext still needs the existing
+`BETTER_AUTH_SECRET` during this transition, so never rotate the auth secret
+before that zero-remaining gate. Roll back the `v1` writer only to the compatible
+reader version, never to a revision that cannot read tagged ciphertext. Use
+`wrangler versions secret put` or a reviewed
+`--secrets-file` upload to stage this key with code; `wrangler secret put`
+deploys immediately.
+
 Authentication checks read the current session/user together using Better Auth's
 database joins, then read active membership on every protected request. Session
 renewal writes are throttled to five minutes, with a one-hour lifetime from the
