@@ -223,6 +223,11 @@ npm run dev
 The source migration directory is `migrations/crm`. Apply it without starting
 the development server with `npm run db:migrate:local`.
 
+Application database access and schema definitions use `drizzle-orm`. The
+versioned Cloudflare D1 migration contract remains reviewed SQL applied by
+`scripts/d1-migrations.mjs`; the repository does not depend on the unused
+Drizzle Kit CLI or its generated migration state.
+
 4. Build the application:
 
 ```bash
@@ -257,6 +262,12 @@ The [package scripts](package.json) own the local checks, binding generation,
 and deployment commands. `npm run check` covers the non-browser release gates;
 browser checks use the disposable local runner above. Local mail fixtures do
 not prove Cloudflare Email Service delivery or remote auth cookies.
+
+Run `npm run audit:dependencies` before release to reject moderate-or-higher
+advisories in the locked dependency graph. The GitHub quality workflow runs
+this audit, `npm run check`, and the auth, scheduling, and operations browser
+suites against separate disposable local databases; it never invokes a deploy
+or remote migration command.
 
 The selected remote database already contains bootstrapped accounts and older
 migration history. The fresh baseline in [migrations/crm](migrations/crm) cannot
