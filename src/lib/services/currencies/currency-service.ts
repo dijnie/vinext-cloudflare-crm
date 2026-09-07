@@ -1,5 +1,5 @@
 import { permissionPredicate } from "../permissions/permission-policy";
-import { and, asc, eq, gt, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, gt, isNotNull, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { AppDatabase } from "@/lib/db/database";
 import { crmSetting, currencyJob, deal, dealConversion, exchangeRate, operationConditionGuard, singletonMembership } from "@/lib/db/schema";
@@ -35,14 +35,30 @@ export class CurrencyService {
     const [rows, job, excluded] = await Promise.all([
       this.rates.list(base),
       setting.pendingJobId ? this.db.select().from(currencyJob).where(eq(currencyJob.id, setting.pendingJobId)).get() : undefined,
-      this.db.$client.prepare(`SELECT d.currency, count(*) AS count FROM deal d LEFT JOIN deal_conversion c ON c.deal_id=d.id AND c.version=? AND c.money_revision=d.money_revision WHERE d.archived_at IS NULL AND d.amount_minor IS NOT NULL AND (c.base_amount_minor IS NULL OR c.base_currency IS NULL OR c.base_currency!=?) GROUP BY d.currency`).bind(setting.activeConversionVersion, setting.reportingCurrency).all<{currency: string; count: number}>(),
+      this.db.select({ currency: deal.currency, count: count() })
+        .from(deal)
+        .leftJoin(dealConversion, and(
+          eq(dealConversion.dealId, deal.id),
+          eq(dealConversion.version, setting.activeConversionVersion),
+          eq(dealConversion.moneyRevision, deal.moneyRevision),
+        ))
+        .where(and(
+          isNull(deal.archivedAt),
+          isNotNull(deal.amountMinor),
+          or(
+            isNull(dealConversion.baseAmountMinor),
+            isNull(dealConversion.baseCurrency),
+            ne(dealConversion.baseCurrency, setting.reportingCurrency),
+          ),
+        ))
+        .groupBy(deal.currency),
     ]);
     const effective = new Map<string, typeof rows[number]>();
     for (const row of rows.filter(row => row.source === "fetched").concat(rows.filter(row => row.source === "manual"))) if (CURRENCY_CODES.includes(row.quoteCurrency as typeof CURRENCY_CODES[number])) effective.set(row.quoteCurrency, row);
     return {
       reportingCurrency: currencyCodeSchema.parse(setting.reportingCurrency), activeVersion: setting.activeConversionVersion, canManage: context.role === "owner", catalog: CURRENCIES,
       rates: [...effective.values()].map(row => ({ baseCurrency: base, currency: currencyCodeSchema.parse(row.quoteCurrency), rate: row.rate, asOf: row.asOf.toISOString(), source: row.source, overriding: row.source === "manual" && rows.some(other => other.quoteCurrency === row.quoteCurrency && other.source === "fetched") })).sort((a,b) => a.currency.localeCompare(b.currency)),
-      unconverted: { count: excluded.results.reduce((total,row) => total + row.count, 0), currencies: excluded.results.map(row => row.currency).sort() },
+      unconverted: { count: excluded.reduce((total,row) => total + row.count, 0), currencies: excluded.map(row => row.currency).sort() },
       job: job ? currencyJobSchema.parse(job) : null,
     };
   }

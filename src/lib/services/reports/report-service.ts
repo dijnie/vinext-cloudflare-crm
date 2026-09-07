@@ -1,6 +1,6 @@
-import { sql } from "drizzle-orm";
-import type { AppDatabase } from "@/lib/db/database";
-import { reportingGoal } from "@/lib/db/schema";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { executeD1Batch, type AppDatabase } from "@/lib/db/database";
+import { branch, crmSetting, reportingGoal, singletonMembership } from "@/lib/db/schema";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
 import { actionGuard, permissionError, requirePermission } from "../permissions/permission-policy";
@@ -78,25 +78,25 @@ export class ReportService {
   async setGoal(context: RequestContext, raw: ReportGoalInput) {
     const input = reportGoalInputSchema.parse(raw);
     await requirePermission(this.db, context, [], true);
-    const settings = await this.db.$client.prepare("SELECT reporting_currency FROM crm_setting WHERE id='settings'").first<Row>();
+    const settings = await this.db.select({ reportingCurrency: crmSetting.reportingCurrency }).from(crmSetting).where(eq(crmSetting.id, "settings")).get();
     if (!settings) throw new HttpError(503, "internal_error", "Reporting settings are unavailable");
     if (input.scopeKind === "member") {
-      const member = await this.db.$client.prepare("SELECT 1 ok FROM singleton_membership WHERE user_id=? AND status='active'").bind(input.scopeId).first<Row>();
+      const member = await this.db.select({ id: singletonMembership.userId }).from(singletonMembership).where(and(eq(singletonMembership.userId, input.scopeId), eq(singletonMembership.status, "active"))).get();
       if (!member) throw new HttpError(400, "validation_failed", "Goal member must be active");
     }
     if (input.scopeKind === "branch") {
-      const branch = await this.db.$client.prepare("SELECT 1 ok FROM branch WHERE id=? AND archived_at IS NULL").bind(input.scopeId).first<Row>();
-      if (!branch) throw new HttpError(400, "validation_failed", "Goal branch must be active");
+      const activeBranch = await this.db.select({ id: branch.id }).from(branch).where(and(eq(branch.id, input.scopeId), isNull(branch.archivedAt))).get();
+      if (!activeBranch) throw new HttpError(400, "validation_failed", "Goal branch must be active");
     }
     const id = crypto.randomUUID(), now = new Date();
     const targetScope = input.scopeKind === "workspace" ? sql`${input.scopeId} = ''`
       : input.scopeKind === "member" ? sql`exists(select 1 from singleton_membership where user_id=${input.scopeId} and status='active')`
       : sql`exists(select 1 from branch where id=${input.scopeId} and archived_at is null)`;
-    const guard = actionGuard(this.db, context, [], true, sql`${targetScope} and exists(select 1 from crm_setting where id='settings' and reporting_currency=${String(settings.reporting_currency)})`);
+    const guard = actionGuard(this.db, context, [], true, sql`${targetScope} and exists(select 1 from crm_setting where id='settings' and reporting_currency=${settings.reportingCurrency})`);
     try {
       await this.db.batch([
         guard.begin,
-        this.db.insert(reportingGoal).values({ id, scopeKind: input.scopeKind, scopeId: input.scopeId, periodFrom: input.from, periodTo: input.to, currency: String(settings.reporting_currency), amountMinor: Number(input.amountMinor), creatorUserId: context.userId, updatedAt: now }).onConflictDoUpdate({ target: [reportingGoal.scopeKind, reportingGoal.scopeId, reportingGoal.periodFrom, reportingGoal.periodTo, reportingGoal.currency], set: { amountMinor: Number(input.amountMinor), creatorUserId: context.userId, updatedAt: now } }),
+        this.db.insert(reportingGoal).values({ id, scopeKind: input.scopeKind, scopeId: input.scopeId, periodFrom: input.from, periodTo: input.to, currency: settings.reportingCurrency, amountMinor: Number(input.amountMinor), creatorUserId: context.userId, updatedAt: now }).onConflictDoUpdate({ target: [reportingGoal.scopeKind, reportingGoal.scopeId, reportingGoal.periodFrom, reportingGoal.periodTo, reportingGoal.currency], set: { amountMinor: Number(input.amountMinor), creatorUserId: context.userId, updatedAt: now } }),
         guard.end,
       ]);
     } catch (error) { permissionError(error); }
@@ -107,42 +107,41 @@ export class ReportService {
     const input = reportInputSchema.parse(raw);
     await requirePermission(this.db, context, ["report.view"]);
     const [settings, exportGrant] = await Promise.all([
-      this.db.$client.prepare("SELECT reporting_currency,time_zone FROM crm_setting WHERE id='settings'").first<Row>(),
-      this.db.$client.prepare("SELECT EXISTS(SELECT 1 FROM membership_access ma JOIN access_grant ag ON ag.profile_id=ma.profile_id WHERE ma.membership_id=? AND ag.permission='report.export') allowed").bind(context.membershipId).first<Row>(),
+      this.db.select({ reportingCurrency: crmSetting.reportingCurrency, timeZone: crmSetting.timeZone }).from(crmSetting).where(eq(crmSetting.id, "settings")).get(),
+      this.db.get<{ allowed: number }>(sql`SELECT EXISTS(SELECT 1 FROM membership_access ma JOIN access_grant ag ON ag.profile_id=ma.profile_id WHERE ma.membership_id=${context.membershipId} AND ag.permission='report.export') allowed`),
     ]);
     if (!settings) throw new HttpError(503, "internal_error", "Reporting settings are unavailable");
-    const reporting = String(settings.reporting_currency), timeZone = String(settings.time_zone), today = businessDate(now, timeZone);
+    const reporting = settings.reportingCurrency, timeZone = settings.timeZone, today = businessDate(now, timeZone);
     const periodTo = input.from <= today && today < input.to ? today : input.to;
     const { start } = businessDayBounds(input.from, timeZone), { end } = businessDayBounds(periodTo, timeZone);
     const days = Math.round((Date.parse(`${periodTo}T00:00:00Z`) - Date.parse(`${input.from}T00:00:00Z`)) / DAY) + 1;
     const previousTo = isoDate(Date.parse(`${input.from}T00:00:00Z`) - DAY), previousFrom = isoDate(Date.parse(`${input.from}T00:00:00Z`) - days * DAY);
     const ownerId = input.scope === "me" ? context.membershipId : input.scope === "member" ? input.scopeId : undefined;
     const branchId = input.scope === "branch" ? input.scopeId : undefined;
-    const ownershipFilter = ownerId ? " AND so.owner_membership_id=?" : branchId ? " AND so.owner_membership_id IN (SELECT membership_id FROM member_branch WHERE branch_id=?)" : "";
+    const ownershipFilter = ownerId ? sql` AND so.owner_membership_id=${ownerId}` : branchId ? sql` AND so.owner_membership_id IN (SELECT membership_id FROM member_branch WHERE branch_id=${branchId})` : sql``;
     const missingSource = input.source === "__missing__";
-    const orderFilter = `${ownershipFilter}${missingSource ? " AND so.source IS NULL" : input.source ? " AND so.source=?" : ""}${input.recorderUserId ? " AND so.creator_user_id=?" : ""}`;
-    const orderArgs = [...(ownerId ? [ownerId] : branchId ? [branchId] : []), ...(input.source && !missingSource ? [input.source] : []), ...(input.recorderUserId ? [input.recorderUserId] : [])];
-    const workFilter = ownerId ? " AND ASSIGNEE=?" : branchId ? " AND ASSIGNEE IN (SELECT membership_id FROM member_branch WHERE branch_id=?)" : "";
-    const workArgs = ownerId ? [ownerId] : branchId ? [branchId] : [];
-    const leadFilter = ownerId ? " AND l.owner_membership_id=?" : branchId ? " AND l.owner_membership_id IN (SELECT membership_id FROM member_branch WHERE branch_id=?)" : "";
+    const orderFilter = sql`${ownershipFilter}${missingSource ? sql` AND so.source IS NULL` : input.source ? sql` AND so.source=${input.source}` : sql``}${input.recorderUserId ? sql` AND so.creator_user_id=${input.recorderUserId}` : sql``}`;
+    const taskFilter = ownerId ? sql` AND tr.assignee_membership_id=${ownerId}` : branchId ? sql` AND tr.assignee_membership_id IN (SELECT membership_id FROM member_branch WHERE branch_id=${branchId})` : sql``;
+    const ticketFilter = ownerId ? sql` AND t.assignee_membership_id=${ownerId}` : branchId ? sql` AND t.assignee_membership_id IN (SELECT membership_id FROM member_branch WHERE branch_id=${branchId})` : sql``;
+    const leadFilter = ownerId ? sql` AND l.owner_membership_id=${ownerId}` : branchId ? sql` AND l.owner_membership_id IN (SELECT membership_id FROM member_branch WHERE branch_id=${branchId})` : sql``;
     const goalKind = input.scope === "everyone" ? "workspace" : input.scope === "branch" ? "branch" : "member", goalId = input.scope === "me" ? context.membershipId : input.scopeId ?? "";
     const statements = [
-      this.db.$client.prepare(`SELECT so.*,trim(c.first_name||' '||coalesce(c.last_name,'')) contact_name,c.birth_date,c.gender,u.name recorder_name FROM sales_order so JOIN contact c ON c.id=so.contact_id LEFT JOIN user u ON u.id=so.creator_user_id WHERE so.completed_date BETWEEN ? AND ?${orderFilter} ORDER BY so.completed_date,so.number LIMIT 5001`).bind(input.from, periodTo, ...orderArgs),
-      this.db.$client.prepare(`SELECT oo.action,count(*) count FROM order_operation oo JOIN sales_order so ON so.id=oo.order_id WHERE oo.business_date BETWEEN ? AND ? AND oo.action IN ('confirm','complete','cancel')${orderFilter} GROUP BY oo.action`).bind(input.from, periodTo, ...orderArgs),
-      this.db.$client.prepare(`SELECT so.currency,sum(oa.goods_minor+oa.surcharge_minor) amount,sum(oa.tax_minor) tax FROM order_adjustment oa JOIN sales_order so ON so.id=oa.order_id WHERE oa.business_date BETWEEN ? AND ?${orderFilter} GROUP BY so.currency`).bind(input.from, periodTo, ...orderArgs),
-      this.db.$client.prepare(`SELECT op.currency,op.kind,sum(op.amount_minor) amount FROM order_payment op JOIN sales_order so ON so.id=op.order_id WHERE op.business_date BETWEEN ? AND ?${orderFilter} GROUP BY op.currency,op.kind`).bind(input.from, periodTo, ...orderArgs),
-      this.db.$client.prepare(`SELECT count(*) cohort,sum(exists(select 1 from lead_conversion lc where lc.lead_id=l.id and lc.completed_at<?)) converted FROM lead l WHERE l.created_at>=? AND l.created_at<?${leadFilter}`).bind(end.getTime(), start.getTime(), end.getTime(), ...workArgs),
-      this.db.$client.prepare(`SELECT count(*) count FROM lead_conversion lc JOIN lead l ON l.id=lc.lead_id WHERE lc.completed_at>=? AND lc.completed_at<?${leadFilter}`).bind(start.getTime(), end.getTime(), ...workArgs),
-      this.db.$client.prepare(`SELECT tc.due_at,tc.completed_at FROM task_cycle tc JOIN task_record tr ON tr.activity_id=tc.task_id WHERE ((tc.completed_at>=? AND tc.completed_at<?) OR (tc.completed_at IS NULL AND tc.due_at<?))${workFilter.replace("ASSIGNEE", "tr.assignee_membership_id")} LIMIT 5001`).bind(start.getTime(), end.getTime(), end.getTime(), ...workArgs),
-      this.db.$client.prepare(`SELECT cyc.due_at,cyc.resolved_at,cyc.opened_at,cyc.first_response_at FROM ticket_cycle cyc JOIN ticket t ON t.id=cyc.ticket_id WHERE ((cyc.resolved_at>=? AND cyc.resolved_at<?) OR (cyc.resolved_at IS NULL AND cyc.due_at<?))${workFilter.replace("ASSIGNEE", "t.assignee_membership_id")} LIMIT 5001`).bind(start.getTime(), end.getTime(), end.getTime(), ...workArgs),
-      this.db.$client.prepare(`SELECT so.contact_id,count(*) count FROM sales_order so WHERE so.completed_at<? AND so.state!='cancelled' AND (so.goods_remaining_minor+so.surcharge_remaining_minor+so.tax_remaining_minor)>0${orderFilter} GROUP BY so.contact_id LIMIT 5001`).bind(end.getTime(), ...orderArgs),
-      this.db.$client.prepare(`SELECT DISTINCT so.contact_id FROM sales_order so WHERE so.completed_at>=? AND so.completed_at<? AND so.state!='cancelled' AND (so.goods_remaining_minor+so.surcharge_remaining_minor+so.tax_remaining_minor)>0${orderFilter} LIMIT 5001`).bind(end.getTime() - 30 * DAY, end.getTime(), ...orderArgs),
-      this.db.$client.prepare(`SELECT so.currency,sum(so.goods_remaining_minor+so.surcharge_remaining_minor+so.tax_remaining_minor-so.collected_minor+so.refunded_minor) amount FROM sales_order so WHERE so.state!='cancelled'${orderFilter} GROUP BY so.currency`).bind(...orderArgs),
-      this.db.$client.prepare(`SELECT so.currency,sum(so.goods_minor-so.discount_minor+so.surcharge_minor) amount FROM sales_order so WHERE so.completed_date BETWEEN ? AND ?${orderFilter} GROUP BY so.currency`).bind(previousFrom, previousTo, ...orderArgs),
-      this.db.$client.prepare(`SELECT im.order_id,im.variant_id,im.quantity,so.lines_json,so.currency FROM inventory_movement im JOIN sales_order so ON so.id=im.order_id WHERE im.kind='return' AND im.business_date BETWEEN ? AND ?${orderFilter} LIMIT 5001`).bind(input.from, periodTo, ...orderArgs),
-      this.db.$client.prepare("SELECT scope_kind,amount_minor FROM reporting_goal WHERE period_from=? AND period_to=? AND currency=? AND ((scope_kind=? AND scope_id=?) OR (scope_kind='workspace' AND scope_id='')) ORDER BY CASE WHEN scope_kind=? THEN 0 ELSE 1 END LIMIT 1").bind(input.from, input.to, reporting, goalKind, goalId, goalKind),
+      this.db.all<Row>(sql`SELECT so.*,trim(c.first_name||' '||coalesce(c.last_name,'')) contact_name,c.birth_date,c.gender,u.name recorder_name FROM sales_order so JOIN contact c ON c.id=so.contact_id LEFT JOIN user u ON u.id=so.creator_user_id WHERE so.completed_date BETWEEN ${input.from} AND ${periodTo}${orderFilter} ORDER BY so.completed_date,so.number LIMIT 5001`),
+      this.db.all<Row>(sql`SELECT oo.action,count(*) count FROM order_operation oo JOIN sales_order so ON so.id=oo.order_id WHERE oo.business_date BETWEEN ${input.from} AND ${periodTo} AND oo.action IN ('confirm','complete','cancel')${orderFilter} GROUP BY oo.action`),
+      this.db.all<Row>(sql`SELECT so.currency,sum(oa.goods_minor+oa.surcharge_minor) amount,sum(oa.tax_minor) tax FROM order_adjustment oa JOIN sales_order so ON so.id=oa.order_id WHERE oa.business_date BETWEEN ${input.from} AND ${periodTo}${orderFilter} GROUP BY so.currency`),
+      this.db.all<Row>(sql`SELECT op.currency,op.kind,sum(op.amount_minor) amount FROM order_payment op JOIN sales_order so ON so.id=op.order_id WHERE op.business_date BETWEEN ${input.from} AND ${periodTo}${orderFilter} GROUP BY op.currency,op.kind`),
+      this.db.all<Row>(sql`SELECT count(*) cohort,sum(exists(select 1 from lead_conversion lc where lc.lead_id=l.id and lc.completed_at<${end.getTime()})) converted FROM lead l WHERE l.created_at>=${start.getTime()} AND l.created_at<${end.getTime()}${leadFilter}`),
+      this.db.all<Row>(sql`SELECT count(*) count FROM lead_conversion lc JOIN lead l ON l.id=lc.lead_id WHERE lc.completed_at>=${start.getTime()} AND lc.completed_at<${end.getTime()}${leadFilter}`),
+      this.db.all<Row>(sql`SELECT tc.due_at,tc.completed_at FROM task_cycle tc JOIN task_record tr ON tr.activity_id=tc.task_id WHERE ((tc.completed_at>=${start.getTime()} AND tc.completed_at<${end.getTime()}) OR (tc.completed_at IS NULL AND tc.due_at<${end.getTime()}))${taskFilter} LIMIT 5001`),
+      this.db.all<Row>(sql`SELECT cyc.due_at,cyc.resolved_at,cyc.opened_at,cyc.first_response_at FROM ticket_cycle cyc JOIN ticket t ON t.id=cyc.ticket_id WHERE ((cyc.resolved_at>=${start.getTime()} AND cyc.resolved_at<${end.getTime()}) OR (cyc.resolved_at IS NULL AND cyc.due_at<${end.getTime()}))${ticketFilter} LIMIT 5001`),
+      this.db.all<Row>(sql`SELECT so.contact_id,count(*) count FROM sales_order so WHERE so.completed_at<${end.getTime()} AND so.state!='cancelled' AND (so.goods_remaining_minor+so.surcharge_remaining_minor+so.tax_remaining_minor)>0${orderFilter} GROUP BY so.contact_id LIMIT 5001`),
+      this.db.all<Row>(sql`SELECT DISTINCT so.contact_id FROM sales_order so WHERE so.completed_at>=${end.getTime() - 30 * DAY} AND so.completed_at<${end.getTime()} AND so.state!='cancelled' AND (so.goods_remaining_minor+so.surcharge_remaining_minor+so.tax_remaining_minor)>0${orderFilter} LIMIT 5001`),
+      this.db.all<Row>(sql`SELECT so.currency,sum(so.goods_remaining_minor+so.surcharge_remaining_minor+so.tax_remaining_minor-so.collected_minor+so.refunded_minor) amount FROM sales_order so WHERE so.state!='cancelled'${orderFilter} GROUP BY so.currency`),
+      this.db.all<Row>(sql`SELECT so.currency,sum(so.goods_minor-so.discount_minor+so.surcharge_minor) amount FROM sales_order so WHERE so.completed_date BETWEEN ${previousFrom} AND ${previousTo}${orderFilter} GROUP BY so.currency`),
+      this.db.all<Row>(sql`SELECT im.order_id,im.variant_id,im.quantity,so.lines_json,so.currency FROM inventory_movement im JOIN sales_order so ON so.id=im.order_id WHERE im.kind='return' AND im.business_date BETWEEN ${input.from} AND ${periodTo}${orderFilter} LIMIT 5001`),
+      this.db.all<Row>(sql`SELECT scope_kind,amount_minor FROM reporting_goal WHERE period_from=${input.from} AND period_to=${input.to} AND currency=${reporting} AND ((scope_kind=${goalKind} AND scope_id=${goalId}) OR (scope_kind='workspace' AND scope_id='')) ORDER BY CASE WHEN scope_kind=${goalKind} THEN 0 ELSE 1 END LIMIT 1`),
     ];
-    const results = await this.db.$client.batch<Row>(statements);
+    const results = await executeD1Batch<Row>(this.db, statements);
     const [orders, events, adjustments, payments, leadCohort, leadEvents, tasks, tickets, contactCounts, windowContacts, receivables, previousOrders, returns, goals] = results.map(result => result.results);
     if ([orders, tasks, tickets, contactCounts, windowContacts, returns].some(rows => rows.length > 5000)) throw new HttpError(400, "input_limit_exceeded", "Report contains more than 5,000 detail rows in one section; narrow the date range or scope");
     const detail = orders.filter(row => row.currency === reporting).map(row => {

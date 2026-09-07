@@ -61,6 +61,7 @@ async function clearState() {
 
 import { requireRequestContext } from "@/lib/http/request-context";
 import { DashboardRepository } from "@/lib/services/dashboard/dashboard-repository";
+import { executeD1Batch } from "@/lib/db/database";
 import { createDashboardGetHandler } from "../../src/app/api/crm/dashboard/route";
 import { DealRepository } from "@/lib/services/deals/deal-repository";
 import { dealListInputSchema } from "@/lib/services/deals/deal-contract";
@@ -203,7 +204,7 @@ describe.sequential("SQL dashboard summaries",()=>{
       expect(snapshot.rowsRead).toBeLessThanOrEqual(200_000);
       const bytes=new TextEncoder().encode(JSON.stringify(summary)).length;
       expect(bytes).toBeLessThanOrEqual(32_768);
-      const plans=await env.DB.batch<{detail:string}>(repository.statements(actor.id,{scope},NOW,true));
+      const plans=await executeD1Batch<{detail:string}>(root().db,repository.statements(actor.id,{scope},NOW,true));
       const details=plans.flatMap(plan=>plan.results.map(row=>row.detail));
       for(let index=1;index<=8;index++) {
         const detail=plans[index].results.map(row=>row.detail).join("\n");
