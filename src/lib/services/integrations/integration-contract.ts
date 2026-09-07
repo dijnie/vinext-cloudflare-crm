@@ -1,6 +1,11 @@
 import {z} from "zod";
 export const appGrantSchema=z.enum(["events.write","contacts.read","leads.read","leads.create","tickets.create"]);
 export const appCreateSchema=z.object({name:z.string().trim().min(1).max(120),grants:z.array(appGrantSchema).min(1).max(5)}).strict();
+export const apiKeyMutationSchema=z.discriminatedUnion("action",[
+ z.object({action:z.literal("create-app"),data:appCreateSchema}).strict(),
+ z.object({action:z.literal("rotate-app"),id:z.string().uuid(),revision:z.number().int().min(0)}).strict(),
+ z.object({action:z.literal("revoke-app"),id:z.string().uuid(),revision:z.number().int().min(0)}).strict(),
+]);
 export const inboundEventSchema=z.object({externalId:z.string().trim().min(1).max(255),subjectId:z.string().trim().min(1).max(255),type:z.string().trim().regex(/^[a-z][a-z0-9_.-]*$/).max(120),occurredAt:z.string().datetime(),payload:z.record(z.string(),z.unknown())}).strict();
 export const endpointCreateSchema=z.object({name:z.string().trim().min(1).max(120),url:z.string().url().refine(value=>new URL(value).protocol==="https:"),events:z.array(z.string().trim().min(1).max(120)).min(1).max(50)}).strict();
 export const templateCreateSchema=z.object({name:z.string().trim().min(1).max(120),subject:z.string().trim().min(1).max(300),body:z.string().min(1).max(50_000),requiredVariables:z.array(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/)).max(50)}).strict();

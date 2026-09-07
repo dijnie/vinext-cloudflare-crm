@@ -66,6 +66,7 @@ export function AppShell({children,dictionary,locale,role,slug,user}:{children:R
   useEffect(()=>setDark(document.documentElement.classList.contains("dark")),[]);
   useEffect(()=>{if(inSettings)setSettingsOpen(true)},[inSettings]);
   const settings=[{href:`${base}/settings/currencies`,label:currency.currencies},{href:`${base}/settings/general`,label:getBusinessSettingsDictionary(locale).title},...(role==="owner"?[
+    {href:`${base}/settings/account`,label:locale==="vi"?"Tài khoản và API":"Account & API"},
     {href:`${base}/settings/catalog`,label:getCatalogDictionary(locale).categories},
     {href:`${base}/settings/leads`,label:getLeadDictionary(locale).title},
     {href:`${base}/settings/lead-conversion`,label:getLeadDictionary(locale).mapping},

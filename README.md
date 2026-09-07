@@ -54,14 +54,18 @@ cycles retain their separate business dates. Missing costs are shown as missing
 instead of zero. Report viewing and exporting are separate profile permissions;
 owners can set workspace, member, or branch goals.
 
-Owners manage operational settings at
-`/{locale}/{workspaceSlug}/settings/operations`. Public webform submissions
-require an `Idempotency-Key`; signed-system forms also require the one-time
-bearer token, `X-Webform-Timestamp`, and `X-Webform-Signature` generated over
-`token.timestamp.rawBody`. API app tokens are shown only when created and can
-be revoked immediately. Their explicit grants authorize contact/lead reads and
-idempotent lead/ticket creation through `/api/integrations/*`; every write also
-rechecks the stored active member authority atomically. Webhook secrets are
+Owners manage API keys at `/{locale}/{workspaceSlug}/settings/account` and all
+other operational settings at `/{locale}/{workspaceSlug}/settings/operations`.
+Public webform submissions
+require an `Idempotency-Key`; signed-system forms also require their separately
+issued bearer token (whose plaintext is shown only once), `X-Webform-Timestamp`, and `X-Webform-Signature` generated over
+`token.timestamp.rawBody`. New API keys contain exactly 32 lowercase hexadecimal
+characters, are shown only when created or rotated, and can be revoked
+immediately. They belong to the workspace; the creating owner remains audit
+attribution rather than a continuing runtime dependency. Explicit grants
+authorize contact/lead reads and idempotent lead/ticket creation through the
+canonical `/api/integrations/v1/*` routes. Existing unversioned routes and
+legacy `crm_` credentials remain compatible. Webhook secrets are
 encrypted at rest, while delivery retries retain event IDs and attempt history.
 Email templates block previews with missing required variables. Automations can
 assign leads, update allowed lead fields, create tasks/internal notifications,
@@ -82,6 +86,27 @@ Shared controls live in `src/components/ui`; source-derived styles live in
 `src/styles/globals.css`. Use the unified `radix-ui` package for modal, popover
 and select controls so their focus scopes share one runtime. Source component
 attribution is in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+
+## Third-party API
+
+Interactive Swagger documentation is available at `/api-docs`, backed by the
+OpenAPI document at `/api/openapi.json`. The public document contains only
+`/api/integrations/v1/*` and `/api/public/*`; private cookie-authenticated
+`/api/crm/*` routes are intentionally excluded.
+
+Create a key from **Settings → Account & API**, select only the required grants,
+and copy it immediately because its plaintext is never stored. Third-party
+backends send it over HTTPS:
+
+```http
+Authorization: Bearer 0123456789abcdef0123456789abcdef
+```
+
+These credentials are intended for server-to-server use and must not be stored
+in browser code. Integration requests share a best-effort Cloudflare edge limit
+of 600 requests per 60 seconds per credential; a limited response uses HTTP 429
+and `Retry-After: 60`. Rotation invalidates the previous key immediately. The
+last-used timestamp is approximate and may lag by up to five minutes.
 
 ## Branches and permission profiles
 

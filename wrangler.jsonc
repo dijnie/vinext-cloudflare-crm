@@ -47,6 +47,13 @@
     }
   ],
   "r2_buckets": [{ "binding": "CRM_FILES", "bucket_name": "vinext-crm-private-files" }],
+  "ratelimits": [
+    {
+      "name": "INTEGRATION_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 600, "period": 60 }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

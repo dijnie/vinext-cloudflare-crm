@@ -50,6 +50,7 @@ export interface RuntimeEnv extends Cloudflare.Env {
   AUTH_BASE_URL: string;
   AUTH_EMAIL_FROM: string;
   EMAIL: SendEmail;
+  INTEGRATION_RATE_LIMITER: RateLimit;
 }
 
 export function createCompositionRoot(
