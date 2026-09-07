@@ -14,7 +14,8 @@ test("owner saves the business calendar and recovers from a concurrent settings 
   try {
     await page.goto("/vi/crm/settings/general");
     await expect(page.getByRole("heading", { name: "Cài đặt chung", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Ngôn ngữ: EN", exact: true }).click();
+    await page.getByRole("button", { name: "Menu tài khoản", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Ngôn ngữ: EN", exact: true }).click();
     await expect(page.getByRole("heading", { name: "General settings", exact: true })).toBeVisible();
     await page.getByLabel("Time zone", { exact: true }).fill("UTC");
     await page.getByLabel("Country code", { exact: true }).fill("US");

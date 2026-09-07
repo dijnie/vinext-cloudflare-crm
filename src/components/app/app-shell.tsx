@@ -43,7 +43,7 @@ import {getSchedulingDictionary} from "@/lib/i18n/scheduling-dictionary";
 import {getShellInterfaceDictionary} from "@/lib/i18n/shell-interface-dictionary";
 import {cn} from "@/lib/utils";
 import {DealStageRefreshStatus} from "./deal-stage-provider";
-import {LocaleSwitcher} from "./locale-switcher";
+import {LocaleMenuItem} from "./locale-switcher";
 import {useModules} from "./module-provider";
 import {NavigationSkeleton} from "./navigation-skeleton";
 import {RecordSheetHost} from "./record-sheet/record-sheet-host";
@@ -124,9 +124,8 @@ export function AppShell({children,dictionary,locale,role,slug,user}:{children:R
         <Link prefetch={false} className="flex items-center gap-2 md:hidden" href={base} aria-label={copy.home} onClick={event=>navigate(event,base)}><ShellLogo className="size-5 text-[#f48120]"/><span className="text-sm font-semibold">{dictionary.common.appName}</span></Link>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {signOutError&&<p className="max-w-48 text-xs text-destructive" role="alert">{dictionary.auth.signOutError}</p>}
-          <div className="[&_button]:min-h-0"><LocaleSwitcher label={dictionary.common.language} locale={locale}/></div>
           <NotificationCenter locale={locale} base={base}/>
-          <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={copy.account}><span className="flex size-7 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-medium">{user?.image?<img alt={user.name} src={user.image} className="size-full object-cover"/>:initials||<UserAvatar size={20}/>}</span></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-64"><DropdownMenuLabel><span className="block truncate text-sm font-medium">{user?.name??copy.account}</span><span className="block truncate font-normal text-muted-foreground">{user?.email}</span></DropdownMenuLabel><DropdownMenuSeparator/><DropdownMenuItem onSelect={event=>{event.preventDefault();toggleTheme()}}>{dark?<Light/>:<Asleep/>}{dark?copy.light:copy.dark}</DropdownMenuItem><DropdownMenuSeparator/><DropdownMenuItem onSelect={()=>void signOut()}><Logout/>{dictionary.auth.signOut}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+          <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={copy.account}><span className="flex size-7 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-medium">{user?.image?<img alt={user.name} src={user.image} className="size-full object-cover"/>:initials||<UserAvatar size={20}/>}</span></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-64"><DropdownMenuLabel><span className="block truncate text-sm font-medium">{user?.name??copy.account}</span><span className="block truncate font-normal text-muted-foreground">{user?.email}</span></DropdownMenuLabel><DropdownMenuSeparator/><LocaleMenuItem label={dictionary.common.language} locale={locale}/><DropdownMenuItem onSelect={event=>{event.preventDefault();toggleTheme()}}>{dark?<Light/>:<Asleep/>}{dark?copy.light:copy.dark}</DropdownMenuItem><DropdownMenuSeparator/><DropdownMenuItem onSelect={()=>void signOut()}><Logout/>{dictionary.auth.signOut}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </div>
       </header>
       <main aria-busy={navigationPending} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 py-6 sm:px-6 md:px-8 md:py-9" id="main-content" tabIndex={-1}>

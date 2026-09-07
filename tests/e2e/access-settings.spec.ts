@@ -28,7 +28,8 @@ test("owner manages localized branch and permission forms with persisted API sta
   try {
     await page.goto("/vi/crm/settings/access");
     await expect(page.getByRole("heading", { name: "Chi nhánh và quyền", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Ngôn ngữ: EN" }).click();
+    await page.getByRole("button", { name: "Menu tài khoản", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Ngôn ngữ: EN", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Branches and permissions", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Create branch", exact: true }).click();
     let dialog = page.getByRole("dialog");

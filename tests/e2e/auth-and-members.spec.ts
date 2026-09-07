@@ -107,7 +107,8 @@ test("owner sees localized members and canonical stale slugs", async ({ browser,
   await expect(page.locator("html")).toHaveAttribute("lang", "vi");
   await expect(page.getByRole("heading", { name: "Thành viên" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Thành viên" })).toBeVisible();
-  await page.getByRole("button", { name: "Ngôn ngữ: EN" }).click();
+  await page.getByRole("button", { name: "Menu tài khoản", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Ngôn ngữ: EN", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/crm\/settings\/members\?status=active&record=e2e-record$/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByRole("heading", { name: "Members" })).toBeVisible();
