@@ -61,19 +61,20 @@ for (const locale of ["vi", "en"] as const) {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.locator(":focus")).toHaveCount(1);
-    const settingsLink = dialog.getByRole("link", { name: vi ? "Cài đặt" : "Settings", exact: true });
+    const settingsButton = dialog.getByRole("button", { name: vi ? "Cài đặt" : "Settings", exact: true });
     const focusableCount = await dialog.locator('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])').count();
     for (let step = 0; step <= focusableCount; step++) {
       await page.keyboard.press("Tab");
       await expect(dialog.locator(":focus")).toHaveCount(1);
-      if (await settingsLink.evaluate((element) => element === document.activeElement)) break;
+      if (await settingsButton.evaluate((element) => element === document.activeElement)) break;
     }
-    await expect(settingsLink).toBeFocused();
+    await expect(settingsButton).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(menu).toBeFocused();
     await menu.press("Enter");
-    await settingsLink.press("Enter");
+    await settingsButton.press("Enter");
+    await expect(settingsButton).toHaveAttribute("aria-expanded", "true");
     await page.getByRole("link", { name: vi ? "Thành viên" : "Members", exact: true }).click();
     await expect(page.getByRole("heading", { name: vi ? "Thành viên" : "Members", exact: true })).toBeVisible();
     await expect(dialog).toBeHidden();

@@ -4,6 +4,9 @@ import {
   Asleep,
   Building,
   Calendar,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Dashboard,
   Document,
   Light,
@@ -57,9 +60,11 @@ type NavGroup={label:string;items:NavItem[]};
 export function AppShell({children,dictionary,locale,role,slug,user}:{children:ReactNode;dictionary:AppDictionary;locale:AppLocale;role:"owner"|"member";slug:string;user?:{name:string;email:string;image?:string|null}}){
   useCrmInvalidation();
   const modules=useModules(),pathname=usePathname(),router=useRouter();
-  const [open,setOpen]=useState(false),[signOutError,setSignOutError]=useState(false),[navigationPending,startNavigation]=useTransition(),[dark,setDark]=useState(false);
-  useEffect(()=>setDark(document.documentElement.classList.contains("dark")),[]);
   const base=`/${locale}/${slug}`,crm=getCrmDictionary(locale),currency=getCurrencyDictionary(locale),copy=getShellInterfaceDictionary(locale),scheduling=getSchedulingDictionary(locale);
+  const inSettings=pathname.startsWith(`${base}/settings`);
+  const [open,setOpen]=useState(false),[sidebarCollapsed,setSidebarCollapsed]=useState(false),[settingsOpen,setSettingsOpen]=useState(inSettings),[signOutError,setSignOutError]=useState(false),[navigationPending,startNavigation]=useTransition(),[dark,setDark]=useState(false);
+  useEffect(()=>setDark(document.documentElement.classList.contains("dark")),[]);
+  useEffect(()=>{if(inSettings)setSettingsOpen(true)},[inSettings]);
   const settings=[{href:`${base}/settings/currencies`,label:currency.currencies},{href:`${base}/settings/general`,label:getBusinessSettingsDictionary(locale).title},...(role==="owner"?[
     {href:`${base}/settings/catalog`,label:getCatalogDictionary(locale).categories},
     {href:`${base}/settings/leads`,label:getLeadDictionary(locale).title},
@@ -97,26 +102,36 @@ export function AppShell({children,dictionary,locale,role,slug,user}:{children:R
     ]},
     {label:copy.manageGroup,items:[{href:settings[0]!.href,match:`${base}/settings`,label:copy.settings,icon:Settings}]},
   ];
-  const inSettings=pathname.startsWith(`${base}/settings`);
   const isActive=(href:string)=>pathname===href||(href!==base&&pathname.startsWith(`${href}/`));
   function navigate(event:MouseEvent<HTMLAnchorElement>,href:string){if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();setOpen(false);if(pathname!==href)startNavigation(()=>router.push(href))}
+  function toggleSettings(event:MouseEvent<HTMLButtonElement>,compact:boolean){
+    const menu=event.currentTarget.parentElement;
+    if(compact){setSidebarCollapsed(false);setSettingsOpen(true)}
+    else setSettingsOpen(value=>!value);
+    if(compact||!settingsOpen)requestAnimationFrame(()=>menu?.scrollIntoView({block:"start"}));
+  }
   async function signOut(){setSignOutError(false);try{const {error}=await authClient.signOut();if(error)setSignOutError(true);else router.push(`/${locale}/sign-in`)}catch{setSignOutError(true)}}
   function toggleTheme(){const next=!document.documentElement.classList.contains("dark");document.documentElement.classList.toggle("dark",next);try{localStorage.setItem("crm-theme",next?"dark":"light")}catch{}setDark(next)}
   const initials=user?.name.split(" ").map(part=>part[0]).filter(Boolean).slice(0,2).join("").toUpperCase();
 
-  const navigation=(mobile=false)=><nav aria-label={crm.navigation} className={cn("min-h-0 flex-1 overflow-y-auto px-3 py-4",mobile&&"px-3")}>
-    <div className="space-y-5">{groups.map(group=><section key={group.label}><h2 className="mb-1.5 px-2 text-[11px] font-medium text-muted-foreground">{group.label}</h2><div className="space-y-0.5">{group.items.map(({href,match,label,icon:Icon})=><Link key={href} prefetch={false} href={href} aria-current={isActive(match??href)?"page":undefined} onClick={event=>navigate(event,href)} onMouseEnter={()=>router.prefetch(href)} onFocus={()=>router.prefetch(href)} className={cn("flex h-9 items-center gap-3 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",isActive(match??href)&&"bg-muted font-medium text-foreground")}><Icon className="size-4 shrink-0"/><span className="min-w-0 truncate">{label}</span></Link>)}</div></section>)}</div>
-    {inSettings&&<section className="mt-5 border-t pt-4"><h2 className="mb-1.5 px-2 text-[11px] font-medium text-muted-foreground">{copy.workspace}</h2><div className="space-y-0.5">{settings.map(item=><Link key={item.href} prefetch={false} href={item.href} aria-current={isActive(item.href)?"page":undefined} onClick={event=>navigate(event,item.href)} className={cn("flex min-h-9 items-center rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground",isActive(item.href)&&"bg-muted font-medium text-foreground")}>{item.label}</Link>)}</div></section>}
-  </nav>;
+  const navigation=(mobile=false)=>{
+    const compact=sidebarCollapsed&&!mobile;
+    return <nav aria-label={crm.navigation} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+      <div className="space-y-5">{groups.map(group=><section key={group.label}><h2 className={cn("mb-1.5 px-2 text-[11px] font-medium text-muted-foreground",compact&&"sr-only")}>{group.label}</h2><div className="space-y-0.5">{group.items.map(({href,match,label,icon:Icon})=>match===`${base}/settings`?<div key={href}>
+        <button type="button" title={compact?label:undefined} aria-expanded={settingsOpen&&!compact} onClick={event=>toggleSettings(event,compact)} className={cn("flex h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",compact&&"justify-center",inSettings&&"bg-muted font-medium text-foreground")}><Icon className="size-4 shrink-0"/><span className={cn("min-w-0 flex-1 truncate text-left",compact&&"sr-only")}>{label}</span>{!compact&&(settingsOpen?<ChevronDown className="size-4 shrink-0"/>:<ChevronRight className="size-4 shrink-0"/>)}</button>
+        {settingsOpen&&!compact&&<div className="ml-4 mt-1 space-y-0.5 border-l pl-3">{settings.map(item=><Link key={item.href} prefetch={false} href={item.href} aria-current={isActive(item.href)?"page":undefined} onClick={event=>navigate(event,item.href)} className={cn("flex min-h-9 items-center rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground",isActive(item.href)&&"bg-muted font-medium text-foreground")}>{item.label}</Link>)}</div>}
+      </div>:<Link key={href} prefetch={false} href={href} title={compact?label:undefined} aria-current={isActive(match??href)?"page":undefined} onClick={event=>navigate(event,href)} onMouseEnter={()=>router.prefetch(href)} onFocus={()=>router.prefetch(href)} className={cn("flex h-9 items-center gap-3 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",compact&&"justify-center",isActive(match??href)&&"bg-muted font-medium text-foreground")}><Icon className="size-4 shrink-0"/><span className={cn("min-w-0 truncate",compact&&"sr-only")}>{label}</span></Link>)}</div></section>)}</div>
+    </nav>;
+  };
 
   return <div className="isolate flex h-svh min-h-0 overflow-hidden bg-[#f8f8f8] dark:bg-background">
     <a className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-background focus:p-3" href="#main-content">{crm.skip}</a>
-    <aside className="hidden w-[260px] shrink-0 flex-col border-r bg-sidebar md:flex">
-      <Link prefetch={false} href={base} onClick={event=>navigate(event,base)} aria-label={copy.home} className="flex h-[58px] shrink-0 items-center gap-3 border-b px-5">
-        <ShellLogo className="size-6 text-[#f48120]"/><span className="min-w-0"><span className="block truncate text-sm font-semibold">{dictionary.common.appName}</span><span className="block max-w-44 truncate text-xs text-muted-foreground">{user?.email??copy.workspace}</span></span>
+    <aside className={cn("hidden shrink-0 flex-col border-r bg-sidebar md:flex",sidebarCollapsed?"w-16":"w-[260px]")}>
+      <Link prefetch={false} href={base} onClick={event=>navigate(event,base)} aria-label={copy.home} className={cn("flex h-[58px] shrink-0 items-center gap-3 border-b px-5",sidebarCollapsed&&"justify-center px-0")}>
+        <ShellLogo className="size-6 shrink-0 text-[#f48120]"/>{!sidebarCollapsed&&<span className="min-w-0"><span className="block truncate text-sm font-semibold">{dictionary.common.appName}</span><span className="block max-w-44 truncate text-xs text-muted-foreground">{user?.email??copy.workspace}</span></span>}
       </Link>
       {navigation()}
-      <div className="border-t px-5 py-4 text-xs text-muted-foreground">{copy.tagline}</div>
+      <div className="border-t p-2"><Button type="button" variant="ghost" className={cn("h-11 w-full justify-start gap-3 text-muted-foreground",sidebarCollapsed&&"justify-center px-0")} aria-label={sidebarCollapsed?copy.expandSidebar:copy.collapseSidebar} aria-expanded={!sidebarCollapsed} onClick={()=>setSidebarCollapsed(value=>!value)}>{sidebarCollapsed?<ChevronRight/>:<ChevronLeft/>}<span className={cn(sidebarCollapsed&&"sr-only")}>{sidebarCollapsed?copy.expandSidebar:copy.collapseSidebar}</span></Button></div>
     </aside>
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="flex h-[58px] shrink-0 items-center gap-2 border-b bg-[#f8f8f8] px-4 dark:bg-background">

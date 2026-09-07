@@ -3,7 +3,7 @@ import type { AppLocale } from "./config";
 const en = {
   welcome: "Welcome back", mineSummary: "What you have closed, what is still in play, and what needs you today.", teamSummary: "What the team has closed, what is still in play, and what needs you today.", me: "Me", joined: "Joined", you: "You", showing: "Showing", of: "of",
   account: "Account menu", light: "Light mode", dark: "Dark mode", home: "Homepage",
-  tagline: "Every customer, one place.", settings: "Settings", workspace: "Workspace",
+  tagline: "Every customer, one place.", collapseSidebar: "Collapse sidebar", expandSidebar: "Expand sidebar", settings: "Settings", workspace: "Workspace",
   overviewGroup: "Overview", salesGroup: "Sales", customersGroup: "Customers", operationsGroup: "Operations", insightsGroup: "Insights", manageGroup: "Manage",
   salesDescription: "Your pipeline, your priorities, and what happened today.",
   trendTitle: "Closed won vs. new pipeline", trendDescription: "Last six months, by the month a deal closed or was created",
@@ -19,7 +19,7 @@ const en = {
 const vi: typeof en = {
   welcome: "Chào mừng trở lại", mineSummary: "Kết quả đã chốt, cơ hội đang mở và những việc bạn cần làm hôm nay.", teamSummary: "Kết quả cả nhóm đã chốt, cơ hội đang mở và những việc cần làm hôm nay.", me: "Tôi", joined: "Tham gia", you: "Bạn", showing: "Hiển thị", of: "trên",
   account: "Menu tài khoản", light: "Giao diện sáng", dark: "Giao diện tối", home: "Trang chủ",
-  tagline: "Mọi khách hàng, cùng một nơi.", settings: "Cài đặt", workspace: "Không gian làm việc",
+  tagline: "Mọi khách hàng, cùng một nơi.", collapseSidebar: "Thu gọn thanh bên", expandSidebar: "Mở rộng thanh bên", settings: "Cài đặt", workspace: "Không gian làm việc",
   overviewGroup: "Tổng quan", salesGroup: "Bán hàng", customersGroup: "Khách hàng", operationsGroup: "Vận hành", insightsGroup: "Phân tích", manageGroup: "Quản lý",
   salesDescription: "Cơ hội bán hàng, công việc ưu tiên và hoạt động hôm nay.",
   trendTitle: "Thành công và cơ hội mới", trendDescription: "Sáu tháng qua, theo tháng chốt hoặc tạo cơ hội",

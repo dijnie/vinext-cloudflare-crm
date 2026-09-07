@@ -201,6 +201,32 @@ test("sidebar navigation announces pending while the destination response is hel
   } finally { release(); }
 });
 
+test("desktop sidebar footer toggles between expanded and compact navigation", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/en/crm/companies");
+  const sidebar = page.locator("aside");
+  await expect(sidebar).toHaveCSS("width", "260px");
+  await expect(sidebar).not.toContainText("Every customer, one place.");
+
+  await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+  await expect(sidebar).toHaveCSS("width", "64px");
+  await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("navigation", { name: getCrmDictionary("en").navigation, exact: true }).getByRole("link", { name: getCrmDictionary("en").contact, exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
+  await expect(sidebar).toHaveCSS("width", "260px");
+  await expect(page.getByRole("button", { name: "Collapse sidebar", exact: true })).toHaveAttribute("aria-expanded", "true");
+
+  const settings = sidebar.getByRole("button", { name: "Settings", exact: true });
+  await expect(settings).toHaveAttribute("aria-expanded", "false");
+  await settings.click();
+  await expect(settings).toHaveAttribute("aria-expanded", "true");
+  await expect(sidebar.getByRole("link", { name: "General settings", exact: true })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("desktop-sidebar-submenu.png"), animations: "disabled" });
+  await settings.click();
+  await expect(sidebar.getByRole("link", { name: "General settings", exact: true })).toHaveCount(0);
+});
+
 test("Back refreshes a cached company list after invalidation on another page", async ({ page }) => {
   const labels = getCrmDictionary("en");
   const prefix = `off-page-${Date.now()}`;
