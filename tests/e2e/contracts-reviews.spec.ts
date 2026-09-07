@@ -34,7 +34,22 @@ test("creates a Vietnamese contract with an R2 document and a manual review", as
   await form.getByRole("button", { name: copy.create, exact: true }).click();
   const row = page.locator("tr").filter({ hasText: "Hợp đồng dịch vụ năm" });
   await expect(row).toContainText(copy.statuses.draft);
-  await row.getByRole("combobox", { name: copy.status }).selectOption("active");
+  let contractPatchRequests = 0;
+  page.on("request", (request) => {
+    if (
+      request.method() === "PATCH" &&
+      /\/api\/crm\/contracts\/[^/]+$/.test(new URL(request.url()).pathname)
+    )
+      contractPatchRequests += 1;
+  });
+  page.once("dialog", (dialog) => dialog.dismiss());
+  const statusSelect = row.getByRole("combobox", { name: copy.status });
+  await statusSelect.selectOption("active");
+  await expect(statusSelect).toHaveValue("");
+  await expect(row).toContainText(copy.statuses.draft);
+  expect(contractPatchRequests).toBe(0);
+  page.once("dialog", (dialog) => dialog.accept("Hai bên đã phê duyệt"));
+  await statusSelect.selectOption("active");
   await expect(row).toContainText(copy.statuses.active);
   await row.locator('input[type="file"]').setInputFiles({
     name: "hop-dong.txt",
@@ -62,17 +77,38 @@ test("creates a Vietnamese contract with an R2 document and a manual review", as
     })
     .toContain("hop-dong.txt");
   await expect(row.getByRole("link", { name: "hop-dong.txt" })).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept("Đã hoàn tất nghĩa vụ"));
   await row
     .getByRole("combobox", { name: copy.status })
     .selectOption("completed");
+  await expect(row).toContainText(copy.statuses.completed);
+  const completed = await checked(
+    await page.request.get(`/api/crm/contracts/${saved.id}`, { headers }),
+  );
+  expect(completed.versions[0].reason).toBe("Đã hoàn tất nghĩa vụ");
+  page.once("dialog", (dialog) => dialog.accept("Đưa vào kho lưu trữ"));
   await row.getByRole("button", { name: copy.archive }).click();
   await expect(row).toHaveCount(0);
   await page.getByRole("button", { name: copy.showArchived }).click();
   const archivedRow = page
     .locator("tr")
     .filter({ hasText: "Hợp đồng dịch vụ năm" });
+  page.once("dialog", (dialog) => dialog.accept("Khôi phục để tra cứu"));
   await archivedRow.getByRole("button", { name: copy.restore }).click();
   await expect(archivedRow).toHaveCount(0);
+  const restored = await checked(
+    await page.request.get(`/api/crm/contracts/${saved.id}`, { headers }),
+  );
+  expect(
+    restored.versions
+      .slice(0, 4)
+      .map((item: { reason: string }) => item.reason),
+  ).toEqual([
+    "Khôi phục để tra cứu",
+    "Đưa vào kho lưu trữ",
+    "Đã hoàn tất nghĩa vụ",
+    "Hai bên đã phê duyệt",
+  ]);
   await page.goto("/vi/crm/reviews");
   const review = page.locator("form");
   await review

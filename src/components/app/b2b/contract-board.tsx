@@ -114,6 +114,10 @@ export function ContractBoard({
     }
   }
   async function command(row: Row, payload: Record<string, unknown>) {
+    const suppliedReason =
+        typeof payload.reason === "string" ? payload.reason.trim() : "",
+      reason = suppliedReason || window.prompt(c.reason, "")?.trim();
+    if (!reason) return;
     setBusy(true);
     setError("");
     try {
@@ -122,8 +126,8 @@ export function ContractBoard({
         body: JSON.stringify({
           operationKey: crypto.randomUUID(),
           expectedRevision: row.revision,
-          reason: "Updated from contract workspace",
           ...payload,
+          reason,
         }),
       });
       if (payload.action === "archive" || payload.action === "restore")
@@ -432,13 +436,12 @@ export function ContractBoard({
                       className="ml-2 rounded border bg-background"
                       defaultValue=""
                       disabled={!enabled || busy || showArchived}
-                      onChange={(event) =>
-                        event.target.value &&
-                        void command(row, {
-                          action: "status",
-                          status: event.target.value,
-                        })
-                      }
+                      onChange={(event) => {
+                        const status = event.currentTarget.value;
+                        event.currentTarget.value = "";
+                        if (status)
+                          void command(row, { action: "status", status });
+                      }}
                     >
                       <option value="">…</option>
                       {transitions(row.status).map((status) => (
