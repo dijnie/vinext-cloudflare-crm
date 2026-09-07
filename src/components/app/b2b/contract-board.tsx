@@ -228,9 +228,9 @@ export function ContractBoard({
       (item) => !item.companyId || item.companyId === companyId,
     );
   return (
-    <section className="mx-auto w-full max-w-6xl space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-medium">{c.contracts}</h1>
+    <section className="crm-page">
+      <div className="crm-page-header">
+        <h1 className="crm-page-title">{c.contracts}</h1>
         <Button
           variant="outline"
           disabled={busy}
@@ -242,7 +242,7 @@ export function ContractBoard({
       <ModuleReadOnlyBanner entity="contract" />
       {!showArchived && (
         <form
-          className="grid gap-2 rounded-md border p-4 md:grid-cols-4"
+          className="crm-surface grid gap-3 p-5 md:grid-cols-4"
           onSubmit={(event) => {
             event.preventDefault();
             void create();
@@ -370,7 +370,7 @@ export function ContractBoard({
           {error}
         </p>
       )}
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">

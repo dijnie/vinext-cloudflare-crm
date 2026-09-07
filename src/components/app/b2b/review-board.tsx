@@ -126,9 +126,9 @@ export function ReviewBoard({
     });
   }
   return (
-    <section className="mx-auto w-full max-w-5xl space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-medium">{c.reviews}</h1>
+    <section className="crm-page">
+      <div className="crm-page-header">
+        <h1 className="crm-page-title">{c.reviews}</h1>
         <Button
           variant="outline"
           disabled={busy}
@@ -140,7 +140,7 @@ export function ReviewBoard({
       <ModuleReadOnlyBanner entity="review" />
       {!showArchived && (
         <form
-          className="grid gap-2 rounded-md border p-4 md:grid-cols-4"
+          className="crm-surface grid gap-3 p-5 md:grid-cols-4"
           onSubmit={(event) => {
             event.preventDefault();
             void create();
@@ -200,7 +200,7 @@ export function ReviewBoard({
       )}
       <ul className="space-y-3">
         {rows.map((row) => (
-          <li key={row.id} className="rounded-md border p-4">
+          <li key={row.id} className="rounded-xl border bg-card p-5 shadow-xs">
             <div className="flex justify-between">
               <strong>
                 {"★".repeat(row.rating)}
