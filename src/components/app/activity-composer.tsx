@@ -30,7 +30,7 @@ export function ActivityComposer({ entity, recordId, labels, disabled = false }:
   }
   const icons = { note: Document, call: Phone, meeting: Events, task: Checkbox };
   return <form ref={form} className="space-y-2" onSubmit={event => { event.preventDefault(); void submit(); }} onKeyDown={event => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void submit(); } }}>
-    <div className="overflow-hidden rounded-lg border bg-background">
+    <div className="overflow-hidden rounded-xl border bg-background shadow-xs">
       <label className="sr-only" htmlFor={type === "task" ? "activity-subject" : "activity-content"}>{type === "task" ? copy.subject : copy.content}</label>
       {type === "task" ? <Input key="task-subject" id="activity-subject" name="subject" placeholder={copy.subject} maxLength={300} required disabled={busy || disabled} aria-invalid={Boolean(errors.subject)} /> : <Textarea key="activity-body" id="activity-content" name="content" placeholder={copy.add} maxLength={10000} disabled={busy || disabled} className="min-h-24 resize-y rounded-none border-0 shadow-none focus-visible:ring-0" />}
       <div className="flex flex-wrap items-center gap-1 border-t p-2" role="group" aria-label={copy.type}>{(["note", "call", "meeting", "task"] as const).map(value => { const Icon = icons[value]; return <Button type="button" key={value} size="sm" variant={type === value ? "secondary" : "ghost"} aria-pressed={type === value} onClick={() => { setType(value); setErrors({}); }} disabled={busy || disabled}><Icon size={14} />{copy.types[value]}</Button>; })}<Button type="submit" size="sm" disabled={busy || disabled} className="ml-auto">{busy ? labels.loading : labels.save}</Button></div>
