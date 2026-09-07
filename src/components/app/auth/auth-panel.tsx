@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import type { AppLocale } from "@/lib/i18n/config";
 import type { AppDictionary } from "@/lib/i18n/dictionary";
 
-type AuthMode = "sign-in" | "sign-up" | "forgot-password" | "reset-password" | "verify-email";
+type AuthMode =
+  "sign-in" | "sign-up" | "forgot-password" | "reset-password" | "verify-email";
 
 interface AuthPanelProps {
   dictionary: AppDictionary;
@@ -22,7 +23,12 @@ interface AuthPanelProps {
   workspaceSlug: string;
 }
 
-export function AuthPanel({ dictionary, locale, mode, workspaceSlug }: AuthPanelProps) {
+export function AuthPanel({
+  dictionary,
+  locale,
+  mode,
+  workspaceSlug,
+}: AuthPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
@@ -32,8 +38,26 @@ export function AuthPanel({ dictionary, locale, mode, workspaceSlug }: AuthPanel
   const emailFromUrl = searchParams.get("email") ?? "";
   const token = searchParams.get("token");
 
-  const title = mode === "sign-in" ? auth.signInTitle : mode === "sign-up" ? auth.signUpTitle : mode === "forgot-password" ? auth.forgotTitle : mode === "reset-password" ? auth.resetTitle : auth.verifyTitle;
-  const description = mode === "sign-in" ? auth.signInDescription : mode === "sign-up" ? auth.signUpDescription : mode === "forgot-password" ? auth.forgotDescription : mode === "reset-password" ? auth.resetDescription : auth.verifyDescription;
+  const title =
+    mode === "sign-in"
+      ? auth.signInTitle
+      : mode === "sign-up"
+        ? auth.signUpTitle
+        : mode === "forgot-password"
+          ? auth.forgotTitle
+          : mode === "reset-password"
+            ? auth.resetTitle
+            : auth.verifyTitle;
+  const description =
+    mode === "sign-in"
+      ? auth.signInDescription
+      : mode === "sign-up"
+        ? auth.signUpDescription
+        : mode === "forgot-password"
+          ? auth.forgotDescription
+          : mode === "reset-password"
+            ? auth.resetDescription
+            : auth.verifyDescription;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,55 +70,179 @@ export function AuthPanel({ dictionary, locale, mode, workspaceSlug }: AuthPanel
     const name = String(data.get("name") ?? "");
     let error: unknown;
 
-    if (mode === "sign-in") {
-      ({ error } = await authClient.signIn.email({ email, password }));
-      if (!error) router.push(`/${locale}/${workspaceSlug}/companies`);
-    } else if (mode === "sign-up") {
-      ({ error } = await authClient.signUp.email({ name, email, password, callbackURL: `/${locale}/sign-in` }));
-      if (!error) router.push(`/${locale}/verify-email?email=${encodeURIComponent(email)}`);
-    } else if (mode === "forgot-password") {
-      ({ error } = await authClient.requestPasswordReset({ email, redirectTo: `/${locale}/reset-password` }));
-      setMessage(auth.resetSent);
-    } else if (mode === "reset-password") {
-      if (!token) error = new Error("invalid-token");
-      else ({ error } = await authClient.resetPassword({ newPassword: password, token }));
-      if (!error) setMessage(auth.resetSuccess);
-    } else {
-      ({ error } = await authClient.sendVerificationEmail({ email, callbackURL: `/${locale}/sign-in` }));
-      if (!error) setMessage(auth.verificationSent);
-    }
+    try {
+      if (mode === "sign-in") {
+        ({ error } = await authClient.signIn.email({ email, password }));
+        if (!error) router.push(`/${locale}/${workspaceSlug}/companies`);
+      } else if (mode === "sign-up") {
+        ({ error } = await authClient.signUp.email({
+          name,
+          email,
+          password,
+          callbackURL: `/${locale}/sign-in`,
+        }));
+        if (!error)
+          router.push(
+            `/${locale}/verify-email?email=${encodeURIComponent(email)}`,
+          );
+      } else if (mode === "forgot-password") {
+        ({ error } = await authClient.requestPasswordReset({
+          email,
+          redirectTo: `/${locale}/reset-password`,
+        }));
+        setMessage(auth.resetSent);
+      } else if (mode === "reset-password") {
+        if (!token) error = new Error("invalid-token");
+        else
+          ({ error } = await authClient.resetPassword({
+            newPassword: password,
+            token,
+          }));
+        if (!error) setMessage(auth.resetSuccess);
+      } else {
+        ({ error } = await authClient.sendVerificationEmail({
+          email,
+          callbackURL: `/${locale}/sign-in`,
+        }));
+        if (!error) setMessage(auth.verificationSent);
+      }
 
-    if (error && mode !== "forgot-password") {
+      if (error && mode !== "forgot-password") {
+        setFailed(true);
+        setMessage(
+          mode === "reset-password" && !token
+            ? auth.invalidResetLink
+            : auth.genericError,
+        );
+      }
+    } catch {
       setFailed(true);
-      setMessage(mode === "reset-password" && !token ? auth.invalidResetLink : auth.genericError);
+      setMessage(auth.genericError);
+    } finally {
+      setPending(false);
     }
-    setPending(false);
   }
 
   const showName = mode === "sign-up";
   const showEmail = mode !== "reset-password";
-  const showPassword = mode === "sign-in" || mode === "sign-up" || mode === "reset-password";
-  const submitLabel = mode === "sign-in" ? auth.signIn : mode === "sign-up" ? auth.signUp : mode === "forgot-password" ? auth.sendResetLink : mode === "reset-password" ? auth.resetPassword : auth.resendVerification;
+  const showPassword =
+    mode === "sign-in" || mode === "sign-up" || mode === "reset-password";
+  const submitLabel =
+    mode === "sign-in"
+      ? auth.signIn
+      : mode === "sign-up"
+        ? auth.signUp
+        : mode === "forgot-password"
+          ? auth.sendResetLink
+          : mode === "reset-password"
+            ? auth.resetPassword
+            : auth.resendVerification;
 
   return (
     <div className="flex w-full flex-col gap-8">
       <div className="flex flex-col gap-3 text-left">
-        <Link href={`/${locale}/sign-in`} aria-label={getShellInterfaceDictionary(locale).home}><ShellLogo className="size-6" /></Link>
-        <h2 className="text-balance text-2xl font-semibold leading-8 tracking-tight">{title}</h2>
-        <p className="max-w-[32ch] text-pretty text-sm leading-5 text-muted-foreground">{description}</p>
+        <Link
+          href={`/${locale}/sign-in`}
+          aria-label={getShellInterfaceDictionary(locale).home}
+        >
+          <ShellLogo className="size-6" />
+        </Link>
+        <h2 className="text-balance text-2xl font-semibold leading-8 tracking-tight">
+          {title}
+        </h2>
+        <p className="max-w-[32ch] text-pretty text-sm leading-5 text-muted-foreground">
+          {description}
+        </p>
       </div>
       <form className="flex flex-col gap-6" onSubmit={submit}>
         <div className="space-y-4">
-          {showName ? <div className="space-y-2"><Label htmlFor="name">{dictionary.common.name}</Label><Input autoComplete="name" id="name" name="name" required /></div> : null}
-          {showEmail ? <div className="space-y-2"><Label htmlFor="email">{dictionary.common.email}</Label><Input autoComplete="email" defaultValue={emailFromUrl} id="email" name="email" required type="email" /></div> : null}
-          {showPassword ? <div className="space-y-2"><Label htmlFor="password">{mode === "reset-password" ? auth.newPassword : dictionary.common.password}</Label><Input autoComplete={mode === "sign-in" ? "current-password" : "new-password"} id="password" minLength={8} name="password" required type="password" /></div> : null}
-          {message ? <p aria-live="polite" className={failed ? "text-sm text-destructive" : "text-sm text-success"} role={failed ? "alert" : "status"}>{message}</p> : null}
-          {mode === "sign-in" ? <Link className="text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground" href={`/${locale}/forgot-password`}>{auth.forgotPassword}</Link> : null}
+          {showName ? (
+            <div className="space-y-2">
+              <Label htmlFor="name">{dictionary.common.name}</Label>
+              <Input autoComplete="name" id="name" name="name" required />
+            </div>
+          ) : null}
+          {showEmail ? (
+            <div className="space-y-2">
+              <Label htmlFor="email">{dictionary.common.email}</Label>
+              <Input
+                autoComplete="email"
+                defaultValue={emailFromUrl}
+                id="email"
+                name="email"
+                required
+                type="email"
+              />
+            </div>
+          ) : null}
+          {showPassword ? (
+            <div className="space-y-2">
+              <Label htmlFor="password">
+                {mode === "reset-password"
+                  ? auth.newPassword
+                  : dictionary.common.password}
+              </Label>
+              <Input
+                autoComplete={
+                  mode === "sign-in" ? "current-password" : "new-password"
+                }
+                id="password"
+                minLength={8}
+                name="password"
+                required
+                type="password"
+              />
+            </div>
+          ) : null}
+          {message ? (
+            <p
+              aria-live="polite"
+              className={
+                failed ? "text-sm text-destructive" : "text-sm text-success"
+              }
+              role={failed ? "alert" : "status"}
+            >
+              {message}
+            </p>
+          ) : null}
+          {mode === "sign-in" ? (
+            <Link
+              className="text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground"
+              href={`/${locale}/forgot-password`}
+            >
+              {auth.forgotPassword}
+            </Link>
+          ) : null}
         </div>
         <div className="flex flex-col items-stretch gap-4">
-          <Button disabled={pending || (mode === "reset-password" && !token)} type="submit">{pending ? dictionary.common.loading : submitLabel}</Button>
-          {mode === "sign-in" ? <p className="text-center text-sm text-muted-foreground">{auth.needAccount} <Link className="text-foreground underline" href={`/${locale}/sign-up`}>{auth.signUp}</Link></p> : null}
-          {mode !== "sign-in" ? <p className="text-center text-sm text-muted-foreground">{auth.haveAccount} <Link className="text-foreground underline" href={`/${locale}/sign-in`}>{auth.signIn}</Link></p> : null}
+          <Button
+            disabled={pending || (mode === "reset-password" && !token)}
+            type="submit"
+          >
+            {pending ? dictionary.common.loading : submitLabel}
+          </Button>
+          {mode === "sign-in" ? (
+            <p className="text-center text-sm text-muted-foreground">
+              {auth.needAccount}{" "}
+              <Link
+                className="text-foreground underline"
+                href={`/${locale}/sign-up`}
+              >
+                {auth.signUp}
+              </Link>
+            </p>
+          ) : null}
+          {mode !== "sign-in" ? (
+            <p className="text-center text-sm text-muted-foreground">
+              {auth.haveAccount}{" "}
+              <Link
+                className="text-foreground underline"
+                href={`/${locale}/sign-in`}
+              >
+                {auth.signIn}
+              </Link>
+            </p>
+          ) : null}
         </div>
       </form>
     </div>

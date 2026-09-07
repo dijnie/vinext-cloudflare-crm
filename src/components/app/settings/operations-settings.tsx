@@ -189,6 +189,25 @@ export function OperationsSettings({
     [notice, setNotice] = useState(""),
     [error, setError] = useState(""),
     [secret, setSecret] = useState("");
+  const errorText = error
+    ? error === "refresh_failed"
+      ? vi
+        ? "Không thể tải dữ liệu mới. Dữ liệu hợp lệ gần nhất vẫn được giữ lại."
+        : "Unable to refresh. The last valid data is still shown."
+      : vi
+        ? "Không thể hoàn tất thao tác. Hãy kiểm tra dữ liệu và thử lại."
+        : "Unable to complete the operation. Check the data and try again."
+    : "";
+  const impactLabels: Record<string, string> = vi
+    ? {
+        companies: "Công ty",
+        contacts: "Liên hệ",
+        leads: "Tiềm năng",
+        deals: "Cơ hội",
+        orders: "Đơn hàng",
+        private_files: "Tệp riêng tư",
+      }
+    : {};
   const run = async (action: () => Promise<unknown>, message: string) => {
     setError("");
     setNotice("");
@@ -243,7 +262,7 @@ export function OperationsSettings({
       {error && (
         <div className="flex items-center gap-2">
           <p role="alert" className="text-sm text-destructive">
-            {error}
+            {errorText}
           </p>
           {error === "refresh_failed" && (
             <Button
@@ -275,7 +294,7 @@ export function OperationsSettings({
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Workspace</CardTitle>
+            <CardTitle>{vi ? "Không gian làm việc" : "Workspace"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <form
@@ -292,6 +311,7 @@ export function OperationsSettings({
             >
               <Input
                 name="name"
+                aria-label={vi ? "Tên không gian làm việc" : "Workspace name"}
                 defaultValue={workspace.profile.name}
                 maxLength={120}
                 required
@@ -344,6 +364,7 @@ export function OperationsSettings({
             >
               <Input
                 name="logo"
+                aria-label={vi ? "Logo không gian làm việc" : "Workspace logo"}
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif"
                 required
@@ -378,16 +399,23 @@ export function OperationsSettings({
             >
               <Input
                 name="workspaceName"
+                aria-label={
+                  vi
+                    ? "Tên cấu hình không gian làm việc"
+                    : "Configuration workspace name"
+                }
                 defaultValue={workspace.profile.name}
                 required
               />
               <Input
                 name="timeZone"
+                aria-label={vi ? "Múi giờ" : "Time zone"}
                 defaultValue={workspace.general.timeZone}
                 required
               />
               <Input
                 name="countryCode"
+                aria-label={vi ? "Mã quốc gia" : "Country code"}
                 defaultValue={workspace.general.countryCode}
                 minLength={2}
                 maxLength={2}
@@ -400,10 +428,10 @@ export function OperationsSettings({
                   type="submit"
                   variant="outline"
                 >
-                  Preview
+                  {vi ? "Xem trước" : "Preview"}
                 </Button>
                 <Button name="intent" value="apply" type="submit">
-                  Apply
+                  {vi ? "Áp dụng" : "Apply"}
                 </Button>
               </div>
             </form>
@@ -416,7 +444,7 @@ export function OperationsSettings({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Webforms</CardTitle>
+            <CardTitle>{vi ? "Biểu mẫu web" : "Webforms"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <form
@@ -445,28 +473,34 @@ export function OperationsSettings({
             >
               <Input
                 name="name"
+                aria-label={vi ? "Tên biểu mẫu" : "Form name"}
                 placeholder={vi ? "Tên form" : "Form name"}
                 required
               />
               <Input
                 name="slug"
+                aria-label={vi ? "Đường dẫn biểu mẫu" : "Form slug"}
                 placeholder="website-leads"
                 pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
                 required
               />
               <select
                 name="entity"
+                aria-label={vi ? "Loại bản ghi" : "Record type"}
                 className="h-9 rounded-md border bg-background px-3 text-sm"
               >
-                <option value="lead">Lead</option>
+                <option value="lead">{vi ? "Tiềm năng" : "Lead"}</option>
                 <option value="ticket">Ticket</option>
               </select>
               <select
                 name="mode"
+                aria-label={vi ? "Chế độ truy cập" : "Access mode"}
                 className="h-9 rounded-md border bg-background px-3 text-sm"
               >
-                <option value="public">Public</option>
-                <option value="signed_system">Signed system</option>
+                <option value="public">{vi ? "Công khai" : "Public"}</option>
+                <option value="signed_system">
+                  {vi ? "Hệ thống có chữ ký" : "Signed system"}
+                </option>
               </select>
               <Button className="sm:col-span-2" type="submit">
                 {vi ? "Tạo form" : "Create form"}
@@ -475,8 +509,20 @@ export function OperationsSettings({
             <ul className="space-y-1 text-xs">
               {webforms.map((form) => (
                 <li key={form.id}>
-                  {form.name} · <code>{form.slug}</code> · {form.entity} ·{" "}
-                  {form.active ? "active" : "disabled"}
+                  {form.name} · <code>{form.slug}</code> ·{" "}
+                  {form.entity === "lead"
+                    ? vi
+                      ? "Tiềm năng"
+                      : "Lead"
+                    : "Ticket"}{" "}
+                  ·{" "}
+                  {form.active
+                    ? vi
+                      ? "đang bật"
+                      : "active"
+                    : vi
+                      ? "đang tắt"
+                      : "disabled"}
                 </li>
               ))}
             </ul>
@@ -508,14 +554,25 @@ export function OperationsSettings({
                 vi ? "Đã tạo webhook." : "Webhook created.",
               )}
             >
-              <Input name="name" placeholder="CRM receiver" required />
+              <Input
+                name="name"
+                aria-label={vi ? "Tên webhook" : "Webhook name"}
+                placeholder={vi ? "Đầu nhận CRM" : "CRM receiver"}
+                required
+              />
               <Input
                 name="url"
+                aria-label="Webhook URL"
                 type="url"
                 placeholder="https://example.com/hooks"
                 required
               />
-              <Input name="events" defaultValue="lead.created" required />
+              <Input
+                name="events"
+                aria-label={vi ? "Sự kiện webhook" : "Webhook events"}
+                defaultValue="lead.created"
+                required
+              />
               <Button type="submit">
                 {vi ? "Tạo endpoint" : "Create endpoint"}
               </Button>
@@ -580,24 +637,37 @@ export function OperationsSettings({
             >
               <Input
                 name="name"
+                aria-label={vi ? "Tên mẫu" : "Template name"}
                 placeholder={vi ? "Tên mẫu" : "Template name"}
                 required
               />
-              <Input name="subject" placeholder="Hello {{name}}" required />
-              <textarea
-                name="body"
-                className="min-h-24 rounded-md border bg-background p-3 text-sm"
-                placeholder="Account: {{account}}"
+              <Input
+                name="subject"
+                aria-label={vi ? "Tiêu đề email" : "Email subject"}
+                placeholder={vi ? "Xin chào {{name}}" : "Hello {{name}}"}
                 required
               />
-              <Input name="variables" placeholder="name,account" />
+              <textarea
+                name="body"
+                aria-label={vi ? "Nội dung email" : "Email body"}
+                className="min-h-24 rounded-md border bg-background p-3 text-sm"
+                placeholder={
+                  vi ? "Tài khoản: {{account}}" : "Account: {{account}}"
+                }
+                required
+              />
+              <Input
+                name="variables"
+                aria-label={vi ? "Biến bắt buộc" : "Required variables"}
+                placeholder="name,account"
+              />
               <Button type="submit">
                 {vi ? "Tạo mẫu" : "Create template"}
               </Button>
             </form>
             <p className="text-xs text-muted-foreground">
               {vi
-                ? "Preview chặn khi thiếu biến bắt buộc. Gửi email chưa bật khi chưa cấu hình kênh."
+                ? "Bản xem trước sẽ chặn khi thiếu biến bắt buộc. Gửi email chưa bật khi chưa cấu hình kênh."
                 : "Preview blocks missing variables. Sending remains off until a channel is configured."}
             </p>
           </CardContent>
@@ -628,16 +698,17 @@ export function OperationsSettings({
                       maxDepth: 3,
                     },
                   }),
-                vi ? "Đã tạo automation." : "Automation created.",
+                vi ? "Đã tạo tự động hóa." : "Automation created.",
               )}
             >
               <Input
                 name="name"
+                aria-label={vi ? "Tên tự động hóa" : "Automation name"}
                 placeholder={vi ? "Gán lead website" : "Assign website leads"}
                 required
               />
               <Button type="submit">
-                {vi ? "Tạo automation" : "Create automation"}
+                {vi ? "Tạo tự động hóa" : "Create automation"}
               </Button>
             </form>
             <ul className="space-y-2 text-xs">
@@ -670,7 +741,7 @@ export function OperationsSettings({
                           });
                           await refresh();
                         },
-                        vi ? "Đã cập nhật automation." : "Automation updated.",
+                        vi ? "Đã cập nhật tự động hóa." : "Automation updated.",
                       )
                     }
                   >
@@ -704,6 +775,7 @@ export function OperationsSettings({
             >
               <Input
                 name="name"
+                aria-label={vi ? "Tên phân khúc" : "Segment name"}
                 placeholder={vi ? "Lead mới" : "New leads"}
                 required
               />
@@ -713,12 +785,15 @@ export function OperationsSettings({
             </form>
             <p className="text-xs">
               {dashboard.segments
-                .map((item) => `${item.name} (${item.kind})`)
+                .map(
+                  (item) =>
+                    `${item.name} (${vi && item.kind === "dynamic" ? "động" : vi && item.kind === "static" ? "tĩnh" : item.kind})`,
+                )
                 .join(" · ") || (vi ? "Chưa có phân khúc." : "No segments.")}
             </p>
             <p className="text-xs text-muted-foreground">
               {vi
-                ? "Automation chỉ chạy khi owner bật, giữ quyền thực thi và giới hạn vòng lặp 1–5."
+                ? "Tự động hóa chỉ chạy khi chủ sở hữu bật, giữ quyền thực thi và giới hạn vòng lặp 1–5."
                 : "Automations run only when enabled by the owner, retain execution authority, and cap loops at 1–5."}
             </p>
           </CardContent>
@@ -729,32 +804,43 @@ export function OperationsSettings({
           </CardHeader>
           <CardContent>
             <p className="text-sm">
-              {dashboard.ai.enabled ? "Enabled" : "Disabled"} ·{" "}
+              {dashboard.ai.enabled
+                ? vi
+                  ? "Đang bật"
+                  : "Enabled"
+                : vi
+                  ? "Đang tắt"
+                  : "Disabled"}{" "}
+              ·{" "}
               {dashboard.ai.provider ??
-                (vi ? "chưa chọn provider" : "no provider")}{" "}
+                (vi ? "chưa chọn nhà cung cấp" : "no provider")}{" "}
               · {dashboard.ai.usedMinor}/{dashboard.ai.monthlyBudgetMinor}
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               {vi
-                ? "AI không phát sinh cuộc gọi hoặc chi phí khi provider chưa chọn và ngân sách bằng 0."
+                ? "AI không phát sinh cuộc gọi hoặc chi phí khi chưa chọn nhà cung cấp và ngân sách bằng 0."
                 : "AI makes no calls and incurs no cost while provider is unset and budget is zero."}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>{vi ? "Xóa workspace" : "Workspace deletion"}</CardTitle>
+            <CardTitle>
+              {vi ? "Xóa không gian làm việc" : "Workspace deletion"}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-xs text-muted-foreground">
               {vi
-                ? "Owner phải nhập đúng tên. Có 30 ngày để hủy; dữ liệu và lịch sử được giữ tới thời điểm thực thi."
+                ? "Chủ sở hữu phải nhập đúng tên. Có 30 ngày để hủy; dữ liệu và lịch sử được giữ tới thời điểm thực thi."
                 : "Owner must enter the exact name. Cancellation remains available for 30 days; data and history remain until execution."}
             </p>
             <p className="text-xs">
               {workspace.deletionImpact &&
                 Object.entries(workspace.deletionImpact)
-                  .map(([key, value]) => `${key}: ${value}`)
+                  .map(
+                    ([key, value]) => `${impactLabels[key] ?? key}: ${value}`,
+                  )
                   .join(" · ")}
             </p>
             <form
@@ -770,6 +856,11 @@ export function OperationsSettings({
             >
               <Input
                 name="confirmation"
+                aria-label={
+                  vi
+                    ? "Xác nhận tên không gian làm việc"
+                    : "Confirm workspace name"
+                }
                 placeholder={workspace.profile.name}
                 required
               />
@@ -788,7 +879,9 @@ export function OperationsSettings({
                           action: "execute-deletion",
                           confirmation: workspace.profile.name,
                         }),
-                      vi ? "Workspace đã bị xóa." : "Workspace deleted.",
+                      vi
+                        ? "Không gian làm việc đã bị xóa."
+                        : "Workspace deleted.",
                     )
                   }
                 >

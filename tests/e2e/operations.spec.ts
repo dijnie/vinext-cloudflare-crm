@@ -29,8 +29,49 @@ test("owner operates webforms, app tokens, webhooks and private workspace settin
   await expect(
     page.getByRole("heading", { name: "Tích hợp và vận hành", exact: true }),
   ).toBeVisible();
-  await page.getByPlaceholder("Tên form").fill(`Form ${suffix}`);
-  await page.getByPlaceholder("website-leads").fill(`leads-${suffix}`);
+  for (const label of [
+    "Tên không gian làm việc",
+    "Logo không gian làm việc",
+    "Tên cấu hình không gian làm việc",
+    "Múi giờ",
+    "Mã quốc gia",
+    "Tên biểu mẫu",
+    "Đường dẫn biểu mẫu",
+    "Loại bản ghi",
+    "Chế độ truy cập",
+    "Tên webhook",
+    "Webhook URL",
+    "Sự kiện webhook",
+    "Tên mẫu",
+    "Tiêu đề email",
+    "Nội dung email",
+    "Biến bắt buộc",
+    "Tên tự động hóa",
+    "Tên phân khúc",
+    "Xác nhận tên không gian làm việc",
+  ]) {
+    await expect(page.getByLabel(label, { exact: true })).toBeVisible();
+  }
+  await expect(
+    page.getByText("Không gian làm việc", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Xem trước", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Áp dụng", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Biểu mẫu web", { exact: true })).toBeVisible();
+  await expect(
+    page.getByLabel("Chế độ truy cập", { exact: true }),
+  ).toContainText("Công khai");
+  await expect(
+    page.getByLabel("Chế độ truy cập", { exact: true }),
+  ).toContainText("Hệ thống có chữ ký");
+  await page.getByLabel("Tên biểu mẫu", { exact: true }).fill(`Form ${suffix}`);
+  await page
+    .getByLabel("Đường dẫn biểu mẫu", { exact: true })
+    .fill(`leads-${suffix}`);
   await page.getByRole("button", { name: "Tạo form", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Đã tạo webform.");
   const invalid = await page.request.post(
@@ -369,12 +410,14 @@ test("failed operations refresh keeps the last valid settings snapshot", async (
       await route.continue();
     }
   });
-  await page.getByPlaceholder("Form name").fill(`Refresh ${suffix}`);
-  await page.getByPlaceholder("website-leads").fill(`refresh-${suffix}`);
+  await page.getByLabel("Form name", { exact: true }).fill(`Refresh ${suffix}`);
+  await page.getByLabel("Form slug", { exact: true }).fill(`refresh-${suffix}`);
   await page.getByRole("button", { name: "Create form", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText("refresh_failed");
+  await expect(page.getByRole("alert")).toHaveText(
+    "Unable to refresh. The last valid data is still shown.",
+  );
   await expect(heading).toBeVisible();
-  await expect(page.getByPlaceholder("Form name")).toHaveValue(
+  await expect(page.getByLabel("Form name", { exact: true })).toHaveValue(
     `Refresh ${suffix}`,
   );
   malformed = false;
