@@ -92,7 +92,7 @@ async function runGroup(group) {
   const config = "dist/server/wrangler.json";
   const ownerPassword = randomBytes(24).toString("hex");
   const memberPassword = randomBytes(24).toString("hex");
-  const environment = { ...process.env, AUTH_BASE_URL: baseURL, BETTER_AUTH_SECRET: randomBytes(32).toString("hex"), E2E_BASE_URL: baseURL, E2E_OWNER_EMAIL: "owner@e2e.invalid", E2E_OWNER_PASSWORD: ownerPassword, E2E_MEMBER_EMAIL: "member@e2e.invalid", E2E_MEMBER_PASSWORD: memberPassword };
+  const environment = { ...process.env, AUTH_BASE_URL: baseURL, BETTER_AUTH_SECRET: randomBytes(32).toString("hex"), WEBHOOK_ENCRYPTION_KEYS: JSON.stringify({ current: randomBytes(32).toString("hex"), previous: [], write: "v1" }), E2E_BASE_URL: baseURL, E2E_OWNER_EMAIL: "owner@e2e.invalid", E2E_OWNER_PASSWORD: ownerPassword, E2E_MEMBER_EMAIL: "member@e2e.invalid", E2E_MEMBER_PASSWORD: memberPassword };
   environment.E2E_DISPOSABLE_MEMBER_EMAIL = "disposable@e2e.invalid";
   environment.E2E_DISPOSABLE_MEMBER_PASSWORD = randomBytes(24).toString("hex");
   const accounts = [
