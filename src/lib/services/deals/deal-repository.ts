@@ -21,9 +21,10 @@ import {
   type SQL,
 } from "drizzle-orm";
 
-import type { AppDatabase } from "@/lib/db/database";
+import { executeD1Batch, type AppDatabase } from "@/lib/db/database";
 import { listFacets } from "@/lib/services/shared/facet-repository";
 import {
+  activity,
   company,
   crmSetting,
   dealConversion,
@@ -31,6 +32,7 @@ import {
   deal,
   dealContact,
   dealStage,
+  moduleSetting,
   singletonMembership,
   user,
 } from "@/lib/db/schema";
@@ -168,40 +170,40 @@ export class DealRepository {
   async updateWithHistory(id: string, values: Partial<typeof deal.$inferInsert>, expectedStage: string, authorId: string, context: RequestContext, expectedMoney?: {revision:number;amountMinor:number|null;currency:string}, fields?: PreparedRecordFields) {
     const changedStage = values.stageId !== undefined && values.stageId !== expectedStage;
     const now = values.updatedAt ?? new Date();
-    const query = this.db.update(deal).set({
+    const update = this.db.update(deal).set({
       ...values,
       ...(changedStage ? { lastActivityAt: sql`max(coalesce(${deal.lastActivityAt}, 0), ${now.getTime()})` } : {}),
-    }).where(and(eq(deal.id, id), eq(deal.stageId, expectedStage))).returning({ id: deal.id, name: deal.name }).toSQL();
-    const update = this.db.$client.prepare(query.sql).bind(...query.params);
+    }).where(and(eq(deal.id, id), eq(deal.stageId, expectedStage))).returning({ id: deal.id, name: deal.name });
     const fx = expectedMoney ? await prepareDealConversion(this.db,{id,amountMinor:values.amountMinor === undefined ? expectedMoney.amountMinor : values.amountMinor,currency:values.currency ?? expectedMoney.currency,moneyRevision:expectedMoney.revision+1},sql`exists(select 1 from deal where id=${id} and stage_id=${expectedStage} and money_revision=${expectedMoney.revision})`) : undefined;
-    const prepared = (statement: {toSQL():{sql:string;params:unknown[]}}) => { const query=statement.toSQL(); return this.db.$client.prepare(query.sql).bind(...query.params); };
     const op = actionGuard(this.db, context, ["deal.update", ...(values.ownerMembershipId !== undefined ? ["deal.assign" as const] : [])]);
     const auditId = crypto.randomUUID();
     const writeGuardId = crypto.randomUUID();
     // changes() refers to the preceding guarded UPDATE on the same batch connection.
     // A stale stage therefore produces neither history nor related-record stamps.
     let result;
-    try { result = await this.db.$client.batch([
-      prepared(op.begin),
-      ...(fx ? [prepared(fx.guard)] : []),
+    try { result = await executeD1Batch(this.db, [
+      op.begin,
+      ...(fx ? [fx.guard] : []),
       update,
       ...(changedStage ? [
-      this.db.$client.prepare(`INSERT INTO activity
+      this.db.run(sql`INSERT INTO ${activity}
         (id, type, company_id, deal_id, author_user_id, metadata_json, occurred_at, created_at, updated_at)
-        SELECT ?, 'stage_change', company_id, id, ?, json_object('fromStageId', ?, 'toStageId', ?), ?, ?, ?
-        FROM deal WHERE id = ? AND changes() = 1`)
-        .bind(auditId, authorId, expectedStage, values.stageId, now.getTime(), now.getTime(), now.getTime(), id),
+        SELECT ${auditId}, 'stage_change', ${deal.companyId}, ${deal.id}, ${authorId}, json_object('fromStageId', ${expectedStage}, 'toStageId', ${values.stageId}), ${now.getTime()}, ${now.getTime()}, ${now.getTime()}
+        FROM ${deal} WHERE ${deal.id} = ${id} AND changes() = 1`),
       ] : []),
-      ...(fields ? [prepared(this.db.insert(operationConditionGuard).values({ id: writeGuardId, authorized: sql<number>`case when ${changedStage ? sql`exists(select 1 from activity where id=${auditId})` : sql`changes()=1`} then 1 else 0 end` }))] : []),
+      ...(fields ? [this.db.insert(operationConditionGuard).values({ id: writeGuardId, authorized: sql<number>`case when ${changedStage ? sql`exists(select 1 from activity where id=${auditId})` : sql`changes()=1`} then 1 else 0 end` })] : []),
       ...(changedStage ? [
-      this.db.$client.prepare(`UPDATE company SET last_activity_at = max(coalesce(last_activity_at, 0), ?), updated_at = ?
-        WHERE id = (SELECT company_id FROM activity WHERE id = ?)
-        AND EXISTS (SELECT 1 FROM module_setting WHERE entity='company' AND enabled=1)`)
-        .bind(now.getTime(), now.getTime(), auditId),
+      this.db.update(company).set({
+        lastActivityAt: sql`max(coalesce(${company.lastActivityAt}, 0), ${now.getTime()})`,
+        updatedAt: now,
+      }).where(and(
+        sql`${company.id} = (SELECT ${activity.companyId} FROM ${activity} WHERE ${activity.id} = ${auditId})`,
+        sql`EXISTS (SELECT 1 FROM ${moduleSetting} WHERE ${moduleSetting.entity} = 'company' AND ${moduleSetting.enabled} = 1)`,
+      )),
       ] : []),
-      ...(fx ? [prepared(fx.conversion),prepared(fx.finish)] : []),
-      ...(fields ? [...fields.statements.map(prepared), prepared(this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, writeGuardId)))] : []),
-      prepared(op.end),
+      ...(fx ? [fx.conversion,fx.finish] : []),
+      ...(fields ? [...fields.statements, this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, writeGuardId))] : []),
+      op.end,
     ]); } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
     return result[fx ? 2 : 1]!.results[0] as { id: string; name: string } | undefined;
   }
