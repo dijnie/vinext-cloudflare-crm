@@ -13,6 +13,8 @@ export type HttpErrorCode =
   | "validation_failed"
   | "not_found"
   | "conflict"
+  | "calendar_stale"
+  | "appointment_overlap"
   | "internal_error";
 
 export class HttpError extends Error {

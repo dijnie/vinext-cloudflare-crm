@@ -333,9 +333,16 @@ for (const locale of ["vi", "en"] as const) {
       await sheet.getByRole("button", { name: locale === "vi" ? "Thao tác" : "More actions", exact: true }).click();
       await page.getByRole("menuitem", { name: labels.edit, exact: true }).click();
       if (entity === "deals") await expect(sheet.locator('input[name="ownerMembershipId"]')).toHaveValue(ownerId);
+      if (entity === "companies") {
+        await sheet.locator('input[name="website"]').fill("https://temporary.example");
+        await sheet.locator('input[name="website"]').fill("");
+      }
+      const concurrent = entity === "companies" ? { website: `https://concurrent-${prefix}.example` } : entity === "contacts" ? { title: `${prefix}-concurrent-title`, gender: "male" } : { description: `${prefix}-concurrent-description` };
+      expect((await api.patch(`/api/crm/${entity}/${id}`, { data: { action: "update", data: concurrent } })).ok()).toBe(true);
       await sheet.locator(entity === "contacts" ? "#record-firstName" : "#record-name").fill(`${name}-edited`);
       await sheet.getByRole("button", { name: labels.save, exact: true }).click();
       await expect(sheet.getByRole("heading", { name: `${name}-edited`, exact: true })).toBeVisible();
+      expect(await (await api.get(`/api/crm/${entity}/${id}`)).json()).toMatchObject(concurrent);
       if (entity === "companies") {
         const website = `https://${prefix}.example`;
         await sheet.getByRole("button", { name: `${labels.edit}: ${labels.labels.website}`, exact: true }).press("Enter");

@@ -39,9 +39,10 @@ export function displayValue(row: CrmRecord, key: string, locale: string, labels
   if (typeof value === "number") return new Intl.NumberFormat(locale).format(value);
   return typeof value === "string" ? value : "—";
 }
+export class CrmRequestError extends Error { constructor(readonly status: number, readonly code: string) { super(String(status)); this.name = "CrmRequestError"; } }
 export async function crmRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
-  if (!response.ok) throw new Error(String(response.status));
+  if (!response.ok) { const payload=await response.json().catch(()=>null) as {error?:{code?:string}}|null;throw new CrmRequestError(response.status,payload?.error?.code??"internal_error"); }
   return response.json() as Promise<T>;
 }
 export function requestError(error: unknown, labels: CrmDictionary) { return error instanceof Error ? error.message === "409" ? labels.conflict : error.message === "400" ? labels.invalid : error.message === "404" ? labels.missing : labels.error : labels.error; }

@@ -86,15 +86,11 @@ test("owner operates webforms, app tokens, webhooks and private workspace settin
       })
     ).status(),
   ).toBe(401);
-  await page
-    .getByRole("button", { name: "Đã lưu, đóng", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Đã lưu, đóng", exact: true }).click();
   await page
     .getByRole("button", { name: `Thu hồi: App ${suffix}`, exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Thu hồi key", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Thu hồi key", exact: true }).click();
   expect(
     (
       await page.request.get("/api/integrations/v1/contacts", {
@@ -332,4 +328,59 @@ test("Swagger exposes only the approved API and Try it out sends the workspace k
   await expect(
     operation.locator(".response-col_status").filter({ hasText: "200" }),
   ).toBeVisible();
+});
+
+test("failed operations refresh keeps the last valid settings snapshot", async ({
+  page,
+  baseURL,
+}) => {
+  const headers = { origin: baseURL! },
+    suffix = crypto.randomUUID().slice(0, 8);
+  await checked(
+    await page.request.post("/api/auth/sign-in/email", {
+      headers,
+      data: {
+        email: process.env["E2E_OWNER_EMAIL"],
+        password: process.env["E2E_OWNER_PASSWORD"],
+      },
+    }),
+  );
+  await page.goto("/en/crm/settings/operations");
+  const heading = page.getByRole("heading", {
+    name: "Integrations and operations",
+    exact: true,
+  });
+  await expect(heading).toBeVisible();
+  let malformed = true;
+  await page.route("**/api/crm/integrations", async (route) => {
+    if (route.request().method() === "GET" && malformed) {
+      await route.fulfill({
+        status: 200,
+        json: {
+          apps: [],
+          endpoints: [null],
+          templates: [],
+          rules: [],
+          segments: [],
+          ai: {},
+        },
+      });
+    } else {
+      await route.continue();
+    }
+  });
+  await page.getByPlaceholder("Form name").fill(`Refresh ${suffix}`);
+  await page.getByPlaceholder("website-leads").fill(`refresh-${suffix}`);
+  await page.getByRole("button", { name: "Create form", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("refresh_failed");
+  await expect(heading).toBeVisible();
+  await expect(page.getByPlaceholder("Form name")).toHaveValue(
+    `Refresh ${suffix}`,
+  );
+  malformed = false;
+  await page
+    .getByRole("button", { name: "Retry refresh", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(heading).toBeVisible();
 });

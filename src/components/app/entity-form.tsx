@@ -106,7 +106,11 @@ export function EntityForm({ entity, record, labels, onSaved, onCancel, readOnly
     if (leadUnavailable || invalidLeadChoice || invalidStage || entity === "deal" && stageCatalog.unavailable || !moduleEnabled || layoutError || customError || !layout || !customReady || needsDraft && !draftId) return;
     setError(""); setErrors({}); let data: Record<string, unknown> = {}; const formData = new FormData(form);
     for (const key of visibleFields.filter(field => field.kind === "builtin").map(field => field.key)) {
-      if (record && entity === "lead" && !dirtyBuiltins.current.has(key)) continue;
+      if (record && entity !== "lead") {
+        const submitted = key === "stageId" ? selectedStage : String(formData.get(key) ?? "");
+        const baseline = key === "expectedCloseAt" ? String(record[key] ?? "").slice(0, 10) : key === "gender" ? String(record[key] ?? "undisclosed") : String(record[key] ?? "");
+        if (submitted === baseline) continue;
+      } else if (record && !dirtyBuiltins.current.has(key)) continue;
       if (record && entity === "deal" && ["amountMinor", "currency"].includes(key) && currencyPending) continue;
       if (entity === "lead" && key === "collaboratorMembershipIds") { data[key] = collaborators.map(owner => owner.membershipId); continue; }
       if (entity === "lead" && key === "sourceId") { data[key] = sourceId; continue; }
@@ -127,7 +131,7 @@ export function EntityForm({ entity, record, labels, onSaved, onCancel, readOnly
     try { const submission = { ...parsed.data, ...(!record && draftId ? { draftId } : {}) }; if (beforeSubmit && !(await beforeSubmit(submission))) return; const saved = !record && submitCreate ? await submitCreate(submission) : await crmRequest<{ id: string }>(`/api/crm/${entityPaths[entity]}${record ? `/${record.id}` : ""}`, { method: record ? "PATCH" : "POST", body: JSON.stringify(submission) }); invalidateCrm(entity); if (record && selectedOwner?.membershipId !== record.owner?.membershipId) invalidateCrm("ownership"); onSaved(saved.id); }
     catch (reason) { if (["product", "order"].includes(entity) && reason instanceof Error && reason.message === "409") onConflict?.(); const stale = calendarRevision !== undefined && reason instanceof Error && reason.message === "409"; setLeadConflict(entity === "lead" && Boolean(record) && reason instanceof Error && reason.message === "409"); setLatestLead(undefined); setCalendarStale(stale); setError(stale ? labels.custom.calendarStale : requestError(reason, labels)); } finally { setBusy(false); }
   }
-  return <form className="flex min-h-full flex-col gap-5" onChange={event => { if (entity === "lead" && (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) && event.target.name && !event.target.name.startsWith("custom-")) dirtyBuiltins.current.add(event.target.name); if (entity === "lead" && event.target instanceof HTMLInputElement && ["email", "phone"].includes(event.target.name)) { const { name, value } = event.target; setDuplicateInput(previous => ({ ...previous, [name]: value })); } }} onSubmit={event => { event.preventDefault(); void submit(event.currentTarget); }}>
+  return <form className="flex min-h-full flex-col gap-5" onChange={event => { if ((event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) && event.target.name && !event.target.name.startsWith("custom-")) dirtyBuiltins.current.add(event.target.name); if (entity === "lead" && event.target instanceof HTMLInputElement && ["email", "phone"].includes(event.target.name)) { const { name, value } = event.target; setDuplicateInput(previous => ({ ...previous, [name]: value })); } }} onSubmit={event => { event.preventDefault(); void submit(event.currentTarget); }}>
     {entity === "lead" && <LeadDuplicateSuggestions {...duplicateInput} id={record?.id} locale={locale} />}
     {leadUnavailable && <p role={leadSettings.error ? "alert" : "status"}>{leadSettings.error ? labels.error : labels.loading}{leadSettings.error && <Button type="button" variant="outline" onClick={leadSettings.reload}>{labels.retry}</Button>}</p>}
     {invalidLeadChoice && <p role="alert">{labels.conflict}</p>}
