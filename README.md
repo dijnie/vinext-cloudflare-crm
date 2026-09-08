@@ -187,6 +187,12 @@ Cloudflare Email Service. Change the variable and binding sender restriction
 together when changing domains. Email delivery uses the native Worker binding;
 no Resend account or API key is required.
 
+The production `AUTH_BASE_URL` is also a non-secret Wrangler variable tracked
+in `wrangler.jsonc`, so deployments preserve the canonical origin. Set the
+runtime secret named exactly `WEBHOOK_ENCRYPTION_KEYS` (plural) on the Worker;
+`WEBHOOK_ENCRYPTION_KEY` and build-only environment variables do not satisfy
+that binding. Its value must be the JSON keyring below, not a bare random key.
+
 Set `WEBHOOK_ENCRYPTION_KEYS` to JSON containing a distinct current key and up
 to five previous keys, each at least 32 characters, for example
 `{"current":"<random-secret>","previous":[],"write":"legacy"}`. First deploy

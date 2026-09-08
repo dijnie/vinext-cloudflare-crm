@@ -30,13 +30,13 @@
   "upload_source_maps": true,
   "triggers": { "crons": ["* * * * *"] },
   "vars": {
-    "AUTH_EMAIL_FROM": "noreply@dijnie.dev"
+    "AUTH_EMAIL_FROM": "noreply@dijnie.dev",
+    "AUTH_BASE_URL": "https://vinext-cloudflare-crm.tiendung0325.workers.dev"
   },
   "secrets": {
     "required": [
       "BETTER_AUTH_SECRET",
-      "WEBHOOK_ENCRYPTION_KEYS",
-      "AUTH_BASE_URL"
+      "WEBHOOK_ENCRYPTION_KEYS"
     ]
   },
   "send_email": [
