@@ -228,6 +228,24 @@ versioned Cloudflare D1 migration contract remains reviewed SQL applied by
 `scripts/d1-migrations.mjs`; the repository does not depend on the unused
 Drizzle Kit CLI or its generated migration state.
 
+Use Drizzle query builders for ordinary lookups, lists, inserts, updates and
+deletes. Use parameterized Drizzle `sql` templates for complex reporting,
+correlated authorization, JSON expressions, conditional audit writes and SQLite
+schema inspection. Small computed expressions can remain inside a builder;
+do not turn an otherwise straightforward query into a full SQL string.
+Interpolate values with `${value}` in the SQL template; `sql.raw()` is reserved
+for trusted static syntax or validated internal identifiers, never user values.
+
+Execute individual SQL queries through `db.get`, `db.all` or `db.run`. Use
+`db.batch` for builder batches with mapped results. When a batch mixes builders
+and SQL templates or requires native D1 metadata, pass them directly to
+[`executeD1Batch`](src/lib/db/database.ts). This adapter returns native column
+names and storage values, including numeric timestamps; it does not apply
+builder result decoders. Use explicit SQL aliases to preserve response keys.
+Keep permission/revision guards and dependent writes in the same ordered batch.
+The native D1 client remains confined to this adapter; migration scripts and
+test fixtures may use D1 directly.
+
 4. Build the application:
 
 ```bash

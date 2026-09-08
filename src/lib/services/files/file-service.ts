@@ -1,7 +1,7 @@
 import { recordTables, recordAnchorNames } from "@/lib/db/record-entities";
 import { and, eq, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/lib/db/database";
-import { crmFile } from "@/lib/db/schema";
+import { crmFile, fieldConfigurationRevision } from "@/lib/db/schema";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
 import { actionGuard, permissionPredicate, requirePermission } from "../permissions/permission-policy";
@@ -23,7 +23,7 @@ export class FileService {
     if (input.draftId && input.draftId !== input.recordId) throw new HttpError(400, "validation_failed", "Draft and record identifiers must match");
     const permissions = [input.draftId ? `${input.entity}.create` as const : `${input.entity}.update` as const];
     await requirePermission(this.db, context, permissions);
-    const snapshot = await this.db.get<{ revision: number }>(sql`SELECT revision FROM field_configuration_revision WHERE entity=${input.entity} AND (${anchors(input, context)})`);
+    const snapshot = await this.db.select({ revision: fieldConfigurationRevision.revision }).from(fieldConfigurationRevision).where(and(eq(fieldConfigurationRevision.entity, input.entity), anchors(input, context))).get();
     if (!snapshot) throw new HttpError(404, "not_found", "Record or file field is unavailable");
     const fileName = uploadFileName(request), bytes = await readUploadBody(request);
     const id = crypto.randomUUID(), objectKey = crypto.randomUUID(), createdAt = new Date();

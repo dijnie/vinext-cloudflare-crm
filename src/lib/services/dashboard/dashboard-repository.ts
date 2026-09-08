@@ -1,5 +1,6 @@
-import { sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { executeD1Batch, type AppDatabase } from "@/lib/db/database";
+import { activity, company, crmSetting, deal, lead, product, salesOrder, user } from "@/lib/db/schema";
 import type { DashboardInput } from "./dashboard-contracts";
 
 const DAY = 86_400_000;
@@ -22,10 +23,10 @@ export class DashboardRepository {
     const current = month(0), previous = month(-1), next = month(1), trend = month(-5);
     const owned = input.scope === "me" ? sql` AND d.owner_membership_id = ${userId}` : sql``;
     const where = sql`s.id = 'settings' AND d.archived_at IS NULL${owned}`;
-    const prepare = (query: SQL) => this.db.all<DashboardRow>(explain ? sql`EXPLAIN QUERY PLAN ${query}` : query);
+    const prepare = (query: SQLWrapper) => explain ? sql`EXPLAIN QUERY PLAN ${query.getSQL()}` : query.getSQL();
     const query = (selection: SQL, condition: SQL = sql``, tail: SQL = sql``) => prepare(sql`SELECT ${selection} ${sql.raw(FROM)} WHERE ${where}${condition} ${tail}`);
     return [
-      prepare(sql`SELECT reporting_currency, active_conversion_version FROM crm_setting WHERE id = 'settings'`),
+      prepare(this.db.select({ reportingCurrency: crmSetting.reportingCurrency, activeConversionVersion: crmSetting.activeConversionVersion }).from(crmSetting).where(eq(crmSetting.id, "settings"))),
       prepare(sql`SELECT catalog.id AS stage_id, catalog.label AS stage_label, catalog.label_key AS stage_label_key, COALESCE(totals.count, 0) AS count, COALESCE(totals.money_hi, '0') AS money_hi, COALESCE(totals.money_lo, '0') AS money_lo
         FROM deal_stage catalog LEFT JOIN (
           SELECT d.stage_id, count(*) AS count, ${sql.raw(sumParts())} ${sql.raw(FROM)} WHERE ${where} AND ${sql.raw(OPEN)} GROUP BY d.stage_id
@@ -48,14 +49,45 @@ export class DashboardRepository {
         co.id AS company_id, co.name AS company_name, u.id AS owner_id, u.name AS owner_name
         ${sql.raw(FROM)} INNER JOIN company co ON co.id = d.company_id INNER JOIN user u ON u.id = d.owner_membership_id
         WHERE ${where} AND ${sql.raw(OPEN)} ORDER BY base_amount_minor DESC, d.expected_close_at ASC, d.id ASC LIMIT 6`),
-      prepare(sql`SELECT a.id, a.subject, a.due_at, a.company_id AS anchor_company_id, a.contact_id AS anchor_contact_id, a.deal_id AS anchor_deal_id, a.lead_id AS anchor_lead_id, a.product_id AS anchor_product_id, a.order_id AS anchor_order_id, co.id AS company_id, co.name AS company_name, d.id AS deal_id, d.name AS deal_name, l.id AS lead_id, trim(l.first_name || ' ' || coalesce(l.last_name,'')) AS lead_name, p.id AS product_id, p.name AS product_name, so.id AS order_id, so.name AS order_name
-        FROM activity a LEFT JOIN company co ON co.id = a.company_id LEFT JOIN deal d ON d.id = a.deal_id LEFT JOIN lead l ON l.id = a.lead_id LEFT JOIN product p ON p.id = a.product_id LEFT JOIN sales_order so ON so.id = a.order_id
-        WHERE a.type = 'task' AND a.completed_at IS NULL AND a.due_at < ${now.getTime()} AND a.author_user_id = ${userId}
-        ORDER BY a.due_at ASC, a.id ASC LIMIT 10`),
-      prepare(sql`SELECT a.id, a.type, a.subject, substr(a.content, 1, 600) AS content, a.metadata_json, a.created_at,
-        u.id AS author_id, u.name AS author_name, co.id AS company_id, co.name AS company_name, d.id AS deal_id, d.name AS deal_name, l.id AS lead_id, trim(l.first_name || ' ' || coalesce(l.last_name,'')) AS lead_name, p.id AS product_id, p.name AS product_name, so.id AS order_id, so.name AS order_name
-        FROM activity a INNER JOIN user u ON u.id = a.author_user_id LEFT JOIN company co ON co.id = a.company_id LEFT JOIN deal d ON d.id = a.deal_id LEFT JOIN lead l ON l.id = a.lead_id LEFT JOIN product p ON p.id = a.product_id LEFT JOIN sales_order so ON so.id = a.order_id
-        ${input.scope === "me" ? sql`WHERE a.author_user_id = ${userId}` : sql``} ORDER BY a.created_at DESC, a.id DESC LIMIT 12`),
+      prepare(this.db.select({
+        id: activity.id, subject: activity.subject, dueAt: activity.dueAt,
+        anchorCompanyId: sql`${activity.companyId}`.as("anchor_company_id"),
+        anchorContactId: sql`${activity.contactId}`.as("anchor_contact_id"),
+        anchorDealId: sql`${activity.dealId}`.as("anchor_deal_id"),
+        anchorLeadId: sql`${activity.leadId}`.as("anchor_lead_id"),
+        anchorProductId: sql`${activity.productId}`.as("anchor_product_id"),
+        anchorOrderId: sql`${activity.orderId}`.as("anchor_order_id"),
+        companyId: sql`${company.id}`.as("company_id"), companyName: sql`${company.name}`.as("company_name"),
+        dealId: sql`${deal.id}`.as("deal_id"), dealName: sql`${deal.name}`.as("deal_name"),
+        leadId: sql`${lead.id}`.as("lead_id"), leadName: sql`trim(${lead.firstName} || ' ' || coalesce(${lead.lastName},''))`.as("lead_name"),
+        productId: sql`${product.id}`.as("product_id"), productName: sql`${product.name}`.as("product_name"),
+        orderId: sql`${salesOrder.id}`.as("order_id"), orderName: sql`${salesOrder.name}`.as("order_name"),
+      }).from(activity)
+        .leftJoin(company, eq(company.id, activity.companyId))
+        .leftJoin(deal, eq(deal.id, activity.dealId))
+        .leftJoin(lead, eq(lead.id, activity.leadId))
+        .leftJoin(product, eq(product.id, activity.productId))
+        .leftJoin(salesOrder, eq(salesOrder.id, activity.orderId))
+        .where(and(eq(activity.type, "task"), isNull(activity.completedAt), lt(activity.dueAt, now), eq(activity.authorUserId, userId)))
+        .orderBy(asc(activity.dueAt), asc(activity.id)).limit(10)),
+      prepare(this.db.select({
+        id: activity.id, type: activity.type, subject: activity.subject,
+        content: sql`substr(${activity.content}, 1, 600)`.as("content"),
+        metadataJson: activity.metadataJson, createdAt: activity.createdAt,
+        authorId: sql`${user.id}`.as("author_id"), authorName: sql`${user.name}`.as("author_name"),
+        companyId: sql`${company.id}`.as("company_id"), companyName: sql`${company.name}`.as("company_name"),
+        dealId: sql`${deal.id}`.as("deal_id"), dealName: sql`${deal.name}`.as("deal_name"),
+        leadId: sql`${lead.id}`.as("lead_id"), leadName: sql`trim(${lead.firstName} || ' ' || coalesce(${lead.lastName},''))`.as("lead_name"),
+        productId: sql`${product.id}`.as("product_id"), productName: sql`${product.name}`.as("product_name"),
+        orderId: sql`${salesOrder.id}`.as("order_id"), orderName: sql`${salesOrder.name}`.as("order_name"),
+      }).from(activity).innerJoin(user, eq(user.id, activity.authorUserId))
+        .leftJoin(company, eq(company.id, activity.companyId))
+        .leftJoin(deal, eq(deal.id, activity.dealId))
+        .leftJoin(lead, eq(lead.id, activity.leadId))
+        .leftJoin(product, eq(product.id, activity.productId))
+        .leftJoin(salesOrder, eq(salesOrder.id, activity.orderId))
+        .where(input.scope === "me" ? eq(activity.authorUserId, userId) : undefined)
+        .orderBy(desc(activity.createdAt), desc(activity.id)).limit(12)),
     ];
   }
   async snapshot(userId: string, input: DashboardInput, now = new Date()) {

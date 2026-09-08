@@ -72,18 +72,19 @@ export class MemberRepository {
     targetMembershipId: string,
     role: "owner" | "member",
   ): Promise<boolean> {
-    const result = await this.db.run(sql`
-      UPDATE singleton_membership
-         SET role = ${role}, updated_at = ${Date.now()}
-       WHERE user_id = ${targetMembershipId}
-         AND status = 'active'
-         AND EXISTS (
-           SELECT 1 FROM singleton_membership AS actor
-            WHERE actor.user_id = ${actorMembershipId}
-              AND actor.role = 'owner'
-              AND actor.status = 'active'
-         )
-    `);
+    const result = await this.db
+      .update(singletonMembership)
+      .set({ role, updatedAt: new Date() })
+      .where(and(
+        eq(singletonMembership.userId, targetMembershipId),
+        eq(singletonMembership.status, "active"),
+        sql`EXISTS (
+          SELECT 1 FROM singleton_membership AS actor
+           WHERE actor.user_id = ${actorMembershipId}
+             AND actor.role = 'owner'
+             AND actor.status = 'active'
+        )`,
+      ));
     return result.meta.changes === 1;
   }
 
@@ -91,18 +92,19 @@ export class MemberRepository {
     actorMembershipId: string,
     targetMembershipId: string,
   ): Promise<boolean> {
-    const result = await this.db.run(sql`
-      UPDATE singleton_membership
-         SET role = 'member', status = 'active', updated_at = ${Date.now()}
-       WHERE user_id = ${targetMembershipId}
-         AND status = 'revoked'
-         AND EXISTS (
-           SELECT 1 FROM singleton_membership AS actor
-            WHERE actor.user_id = ${actorMembershipId}
-              AND actor.role = 'owner'
-              AND actor.status = 'active'
-         )
-    `);
+    const result = await this.db
+      .update(singletonMembership)
+      .set({ role: "member", status: "active", updatedAt: new Date() })
+      .where(and(
+        eq(singletonMembership.userId, targetMembershipId),
+        eq(singletonMembership.status, "revoked"),
+        sql`EXISTS (
+          SELECT 1 FROM singleton_membership AS actor
+           WHERE actor.user_id = ${actorMembershipId}
+             AND actor.role = 'owner'
+             AND actor.status = 'active'
+        )`,
+      ));
     return result.meta.changes === 1;
   }
 

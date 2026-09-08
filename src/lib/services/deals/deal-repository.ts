@@ -186,10 +186,10 @@ export class DealRepository {
       ...(fx ? [fx.guard] : []),
       update,
       ...(changedStage ? [
-      this.db.run(sql`INSERT INTO ${activity}
+      sql`INSERT INTO ${activity}
         (id, type, company_id, deal_id, author_user_id, metadata_json, occurred_at, created_at, updated_at)
         SELECT ${auditId}, 'stage_change', ${deal.companyId}, ${deal.id}, ${authorId}, json_object('fromStageId', ${expectedStage}, 'toStageId', ${values.stageId}), ${now.getTime()}, ${now.getTime()}, ${now.getTime()}
-        FROM ${deal} WHERE ${deal.id} = ${id} AND changes() = 1`),
+        FROM ${deal} WHERE ${deal.id} = ${id} AND changes() = 1`,
       ] : []),
       ...(fields ? [this.db.insert(operationConditionGuard).values({ id: writeGuardId, authorized: sql<number>`case when ${changedStage ? sql`exists(select 1 from activity where id=${auditId})` : sql`changes()=1`} then 1 else 0 end` })] : []),
       ...(changedStage ? [

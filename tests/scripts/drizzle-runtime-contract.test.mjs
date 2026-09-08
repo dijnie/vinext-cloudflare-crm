@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const runtimeRoot = fileURLToPath(new URL("../../src/lib/", import.meta.url));
+const runtimeRoot = fileURLToPath(new URL("../../src/", import.meta.url));
 const adapterPath = "src/lib/db/database.ts";
 
 async function typescriptFiles(directory) {
@@ -13,7 +13,7 @@ async function typescriptFiles(directory) {
   const nested = await Promise.all(entries.map(entry => {
     const path = `${directory}/${entry.name}`;
     if (entry.isDirectory()) return typescriptFiles(path);
-    return entry.isFile() && entry.name.endsWith(".ts") ? [path] : [];
+    return entry.isFile() && /\.tsx?$/.test(entry.name) ? [path] : [];
   }));
   return nested.flat();
 }
