@@ -33,4 +33,29 @@ describe.sequential("Drizzle D1 batch contract", () => {
       .where(eq(actionOperationGuard.id, id)))
       .toEqual([]);
   });
+
+  it("binds SQL templates and builders in the same ordered batch", async () => {
+    const db = createDatabase(env.DB);
+    const id = `batch-' OR 1=1; -- ${crypto.randomUUID()}`;
+    const [inserted, selected, removed] = await executeD1Batch<{ id: string; authorized: number }>(db, [
+      db.insert(actionOperationGuard).values({ id, authorized: 1 }),
+      sql`select id, authorized from ${actionOperationGuard} where ${actionOperationGuard.id} = ${id}`,
+      db.delete(actionOperationGuard).where(eq(actionOperationGuard.id, id)),
+    ]);
+
+    expect(inserted.meta.changes).toBe(1);
+    expect(selected.results).toEqual([{ id, authorized: 1 }]);
+    expect(selected.meta.rows_read).toBeGreaterThan(0);
+    expect(removed.meta.changes).toBe(1);
+  });
+
+  it("rolls back a builder mutation when a following SQL template fails", async () => {
+    const db = createDatabase(env.DB);
+    const id = `mixed-batch-${crypto.randomUUID()}`;
+    await expect(executeD1Batch(db, [
+      db.insert(actionOperationGuard).values({ id, authorized: 1 }),
+      sql`insert into ${actionOperationGuard} (id, authorized) values (${id}, 1)`,
+    ])).rejects.toThrow();
+    expect(await db.select().from(actionOperationGuard).where(eq(actionOperationGuard.id, id))).toEqual([]);
+  });
 });
