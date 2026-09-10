@@ -69,9 +69,9 @@ function createHarness(overrides: Partial<RuntimeEnv> = {}, queries?: string[]) 
   ): Promise<Response> => {
     const url = /^https?:\/\//.test(pathOrUrl)
       ? pathOrUrl
-      : `https://auth.test/api/auth${pathOrUrl}`;
+      : `${bindings.AUTH_BASE_URL}/api/auth${pathOrUrl}`;
     const headers = new Headers(init.headers);
-    headers.set("origin", headers.get("origin") ?? "https://auth.test");
+    headers.set("origin", headers.get("origin") ?? bindings.AUTH_BASE_URL);
     if (!headers.has("cf-connecting-ip")) {
       headers.set("cf-connecting-ip", `192.0.${currentHarness}.10`);
     }
@@ -165,8 +165,8 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     expect(await root.db.select().from(singletonMembership)).toHaveLength(0);
   });
 
-  it("normalizes sign-up, verifies email, admits a guarded session, and signs out", async () => {
-    const { email, request, root } = createHarness();
+  it.each(["https://auth.test", "http://localhost:8787", "http://127.0.0.1:8787", "http://[::1]:8787"])("signs up, verifies, signs in and signs out on %s", async (baseUrl) => {
+    const { email, request, root } = createHarness({ AUTH_BASE_URL: baseUrl });
     const signUp = await request("/sign-up/email", {
       method: "POST",
       body: jsonBody({
@@ -184,11 +184,12 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     expect(await root.db.select().from(singletonMembership)).toHaveLength(0);
 
     const verificationUrl = new URL(email.verificationMessages[0].url);
+    expect(verificationUrl.origin).toBe(baseUrl);
     const token = verificationUrl.searchParams.get("token");
     if (!token) throw new Error("Verification token was not generated");
     const verify = await root.auth.api.verifyEmail({
       asResponse: true,
-      headers: new Headers({ origin: "https://auth.test" }),
+      headers: new Headers({ origin: baseUrl }),
       query: { token },
     });
     expect([200, 302]).toContain(verify.status);
@@ -196,9 +197,9 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     const membership = await root.db.query.singletonMembership.findFirst();
     expect(membership).toMatchObject({ role: "owner", status: "active" });
 
-    const signIn = await request("http://auth.test/api/auth/sign-in/email", {
+    const signIn = await request(`${baseUrl.replace("https:", "http:")}/api/auth/sign-in/email`, {
       method: "POST",
-      headers: { origin: "http://auth.test" },
+      headers: { origin: baseUrl.replace("https:", "http:") },
       body: jsonBody({
         email: " OWNER@EXAMPLE.COM ",
         password: "correct horse battery staple",
@@ -207,7 +208,11 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     expect(signIn.status).toBe(200);
     const setCookie = signIn.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("HttpOnly");
-    expect(setCookie).toContain("Secure");
+    if (baseUrl.startsWith("https:")) expect(setCookie).toContain("Secure");
+    else {
+      expect(setCookie).not.toContain("Secure");
+      expect(setCookie).not.toContain("__Secure-");
+    }
     expect(setCookie).toContain("SameSite=Lax");
 
     const cookie = requestCookie(signIn);
@@ -229,6 +234,10 @@ describe.sequential("Better Auth compatibility under workerd", () => {
       headers: { cookie },
     });
     expect(await afterSignOut.json()).toBeNull();
+  });
+
+  it.each(["http://auth.test", "http://localhost.evil.test", "http://192.168.1.5", "http://localhost:8787/path", "http://localhost:8787?x=1", "http://user:pass@localhost:8787"])("rejects unsafe auth base URL %s", baseUrl => {
+    expect(() => createHarness({ AUTH_BASE_URL: baseUrl })).toThrow("Auth base URL must be a canonical HTTPS origin or HTTP loopback origin");
   });
 
   it("rejects an untrusted mutation origin", async () => {

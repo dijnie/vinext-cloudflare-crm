@@ -81,7 +81,7 @@
     "dev": "npm run db:migrate:local && vinext dev --port 4321",
     "e2e:dev": "npm run db:migrate:local && vinext dev",
     "preview": "npm run build && npm run start",
-    "start": "npm run db:migrate:built && wrangler dev --config dist/server/wrangler.json --persist-to .wrangler/state --port 8787 --local-protocol https --var AUTH_BASE_URL:https://localhost:8787",
+    "start": "npm run db:migrate:built && wrangler dev --config dist/server/wrangler.json --persist-to .wrangler/state --port 8787 --local-protocol http --var AUTH_BASE_URL:http://localhost:8787",
     "test": "npm run test:unit && npm run test:integration",
     "test:e2e": "playwright test",
     "test:e2e:local": "npm run build && node scripts/e2e-local.mjs",

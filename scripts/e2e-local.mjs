@@ -9,7 +9,7 @@ import { request } from "@playwright/test";
 
 // Only a fresh local D1 is provisioned. Browser sessions still use Better Auth.
 const port = 8787;
-const baseURL = `https://localhost:${port}`;
+const baseURL = `http://localhost:${port}`;
 // Every suite gets a fresh database and server so destructive fixture changes
 // cannot leak across suites. Sessions and auth rate limiters are isolated too.
 const defaultGroups = [
@@ -122,7 +122,7 @@ async function runGroup(group) {
   }
   try {
     await run("npx", ["wrangler", "d1", "migrations", "apply", "DB", "--local", "--config", config, "--persist-to", persist]);
-    server = spawn("node", ["node_modules/wrangler/bin/wrangler.js", "dev", "--config", config, "--persist-to", persist, "--port", String(port), "--local-protocol", "https", "--var", `AUTH_BASE_URL:${baseURL}`], { stdio: "inherit", env: environment, detached: true });
+    server = spawn("node", ["node_modules/wrangler/bin/wrangler.js", "dev", "--config", config, "--persist-to", persist, "--port", String(port), "--local-protocol", "http", "--var", `AUTH_BASE_URL:${baseURL}`], { stdio: "inherit", env: environment, detached: true });
     children.add(server);
     console.log(`Local E2E server PID=${server.pid} port=${port} cwd=${process.cwd()} state=${persist}`);
     server.once("exit", (code, signal) => {
@@ -136,7 +136,7 @@ async function runGroup(group) {
       serverFailure = error;
       void stop(commandProcess).catch(cleanupError => console.error(cleanupError));
     });
-    const api = await request.newContext({ baseURL, ignoreHTTPSErrors: true, extraHTTPHeaders: { origin: baseURL } });
+    const api = await request.newContext({ baseURL, extraHTTPHeaders: { origin: baseURL } });
     try {
       let ready = false;
       for (let attempt = 0; attempt < 60; attempt++) {

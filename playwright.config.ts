@@ -7,8 +7,7 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   use: {
-    baseURL: runtimeEnvironment["E2E_BASE_URL"] ?? "https://localhost:8787",
-    ignoreHTTPSErrors: true,
+    baseURL: runtimeEnvironment["E2E_BASE_URL"] ?? "http://localhost:8787",
     trace: "retain-on-failure",
   },
 });

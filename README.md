@@ -181,7 +181,11 @@ cp .dev.vars.example .dev.vars
 ```
 
 Set `BETTER_AUTH_SECRET` to at least 32 random characters and keep
-`AUTH_BASE_URL` on a canonical HTTPS origin. The sender address is a non-secret
+`AUTH_BASE_URL` on a canonical HTTPS origin in production. HTTP is allowed only
+for loopback hosts (`localhost`, `127.0.0.1`, `[::1]`), with non-Secure auth
+cookies for local development. The example uses `http://localhost:8787` for
+preview; use `http://localhost:4321` in `.dev.vars` when running `npm run dev`.
+The sender address is a non-secret
 Wrangler variable in `wrangler.jsonc`; its domain must already be onboarded in
 Cloudflare Email Service. Change the variable and binding sender restriction
 together when changing domains. Email delivery uses the native Worker binding;
@@ -318,10 +322,10 @@ requires the exact database ID acknowledgement as well as operational approval;
 it still rejects incompatible migration history. See the runbook for the
 conditional apply commands. `npm run start` uses the built Worker's local
 migration configuration to keep preview data and schema in the same local store.
-It also explicitly sets `AUTH_BASE_URL=https://localhost:8787` to match its HTTPS
+It also explicitly sets `AUTH_BASE_URL=http://localhost:8787` to match its HTTP
 listener, because the generated Worker configuration retains production vars
 and does not copy `.dev.vars` overrides for those vars. Open the local preview
-with HTTPS; this local command override does not change the deployment origin.
+with HTTP; this local command override does not change the deployment origin.
 
 The stateful [cutover runbook](../plans/260904-0849-vinext-crm-rebuild/reports/crm-cutover-runbook.md)
 records the selected targets, ledger collision, retained revision, backup and
