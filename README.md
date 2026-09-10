@@ -230,10 +230,22 @@ npm run dev
 The source migration directory is `migrations/crm`. Apply it without starting
 the development server with `npm run db:migrate:local`.
 
-Application database access and schema definitions use `drizzle-orm`. The
-versioned Cloudflare D1 migration contract remains reviewed SQL applied by
-`scripts/d1-migrations.mjs`; the repository does not depend on the unused
-Drizzle Kit CLI or its generated migration state.
+Application database access and schema definitions use `drizzle-orm`.
+[Drizzle Kit configuration](drizzle.config.ts) uses SQLite and targets
+`migrations/crm`, matching the Astro project. Schema discovery supports both
+`src/lib/db/schema.ts` and the directory entry point `src/lib/db/schema/index.ts`
+while the schema files are being reorganized. Run
+`npm run db:schema:export` to inspect schema SQL without
+changing the database or migration files.
+
+Drizzle Kit's legacy TypeScript loader uses a scoped `esbuild` override in
+`package.json` to avoid its vulnerable development-server dependency. This does
+not change the application's database driver.
+
+The versioned Cloudflare D1 migration contract remains reviewed SQL applied by
+`scripts/d1-migrations.mjs`. Existing migrations have no Drizzle Kit snapshot
+baseline; generating migrations requires reconciling that baseline first to
+avoid recreating existing tables.
 
 Use Drizzle query builders for ordinary lookups, lists, inserts, updates and
 deletes. Use parameterized Drizzle `sql` templates for complex reporting,

@@ -49,6 +49,7 @@
     "@vitejs/plugin-rsc": "0.5.34",
     "auth": "1.7.2",
     "autoprefixer": "10.5.4",
+    "drizzle-kit": "0.31.10",
     "postcss": "8.5.28",
     "tailwindcss": "3.4.19",
     "typescript": "5.9.3",
@@ -58,6 +59,13 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "overrides": {
+    "drizzle-kit": {
+      "@esbuild-kit/core-utils": {
+        "esbuild": "0.25.12"
+      }
+    }
   },
   "private": true,
   "type": "module",
@@ -73,6 +81,7 @@
     "db:inspect:local": "node scripts/d1-migrations.mjs --target local",
     "db:inspect:preview": "node scripts/d1-migrations.mjs --target preview",
     "db:inspect:production": "node scripts/d1-migrations.mjs --target production",
+    "db:schema:export": "drizzle-kit export --config=drizzle.config.ts",
     "db:migrate:local": "node scripts/d1-migrations.mjs --target local --apply",
     "db:migrate:built": "node scripts/d1-migrations.mjs --target local --built --apply",
     "db:migrate:preview": "node scripts/d1-migrations.mjs --target preview --apply",
