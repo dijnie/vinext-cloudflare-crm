@@ -318,6 +318,10 @@ requires the exact database ID acknowledgement as well as operational approval;
 it still rejects incompatible migration history. See the runbook for the
 conditional apply commands. `npm run start` uses the built Worker's local
 migration configuration to keep preview data and schema in the same local store.
+It also explicitly sets `AUTH_BASE_URL=https://localhost:8787` to match its HTTPS
+listener, because the generated Worker configuration retains production vars
+and does not copy `.dev.vars` overrides for those vars. Open the local preview
+with HTTPS; this local command override does not change the deployment origin.
 
 The stateful [cutover runbook](../plans/260904-0849-vinext-crm-rebuild/reports/crm-cutover-runbook.md)
 records the selected targets, ledger collision, retained revision, backup and
