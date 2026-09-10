@@ -96,6 +96,19 @@ export const actionOperationGuard = sqliteTable(
   },
   (t) => [check("action_permission_required", sql`${t.authorized} = 1`)],
 );
+export const memberOperationGuard = sqliteTable(
+  "member_operation_guard",
+  {
+    id: text("id").primaryKey(),
+    authorized: integer("authorized").notNull(),
+  },
+  (t) => [
+    check(
+      "member_operation_guard_authorized_check",
+      sql`${t.authorized} = 1`,
+    ),
+  ],
+);
 export const operationConditionGuard = sqliteTable(
   "operation_condition_guard",
   {

@@ -15,7 +15,8 @@ import { company } from "./company-schema";
 import { contact } from "./contact-schema";
 import { deal } from "./deal-schema";
 import { lead } from "./lead-schema";
-import { productVariant, salesOrder } from "./product-order-schema";
+import { productVariant } from "./product-schema";
+import { salesOrder } from "./order-schema";
 
 const timestamps = {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),

@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -10,12 +11,35 @@ import {
 
 import { singletonMembership } from "./auth-schema";
 import { company } from "./company-schema";
-import { dealStage } from "./deal-stage-schema";
+import { contact } from "./contact-schema";
 
 const timestamps = {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 };
+
+export const dealStage = sqliteTable(
+  "deal_stage",
+  {
+    id: text("id").primaryKey(),
+    labelKey: text("label_key").notNull(),
+    label: text("label"),
+    archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
+    position: integer("position").notNull(),
+    closedState: text("closed_state", {
+      enum: ["open", "won", "lost"],
+    })
+      .default("open")
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("deal_stage_position_unique").on(table.position),
+    check(
+      "deal_stage_closed_state_check",
+      sql`${table.closedState} in ('open', 'won', 'lost')`,
+    ),
+  ],
+);
 
 export const deal = sqliteTable(
   "deal",
@@ -63,5 +87,22 @@ export const deal = sqliteTable(
       sql`${table.amountMinor} is null or ${table.amountMinor} >= 0`,
     ),
     check("deal_currency_check", sql`length(${table.currency}) = 3`),
+  ],
+);
+
+export const dealContact = sqliteTable(
+  "deal_contact",
+  {
+    dealId: text("deal_id")
+      .notNull()
+      .references(() => deal.id, { onDelete: "cascade" }),
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => contact.id, { onDelete: "cascade" }),
+    role: text("role"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.dealId, table.contactId] }),
+    index("deal_contact_contact_idx").on(table.contactId),
   ],
 );
