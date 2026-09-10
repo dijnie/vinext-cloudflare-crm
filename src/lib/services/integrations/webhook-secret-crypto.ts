@@ -52,73 +52,40 @@ async function open(secret: string, value: string): Promise<string> {
   );
 }
 
-type Keyring = { current: string; previous?: string[]; write?: "legacy" | "v1" };
-
-function parseKeyring(raw: string | undefined, legacySecret: string): Required<Keyring> {
-  if (raw === undefined) return { current: legacySecret, previous: [], write: "legacy" };
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("WEBHOOK_ENCRYPTION_KEYS must be valid JSON");
-  }
-  if (
-    !parsed ||
-    typeof parsed !== "object" ||
-    typeof (parsed as Keyring).current !== "string" ||
-    (parsed as Keyring).current.length < 32 ||
-    ((parsed as Keyring).write !== undefined && !["legacy", "v1"].includes((parsed as Keyring).write!)) ||
-    ((parsed as Keyring).previous !== undefined &&
-      (!Array.isArray((parsed as Keyring).previous) ||
-        (parsed as Keyring).previous!.length > 5 ||
-        (parsed as Keyring).previous!.some((item) => typeof item !== "string" || item.length < 32)))
-  ) {
-    throw new Error("WEBHOOK_ENCRYPTION_KEYS must contain a current key and up to five previous keys of at least 32 characters");
-  }
-  return {
-    current: (parsed as Keyring).current,
-    previous: [...new Set((parsed as Keyring).previous ?? [])].filter(
-      (item) => item !== (parsed as Keyring).current,
-    ),
-    write: (parsed as Keyring).write ?? "legacy",
-  };
-}
-
 export class WebhookSecretCrypto {
-  private readonly keys: Required<Keyring>;
-
-  constructor(rawKeyring: string | undefined, private readonly legacySecret: string) {
-    this.keys = parseKeyring(rawKeyring, legacySecret);
+  constructor(private readonly encryptionKey: string, private readonly legacySecret: string) {
+    if (typeof encryptionKey !== "string" || !/^[0-9a-f]{64}$/i.test(encryptionKey)) {
+      throw new Error("WEBHOOK_ENCRYPTION_KEY must be 64 hexadecimal characters");
+    }
   }
 
   async encrypt(value: string): Promise<string> {
-    if (this.keys.write === "legacy") return seal(this.legacySecret, value);
-    return `v1.${await keyId(this.keys.current)}.${await seal(this.keys.current, value)}`;
+    return `${await this.currentPrefix()}${await seal(this.encryptionKey, value)}`;
   }
 
-  async currentPrefix(): Promise<string | null> {
-    return this.keys.write === "v1" ? `v1.${await keyId(this.keys.current)}.` : null;
+  async currentPrefix(): Promise<string> {
+    return `v1.${await keyId(this.encryptionKey)}.`;
   }
 
   async decrypt(value: string): Promise<{ value: string; needsRewrap: boolean }> {
     const tagged = /^v1\.([0-9a-f]{16})\.(.+)$/i.exec(value);
     if (tagged) {
-      for (const candidate of [this.keys.current, ...this.keys.previous]) {
-        if ((await keyId(candidate)) !== tagged[1]) continue;
-        try {
-          return { value: await open(candidate, tagged[2]!), needsRewrap: this.keys.write === "v1" && candidate !== this.keys.current };
-        } catch {
-          throw new Error("Webhook secret ciphertext cannot be decrypted");
-        }
+      if ((await keyId(this.encryptionKey)) !== tagged[1]) {
+        throw new Error("Webhook secret encryption key is unavailable");
       }
-      throw new Error("Webhook secret encryption key is unavailable");
+      try {
+        return { value: await open(this.encryptionKey, tagged[2]!), needsRewrap: false };
+      } catch {
+        throw new Error("Webhook secret ciphertext cannot be decrypted");
+      }
     }
 
-    for (const candidate of [...new Set([this.legacySecret, this.keys.current, ...this.keys.previous])]) {
+    // Read existing untagged records so they can be re-encrypted with the dedicated key.
+    for (const candidate of [this.legacySecret, this.encryptionKey]) {
       try {
-        return { value: await open(candidate, value), needsRewrap: this.keys.write === "v1" };
+        return { value: await open(candidate, value), needsRewrap: true };
       } catch {
-        // Try the next configured compatibility key without exposing key material.
+        // Compatibility reads never expose key material.
       }
     }
     throw new Error("Webhook secret ciphertext cannot be decrypted");

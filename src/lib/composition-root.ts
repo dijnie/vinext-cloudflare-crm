@@ -47,7 +47,7 @@ import { defaultSecurityLogger, type SecurityLogger } from "./http/security-logg
 
 export interface RuntimeEnv extends Cloudflare.Env {
   BETTER_AUTH_SECRET: string;
-  WEBHOOK_ENCRYPTION_KEYS: string;
+  WEBHOOK_ENCRYPTION_KEY: string;
   AUTH_BASE_URL: string;
   AUTH_EMAIL_FROM: string;
   EMAIL: SendEmail;
@@ -81,13 +81,13 @@ export function createCompositionRoot(
   const fields = new FieldService(db);
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
-  if (!runtimeBindings.WEBHOOK_ENCRYPTION_KEYS) throw new Error("WEBHOOK_ENCRYPTION_KEYS is required");
+  if (!runtimeBindings.WEBHOOK_ENCRYPTION_KEY) throw new Error("WEBHOOK_ENCRYPTION_KEY is required");
   return {
     workspace: new WorkspaceService(db, runtimeBindings.CRM_FILES),
     integrations: new IntegrationService(
       db,
       runtimeBindings.BETTER_AUTH_SECRET,
-      runtimeBindings.WEBHOOK_ENCRYPTION_KEYS,
+      runtimeBindings.WEBHOOK_ENCRYPTION_KEY,
     ),
     webforms: new WebformService(db),
     reportExports: new ReportExportService(db),

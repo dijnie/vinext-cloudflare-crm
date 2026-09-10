@@ -23,11 +23,7 @@ export default defineConfig({
             path.join(rootDirectory, "migrations/crm"),
           ),
           BETTER_AUTH_SECRET: "test-secret-with-at-least-32-characters",
-          WEBHOOK_ENCRYPTION_KEYS: JSON.stringify({
-            current: "test-webhook-key-with-at-least-32-characters",
-            previous: [],
-            write: "v1",
-          }),
+          WEBHOOK_ENCRYPTION_KEY: "ab".repeat(32),
           AUTH_BASE_URL: "https://auth.test",
           AUTH_EMAIL_FROM: "auth@example.com",
         },

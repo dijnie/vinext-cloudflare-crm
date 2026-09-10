@@ -189,25 +189,22 @@ no Resend account or API key is required.
 
 The production `AUTH_BASE_URL` is also a non-secret Wrangler variable tracked
 in `wrangler.jsonc`, so deployments preserve the canonical origin. Set the
-runtime secret named exactly `WEBHOOK_ENCRYPTION_KEYS` (plural) on the Worker;
-`WEBHOOK_ENCRYPTION_KEY` and build-only environment variables do not satisfy
-that binding. Its value must be the JSON keyring below, not a bare random key.
+runtime secret `WEBHOOK_ENCRYPTION_KEY` to one 64-character hexadecimal value.
+Generate it with `openssl rand -hex 32`, independently of `BETTER_AUTH_SECRET`,
+and use the same variable in `.dev.vars` for local development. No JSON or
+additional webhook key variables are used.
 
-Set `WEBHOOK_ENCRYPTION_KEYS` to JSON containing a distinct current key and up
-to five previous keys, each at least 32 characters, for example
-`{"current":"<random-secret>","previous":[],"write":"legacy"}`. First deploy
-the compatible reader with `write` set to `legacy`; this keeps rollback safe.
-Then create a reviewed Worker version with `write` set to `v1`. New endpoint
-secrets use the current key and the scheduled worker rewraps all old endpoints,
-including idle and disabled ones, in bounded batches. Keep old keys in
-`previous` until scheduled logs report zero remaining ciphertext and no failed
-rewraps. Untagged legacy ciphertext still needs the existing
-`BETTER_AUTH_SECRET` during this transition, so never rotate the auth secret
-before that zero-remaining gate. Roll back the `v1` writer only to the compatible
-reader version, never to a revision that cannot read tagged ciphertext. Use
-`wrangler versions secret put` or a reviewed
-`--secrets-file` upload to stage this key with code; `wrangler secret put`
-deploys immediately.
+When upgrading from the former JSON configuration, use its `current` value
+as `WEBHOOK_ENCRYPTION_KEY` if it is already 64 hex characters, preserving its
+exact spelling. Existing versioned ciphertext remains readable with that same
+key. New webhook secrets are always encrypted with the dedicated webhook key.
+Existing untagged records can still be read with the existing auth secret and
+are re-encrypted on delivery or by the scheduled worker, including idle and
+disabled endpoints. Keep the auth secret until rewrap logs report zero remaining
+records and zero failures. Changing the webhook key without re-encrypting stored
+records makes those records unreadable; automatic multi-key rotation is not
+supported. Deployments must provision the singular runtime secret together with
+this code; build-only environment variables do not satisfy the binding.
 
 Authentication checks read the current session/user together using Better Auth's
 database joins, then read active membership on every protected request. Session
