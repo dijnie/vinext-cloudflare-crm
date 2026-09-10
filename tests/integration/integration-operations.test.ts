@@ -1162,7 +1162,7 @@ describe("integration operations", () => {
       ).first(),
     ).toEqual({ count: 0 });
   });
-  it("resolves static and dynamic segments and leaves AI disabled", async () => {
+  it("resolves static and dynamic segments", async () => {
     const { root, context } = await setup(),
       lead = await root.leads.create(context, {
         firstName: "Segmented",
@@ -1189,13 +1189,5 @@ describe("integration operations", () => {
     expect(
       await root.integrations.segmentMembers(context, dynamic.id),
     ).toContain(lead.id);
-    expect(await root.integrations.aiStatus(context)).toMatchObject({
-      enabled: false,
-      provider: null,
-      monthlyBudgetMinor: 0,
-    });
-    await expect(root.integrations.useAi(context)).rejects.toMatchObject({
-      status: 409,
-    });
   });
 });

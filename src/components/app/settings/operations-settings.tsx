@@ -30,12 +30,6 @@ type Dashboard = {
   templates: { id: string; name: string }[];
   rules: { id: string; name: string; enabled: boolean; revision: number }[];
   segments: { id: string; name: string; kind: string; entity: string }[];
-  ai: {
-    enabled: boolean;
-    provider: string | null;
-    monthlyBudgetMinor: number;
-    usedMinor: number;
-  };
 };
 type FormRow = {
   id: string;
@@ -124,12 +118,7 @@ const isDashboard = (value: unknown): value is Dashboard =>
       typeof segment.name === "string" &&
       typeof segment.kind === "string" &&
       typeof segment.entity === "string",
-  ) &&
-  object(value.ai) &&
-  typeof value.ai.enabled === "boolean" &&
-  (value.ai.provider === null || typeof value.ai.provider === "string") &&
-  typeof value.ai.monthlyBudgetMinor === "number" &&
-  typeof value.ai.usedMinor === "number";
+  );
 const isWebforms = (value: unknown): value is FormRow[] =>
   Array.isArray(value) &&
   value.every(
@@ -795,31 +784,6 @@ export function OperationsSettings({
               {vi
                 ? "Tự động hóa chỉ chạy khi chủ sở hữu bật, giữ quyền thực thi và giới hạn vòng lặp 1–5."
                 : "Automations run only when enabled by the owner, retain execution authority, and cap loops at 1–5."}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>AI</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm">
-              {dashboard.ai.enabled
-                ? vi
-                  ? "Đang bật"
-                  : "Enabled"
-                : vi
-                  ? "Đang tắt"
-                  : "Disabled"}{" "}
-              ·{" "}
-              {dashboard.ai.provider ??
-                (vi ? "chưa chọn nhà cung cấp" : "no provider")}{" "}
-              · {dashboard.ai.usedMinor}/{dashboard.ai.monthlyBudgetMinor}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {vi
-                ? "AI không phát sinh cuộc gọi hoặc chi phí khi chưa chọn nhà cung cấp và ngân sách bằng 0."
-                : "AI makes no calls and incurs no cost while provider is unset and budget is zero."}
             </p>
           </CardContent>
         </Card>

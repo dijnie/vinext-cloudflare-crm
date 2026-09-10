@@ -760,16 +760,6 @@ export const customerSegmentMember = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.segmentId, t.recordId] })],
 );
-export const aiSetting = sqliteTable("ai_setting", {
-  id: text("id", { enum: ["settings"] })
-    .primaryKey()
-    .notNull(),
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
-  provider: text("provider"),
-  monthlyBudgetMinor: integer("monthly_budget_minor").notNull().default(0),
-  usedMinor: integer("used_minor").notNull().default(0),
-  revision: integer("revision").notNull().default(0),
-});
 export const workspaceProfile = sqliteTable("workspace_profile", {
   id: text("id", { enum: ["workspace"] })
     .primaryKey()

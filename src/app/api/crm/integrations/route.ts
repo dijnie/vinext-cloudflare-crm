@@ -75,7 +75,6 @@ const mutation = z.discriminatedUnion("action", [
   z
     .object({ action: z.literal("segment-members"), id: z.string().uuid() })
     .strict(),
-  z.object({ action: z.literal("use-ai") }).strict(),
 ]);
 export const createIntegrationsGetHandler = (root: CompositionRoot) =>
   createRouteHandler(root, {
@@ -124,8 +123,6 @@ export const createIntegrationsPostHandler = (root: CompositionRoot) =>
           return root.integrations.createSegment(context, input.data);
         case "segment-members":
           return root.integrations.segmentMembers(context, input.id);
-        case "use-ai":
-          return root.integrations.useAi(context);
       }
     },
   });

@@ -23,9 +23,3 @@ export function catalogWriteError(error: unknown): never {
     relationError(classified, "Catalog relationship is invalid");
   }
 }
-export function normalizeSku(value: string | null | undefined) {
-  const trimmed = value?.replace(/^ +| +$/g, "") ?? "";
-  return trimmed
-    ? trimmed.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
-    : null;
-}

@@ -190,7 +190,6 @@ export const orderMutationOutputSchema = z.union([
   orderWriteOutputSchema,
   orderArchiveOutputSchema,
 ]);
-export const orderIdSchema = stableIdSchema;
 export const orderBulkInputSchema = bulkArchiveInputSchema;
 export const orderBulkOutputSchema = bulkResultSchema;
 export type OrderCreateInput = z.infer<typeof orderCreateInputSchema>;

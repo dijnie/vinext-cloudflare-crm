@@ -87,19 +87,3 @@ export class DraftService {
   }
 }
 
-export function translateDraftError(error: unknown): never {
-  let current: unknown = error;
-  while (current && typeof current === "object") {
-    if (
-      current instanceof Error &&
-      current.message.includes("operation_conflict")
-    )
-      throw new HttpError(
-        409,
-        "conflict",
-        "Creation reservation changed before the operation completed",
-      );
-    current = "cause" in current ? current.cause : null;
-  }
-  throw error;
-}

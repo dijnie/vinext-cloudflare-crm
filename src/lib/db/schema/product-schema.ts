@@ -142,13 +142,6 @@ export const productVariant = sqliteTable(
     check("product_variant_revision", sql`${table.revision}>=0`),
   ],
 );
-export const productSku = sqliteTable("product_sku", {
-  normalizedSku: text("normalized_sku").primaryKey().notNull(),
-  variantId: text("variant_id")
-    .notNull()
-    .unique()
-    .references(() => productVariant.id, { onDelete: "cascade" }),
-});
 export const productPackageComponent = sqliteTable(
   "product_package_component",
   {

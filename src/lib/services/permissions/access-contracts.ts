@@ -85,7 +85,6 @@ export const PERMISSIONS = [
   "template.manage",
   "workspace.manage",
   "workspace.delete",
-  "ai.use",
   "activity.create",
   "activity.update",
   "field.configure",
@@ -111,7 +110,6 @@ const OWNER_ONLY_OPERATION_PERMISSIONS = new Set<Permission>([
   "template.manage",
   "workspace.manage",
   "workspace.delete",
-  "ai.use",
 ]);
 export const DEFAULT_MEMBER_GRANTS = PERMISSIONS.filter(
   (permission) =>

@@ -6,7 +6,6 @@ import {
 } from "@/lib/db/database";
 import {
   activity,
-  aiSetting,
   appointment,
   automationRule,
   automationRun,
@@ -113,9 +112,8 @@ export class IntegrationService {
   }
   async dashboard(context: RequestContext) {
     await requirePermission(this.db, context, ["integration.manage"], true);
-    const [apps, endpoints, templates, rules, segments, ai] = await Promise.all(
-      [
-        this.db.select().from(integrationApp),
+    const [apps, endpoints, templates, rules, segments] = await Promise.all([
+      this.db.select().from(integrationApp),
         this.db
           .select({
             id: webhookEndpoint.id,
@@ -128,10 +126,8 @@ export class IntegrationService {
           .from(webhookEndpoint),
         this.db.select().from(emailTemplate),
         this.db.select().from(automationRule),
-        this.db.select().from(customerSegment),
-        this.db.select().from(aiSetting).get(),
-      ],
-    );
+      this.db.select().from(customerSegment),
+    ]);
     return {
       apps: this.appRows(apps),
       endpoints: endpoints.map((item) => ({
@@ -151,7 +147,6 @@ export class IntegrationService {
         ...item,
         filter: JSON.parse(item.filterJson),
       })),
-      ai,
     };
   }
   async createApp(context: RequestContext, input: AppCreate) {
@@ -2010,28 +2005,5 @@ export class IntegrationService {
       );
     await this.touchApp(tokenHash);
     return app;
-  }
-  async aiStatus(context: RequestContext) {
-    await requirePermission(this.db, context);
-    return this.db.select().from(aiSetting).get();
-  }
-  async useAi(context: RequestContext) {
-    await requirePermission(this.db, context, ["ai.use"]);
-    const setting = await this.db.select().from(aiSetting).get();
-    if (
-      !setting?.enabled ||
-      !setting.provider ||
-      setting.monthlyBudgetMinor <= setting.usedMinor
-    )
-      throw new HttpError(
-        409,
-        "conflict",
-        "AI is disabled until a provider and positive budget are configured",
-      );
-    throw new HttpError(
-      409,
-      "conflict",
-      "No AI provider adapter is configured",
-    );
   }
 }
