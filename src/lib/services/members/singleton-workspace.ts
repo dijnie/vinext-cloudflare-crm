@@ -1,8 +1,20 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-
 import type { AppDatabase } from "@/lib/db/database";
-import { singletonMembership, singletonWorkspace, user } from "@/lib/db/schema";
 import { MemberService } from "@/lib/services/members/member-service";
+import {
+  singletonMembership,
+  singletonWorkspace,
+  user,
+  crmSetting,
+  dealStage,
+  dealStageCatalogRevision,
+  moduleSetting,
+  fieldConfigurationRevision,
+  leadSettingsRevision,
+  productCategoryRevision,
+  leadSource,
+  leadStatus,
+} from "@/lib/db/schema";
 import type { RequestContext } from "@/lib/http/request-context";
 
 export const SINGLETON_WORKSPACE_ID = "00000000-0000-4000-8000-000000000001";
@@ -71,6 +83,64 @@ export async function reconcileSingletonMembership(
     if (!workspace) {
       throw new Error("Singleton workspace could not be initialized");
     }
+  }
+
+  // Seed baseline configuration for the first user
+  if (workspace.ownerUserId === userId) {
+    await db.batch([
+      db.insert(crmSetting).values({
+        id: "settings",
+        reportingCurrency: "USD",
+        createdAt: now,
+        updatedAt: now,
+      }).onConflictDoNothing(),
+      db.insert(dealStageCatalogRevision).values({
+        id: "stages",
+        revision: 0,
+      }).onConflictDoNothing(),
+      db.insert(dealStage).values([
+        { id: "demo-booked", labelKey: "dealStage.demoBooked", position: 10, closedState: "open" },
+        { id: "qualified-to-buy", labelKey: "dealStage.qualifiedToBuy", position: 20, closedState: "open" },
+        { id: "unqualified-to-buy", labelKey: "dealStage.unqualifiedToBuy", position: 30, closedState: "lost" },
+        { id: "decision-maker-bought-in", labelKey: "dealStage.decisionMakerBoughtIn", position: 40, closedState: "open" },
+        { id: "contract-sent", labelKey: "dealStage.contractSent", position: 50, closedState: "open" },
+        { id: "closed-won", labelKey: "dealStage.closedWon", position: 60, closedState: "won" },
+        { id: "closed-lost", labelKey: "dealStage.closedLost", position: 70, closedState: "lost" },
+      ]).onConflictDoNothing(),
+      db.insert(moduleSetting).values([
+        { entity: "company", enabled: true, revision: 0, updatedAt: now },
+        { entity: "contact", enabled: true, revision: 0, updatedAt: now },
+        { entity: "deal", enabled: true, revision: 0, updatedAt: now },
+        { entity: "lead", enabled: true, revision: 0, updatedAt: now },
+        { entity: "product", enabled: true, revision: 0, updatedAt: now },
+        { entity: "order", enabled: true, revision: 0, updatedAt: now },
+        { entity: "contract", enabled: true, revision: 0, updatedAt: now },
+        { entity: "review", enabled: true, revision: 0, updatedAt: now },
+      ]).onConflictDoNothing(),
+      db.insert(fieldConfigurationRevision).values([
+        { entity: "company", revision: 0 },
+        { entity: "contact", revision: 0 },
+        { entity: "deal", revision: 0 },
+      ]).onConflictDoNothing(),
+      db.insert(leadSettingsRevision).values({
+        id: "settings",
+        revision: 0,
+      }).onConflictDoNothing(),
+      db.insert(leadSource).values([
+        { id: "manual", labelKey: "leadSource.manual", position: 10 },
+      ]).onConflictDoNothing(),
+      db.insert(leadStatus).values([
+        { id: "new", labelKey: "leadStatus.new", position: 10, meaning: "working", requiresReason: false },
+        { id: "contacted", labelKey: "leadStatus.contacted", position: 20, meaning: "working", requiresReason: false },
+        { id: "nurturing", labelKey: "leadStatus.nurturing", position: 30, meaning: "working", requiresReason: false },
+        { id: "unqualified", labelKey: "leadStatus.unqualified", position: 40, meaning: "rejected", requiresReason: true },
+        { id: "converted", labelKey: "leadStatus.converted", position: 50, meaning: "converted", requiresReason: false },
+      ]).onConflictDoNothing(),
+      db.insert(productCategoryRevision).values({
+        id: "categories",
+        revision: 0,
+      }).onConflictDoNothing(),
+    ]);
   }
 
   const role: SingletonRole =
