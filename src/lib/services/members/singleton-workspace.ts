@@ -43,13 +43,34 @@ export async function reconcileSingletonMembership(
     )
     .returning({ ownerUserId: singletonWorkspace.ownerUserId });
 
-  const workspace = claimed[0]
+  let workspace = claimed[0]
     ? claimed[0]
     : await db.query.singletonWorkspace.findFirst({
         where: eq(singletonWorkspace.id, SINGLETON_WORKSPACE_ID),
       });
+
   if (!workspace) {
-    throw new Error("Singleton workspace is not initialized");
+    const inserted = await db
+      .insert(singletonWorkspace)
+      .values({
+        id: SINGLETON_WORKSPACE_ID,
+        slug: SINGLETON_WORKSPACE_SLUG,
+        ownerUserId: userId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing()
+      .returning({ ownerUserId: singletonWorkspace.ownerUserId });
+
+    workspace = inserted[0]
+      ? inserted[0]
+      : await db.query.singletonWorkspace.findFirst({
+          where: eq(singletonWorkspace.id, SINGLETON_WORKSPACE_ID),
+        });
+
+    if (!workspace) {
+      throw new Error("Singleton workspace could not be initialized");
+    }
   }
 
   const role: SingletonRole =
