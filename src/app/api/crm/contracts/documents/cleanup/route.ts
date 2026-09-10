@@ -1,6 +1,10 @@
 import { env } from "cloudflare:workers";
 import { z } from "zod";
-import { createCompositionRoot, type CompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
+import {
+  createCompositionRoot,
+  type CompositionRoot,
+  type RuntimeEnv,
+} from "@/lib/composition-root";
 import { createRouteHandler } from "@/lib/http/route-handler";
 
 export const createContractDocumentCleanupHandler = (root: CompositionRoot) =>
@@ -13,5 +17,7 @@ export const createContractDocumentCleanupHandler = (root: CompositionRoot) =>
   });
 
 export function POST(request: Request) {
-  return createContractDocumentCleanupHandler(createCompositionRoot(env as RuntimeEnv))(request);
+  return createContractDocumentCleanupHandler(
+    createCompositionRoot(env as RuntimeEnv),
+  )(request);
 }

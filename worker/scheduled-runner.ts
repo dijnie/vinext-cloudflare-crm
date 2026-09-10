@@ -3,19 +3,30 @@ import type { WebhookTransport } from "../src/lib/services/integrations/integrat
 export interface ScheduledServices {
   workspace: { cleanupDeletionObjects(): Promise<unknown> };
   integrations: {
-    rewrapWebhookSecrets(): Promise<{ processed: number; failed: number; remaining: number }>;
+    rewrapWebhookSecrets(): Promise<{
+      processed: number;
+      failed: number;
+      remaining: number;
+    }>;
     dispatchOutbox(): Promise<unknown>;
     deliverDue(transport: WebhookTransport): Promise<unknown>;
   };
 }
 
-export async function runScheduled(root: ScheduledServices, transport: WebhookTransport): Promise<void> {
+export async function runScheduled(
+  root: ScheduledServices,
+  transport: WebhookTransport,
+): Promise<void> {
   const stages: Array<[string, () => Promise<unknown>]> = [
     ["workspace-cleanup", () => root.workspace.cleanupDeletionObjects()],
-    ["webhook-rewrap", async () => {
-      const status = await root.integrations.rewrapWebhookSecrets();
-      if (status.processed || status.failed || status.remaining) console.info("Webhook rewrap status", status);
-    }],
+    [
+      "webhook-rewrap",
+      async () => {
+        const status = await root.integrations.rewrapWebhookSecrets();
+        if (status.processed || status.failed || status.remaining)
+          console.info("Webhook rewrap status", status);
+      },
+    ],
     ["outbox-dispatch", () => root.integrations.dispatchOutbox()],
     ["webhook-delivery", () => root.integrations.deliverDue(transport)],
   ];

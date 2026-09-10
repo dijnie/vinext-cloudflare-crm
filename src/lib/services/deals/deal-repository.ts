@@ -1,13 +1,24 @@
-import type { PreparedRecordFields, PreparedRecordCreation } from "../shared/record-fields-contract";
+import type {
+  PreparedRecordFields,
+  PreparedRecordCreation,
+} from "../shared/record-fields-contract";
 import { operationConditionGuard } from "@/lib/db/schema";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { fieldConditionQuery } from "../custom-fields/field-condition-query";
 import { customFieldSort } from "../custom-fields/field-sort";
 import type { RequestContext } from "@/lib/http/request-context";
-import { actionGuard, authorizedWrite, permissionError } from "../permissions/permission-policy";
+import {
+  actionGuard,
+  authorizedWrite,
+  permissionError,
+} from "../permissions/permission-policy";
 import { inJsonArray } from "@/lib/db/sql-filters";
 import { prepareDealConversion } from "@/lib/services/deals/deal-conversion-write";
-import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/lib/services/custom-fields/field-list-query";
+import {
+  fieldFilterConditions,
+  fieldListData,
+  validateFieldFilters,
+} from "@/lib/services/custom-fields/field-list-query";
 import {
   and,
   asc,
@@ -43,8 +54,17 @@ export class DealRepository {
 
   async list(input: DealListInput) {
     await validateFieldFilters(this.db, "deal", input.fields);
-    const fieldSort = await customFieldSort(this.db, "deal", input.sort, input.dir);
-    const conditions = await fieldConditionQuery(this.db, "deal", input.criteria);
+    const fieldSort = await customFieldSort(
+      this.db,
+      "deal",
+      input.sort,
+      input.dir,
+    );
+    const conditions = await fieldConditionQuery(
+      this.db,
+      "deal",
+      input.criteria,
+    );
     const where = and(this.where(input), ...conditions)!;
     const rowsQuery = this.db
       .select({
@@ -78,27 +98,62 @@ export class DealRepository {
       })
       .from(deal)
       .innerJoin(crmSetting, eq(crmSetting.id, "settings"))
-      .leftJoin(dealConversion, and(eq(dealConversion.dealId,deal.id),eq(dealConversion.version,crmSetting.activeConversionVersion),eq(dealConversion.moneyRevision,deal.moneyRevision)))
+      .leftJoin(
+        dealConversion,
+        and(
+          eq(dealConversion.dealId, deal.id),
+          eq(dealConversion.version, crmSetting.activeConversionVersion),
+          eq(dealConversion.moneyRevision, deal.moneyRevision),
+        ),
+      )
       .innerJoin(company, eq(company.id, deal.companyId))
       .innerJoin(dealStage, eq(dealStage.id, deal.stageId))
       .innerJoin(user, eq(user.id, deal.ownerMembershipId))
       .where(where)
-      .orderBy(...(fieldSort?.order ?? [...(input.sort === "amount" ? [asc(sql`${dealConversion.baseAmountMinor} is null`)] : []), this.order(input.sort, input.dir)]), asc(deal.id))
+      .orderBy(
+        ...(fieldSort?.order ?? [
+          ...(input.sort === "amount"
+            ? [asc(sql`${dealConversion.baseAmountMinor} is null`)]
+            : []),
+          this.order(input.sort, input.dir),
+        ]),
+        asc(deal.id),
+      )
       .limit(input.pageSize)
       .offset((input.page - 1) * input.pageSize);
     const countQuery = this.db
       .select({ total: sql<number>`count(*)` })
       .from(deal)
       .where(where);
-    const facetWhere = and(this.where({ ...input, owner: [], company: [], stage: [], fields: {} }), ...conditions)!;
+    const facetWhere = and(
+      this.where({ ...input, owner: [], company: [], stage: [], fields: {} }),
+      ...conditions,
+    )!;
     assertQueryLimits(rowsQuery, countQuery);
     const [rows, [{ total }], facets] = await Promise.all([
       rowsQuery,
       countQuery,
       listFacets(this.db, "deal", facetWhere),
     ]);
-    const fields = await fieldListData(this.db, "deal", rows.map(row => row.id), facetWhere);
-    return { rows: rows.map(({ internalFieldSortValue: _sortValue, ...row }) => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldFileLabels: fields.fieldFileLabels, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
+    const fields = await fieldListData(
+      this.db,
+      "deal",
+      rows.map((row) => row.id),
+      facetWhere,
+    );
+    return {
+      rows: rows.map(({ internalFieldSortValue: _sortValue, ...row }) => ({
+        ...row,
+        fields: fields.fieldsByRecord[row.id] ?? {},
+      })),
+      total,
+      facets,
+      customFields: fields.customFields,
+      fieldFacets: fields.fieldFacets,
+      fieldFileLabels: fields.fieldFileLabels,
+      fieldCustomerLabels: fields.fieldCustomerLabels,
+      fieldUserLabels: fields.fieldUserLabels,
+    };
   }
 
   async byId(id: string) {
@@ -135,7 +190,14 @@ export class DealRepository {
       })
       .from(deal)
       .innerJoin(crmSetting, eq(crmSetting.id, "settings"))
-      .leftJoin(dealConversion, and(eq(dealConversion.dealId,deal.id),eq(dealConversion.version,crmSetting.activeConversionVersion),eq(dealConversion.moneyRevision,deal.moneyRevision)))
+      .leftJoin(
+        dealConversion,
+        and(
+          eq(dealConversion.dealId, deal.id),
+          eq(dealConversion.version, crmSetting.activeConversionVersion),
+          eq(dealConversion.moneyRevision, deal.moneyRevision),
+        ),
+      )
       .innerJoin(company, eq(company.id, deal.companyId))
       .innerJoin(dealStage, eq(dealStage.id, deal.stageId))
       .innerJoin(user, eq(user.id, deal.ownerMembershipId))
@@ -158,61 +220,176 @@ export class DealRepository {
     return { ...record, contacts };
   }
 
-  async create(values: typeof deal.$inferInsert, context: RequestContext, fields?: PreparedRecordFields, creation?: PreparedRecordCreation) {
-    const fx = await prepareDealConversion(this.db,{id:values.id,amountMinor:values.amountMinor ?? null,currency:values.currency ?? "USD",moneyRevision:0});
+  async create(
+    values: typeof deal.$inferInsert,
+    context: RequestContext,
+    fields?: PreparedRecordFields,
+    creation?: PreparedRecordCreation,
+  ) {
+    const fx = await prepareDealConversion(this.db, {
+      id: values.id,
+      amountMinor: values.amountMinor ?? null,
+      currency: values.currency ?? "USD",
+      moneyRevision: 0,
+    });
     const op = actionGuard(this.db, context, ["deal.create", "deal.assign"]);
     try {
       const before = creation?.before ?? [];
-      const results = await this.db.batch([op.begin, ...before, fx.guard, this.db.insert(deal).values(values).returning(), fx.conversion, fx.finish, ...(fields?.statements ?? []), ...(creation?.after ?? []), op.end]);
+      const results = await this.db.batch([
+        op.begin,
+        ...before,
+        fx.guard,
+        this.db.insert(deal).values(values).returning(),
+        fx.conversion,
+        fx.finish,
+        ...(fields?.statements ?? []),
+        ...(creation?.after ?? []),
+        op.end,
+      ]);
       return (results[2 + before.length] as (typeof deal.$inferSelect)[])[0]!;
-    } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
+    } catch (error) {
+      if (fields) fields.translateError(error);
+      permissionError(error);
+    }
   }
-  async updateWithHistory(id: string, values: Partial<typeof deal.$inferInsert>, expectedStage: string, authorId: string, context: RequestContext, expectedMoney?: {revision:number;amountMinor:number|null;currency:string}, fields?: PreparedRecordFields) {
-    const changedStage = values.stageId !== undefined && values.stageId !== expectedStage;
+  async updateWithHistory(
+    id: string,
+    values: Partial<typeof deal.$inferInsert>,
+    expectedStage: string,
+    authorId: string,
+    context: RequestContext,
+    expectedMoney?: {
+      revision: number;
+      amountMinor: number | null;
+      currency: string;
+    },
+    fields?: PreparedRecordFields,
+  ) {
+    const changedStage =
+      values.stageId !== undefined && values.stageId !== expectedStage;
     const now = values.updatedAt ?? new Date();
-    const update = this.db.update(deal).set({
-      ...values,
-      ...(changedStage ? { lastActivityAt: sql`max(coalesce(${deal.lastActivityAt}, 0), ${now.getTime()})` } : {}),
-    }).where(and(eq(deal.id, id), eq(deal.stageId, expectedStage))).returning({ id: deal.id, name: deal.name });
-    const fx = expectedMoney ? await prepareDealConversion(this.db,{id,amountMinor:values.amountMinor === undefined ? expectedMoney.amountMinor : values.amountMinor,currency:values.currency ?? expectedMoney.currency,moneyRevision:expectedMoney.revision+1},sql`exists(select 1 from deal where id=${id} and stage_id=${expectedStage} and money_revision=${expectedMoney.revision})`) : undefined;
-    const op = actionGuard(this.db, context, ["deal.update", ...(values.ownerMembershipId !== undefined ? ["deal.assign" as const] : [])]);
+    const update = this.db
+      .update(deal)
+      .set({
+        ...values,
+        ...(changedStage
+          ? {
+              lastActivityAt: sql`max(coalesce(${deal.lastActivityAt}, 0), ${now.getTime()})`,
+            }
+          : {}),
+      })
+      .where(and(eq(deal.id, id), eq(deal.stageId, expectedStage)))
+      .returning({ id: deal.id, name: deal.name });
+    const fx = expectedMoney
+      ? await prepareDealConversion(
+          this.db,
+          {
+            id,
+            amountMinor:
+              values.amountMinor === undefined
+                ? expectedMoney.amountMinor
+                : values.amountMinor,
+            currency: values.currency ?? expectedMoney.currency,
+            moneyRevision: expectedMoney.revision + 1,
+          },
+          sql`exists(select 1 from deal where id=${id} and stage_id=${expectedStage} and money_revision=${expectedMoney.revision})`,
+        )
+      : undefined;
+    const op = actionGuard(this.db, context, [
+      "deal.update",
+      ...(values.ownerMembershipId !== undefined
+        ? ["deal.assign" as const]
+        : []),
+    ]);
     const auditId = crypto.randomUUID();
     const writeGuardId = crypto.randomUUID();
     // changes() refers to the preceding guarded UPDATE on the same batch connection.
     // A stale stage therefore produces neither history nor related-record stamps.
     let result;
-    try { result = await executeD1Batch(this.db, [
-      op.begin,
-      ...(fx ? [fx.guard] : []),
-      update,
-      ...(changedStage ? [
-      sql`INSERT INTO ${activity}
+    try {
+      result = await executeD1Batch(this.db, [
+        op.begin,
+        ...(fx ? [fx.guard] : []),
+        update,
+        ...(changedStage
+          ? [
+              sql`INSERT INTO ${activity}
         (id, type, company_id, deal_id, author_user_id, metadata_json, occurred_at, created_at, updated_at)
         SELECT ${auditId}, 'stage_change', ${deal.companyId}, ${deal.id}, ${authorId}, json_object('fromStageId', ${expectedStage}, 'toStageId', ${values.stageId}), ${now.getTime()}, ${now.getTime()}, ${now.getTime()}
         FROM ${deal} WHERE ${deal.id} = ${id} AND changes() = 1`,
-      ] : []),
-      ...(fields ? [this.db.insert(operationConditionGuard).values({ id: writeGuardId, authorized: sql<number>`case when ${changedStage ? sql`exists(select 1 from activity where id=${auditId})` : sql`changes()=1`} then 1 else 0 end` })] : []),
-      ...(changedStage ? [
-      this.db.update(company).set({
-        lastActivityAt: sql`max(coalesce(${company.lastActivityAt}, 0), ${now.getTime()})`,
-        updatedAt: now,
-      }).where(and(
-        sql`${company.id} = (SELECT ${activity.companyId} FROM ${activity} WHERE ${activity.id} = ${auditId})`,
-        sql`EXISTS (SELECT 1 FROM ${moduleSetting} WHERE ${moduleSetting.entity} = 'company' AND ${moduleSetting.enabled} = 1)`,
-      )),
-      ] : []),
-      ...(fx ? [fx.conversion,fx.finish] : []),
-      ...(fields ? [...fields.statements, this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, writeGuardId))] : []),
-      op.end,
-    ]); } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
-    return result[fx ? 2 : 1]!.results[0] as { id: string; name: string } | undefined;
+            ]
+          : []),
+        ...(fields
+          ? [
+              this.db
+                .insert(operationConditionGuard)
+                .values({
+                  id: writeGuardId,
+                  authorized: sql<number>`case when ${changedStage ? sql`exists(select 1 from activity where id=${auditId})` : sql`changes()=1`} then 1 else 0 end`,
+                }),
+            ]
+          : []),
+        ...(changedStage
+          ? [
+              this.db
+                .update(company)
+                .set({
+                  lastActivityAt: sql`max(coalesce(${company.lastActivityAt}, 0), ${now.getTime()})`,
+                  updatedAt: now,
+                })
+                .where(
+                  and(
+                    sql`${company.id} = (SELECT ${activity.companyId} FROM ${activity} WHERE ${activity.id} = ${auditId})`,
+                    sql`EXISTS (SELECT 1 FROM ${moduleSetting} WHERE ${moduleSetting.entity} = 'company' AND ${moduleSetting.enabled} = 1)`,
+                  ),
+                ),
+            ]
+          : []),
+        ...(fx ? [fx.conversion, fx.finish] : []),
+        ...(fields
+          ? [
+              ...fields.statements,
+              this.db
+                .delete(operationConditionGuard)
+                .where(eq(operationConditionGuard.id, writeGuardId)),
+            ]
+          : []),
+        op.end,
+      ]);
+    } catch (error) {
+      if (fields) fields.translateError(error);
+      permissionError(error);
+    }
+    return result[fx ? 2 : 1]!.results[0] as
+      { id: string; name: string } | undefined;
   }
   async archive(id: string, archivedAt: Date | null, context: RequestContext) {
-    const rows = await authorizedWrite(this.db, context, [archivedAt ? "deal.archive" : "deal.restore"], this.db.update(deal).set({ archivedAt, updatedAt: new Date() }).where(eq(deal.id, id)).returning());
+    const rows = await authorizedWrite(
+      this.db,
+      context,
+      [archivedAt ? "deal.archive" : "deal.restore"],
+      this.db
+        .update(deal)
+        .set({ archivedAt, updatedAt: new Date() })
+        .where(eq(deal.id, id))
+        .returning(),
+    );
     return rows[0];
   }
-  async bulkArchive(ids: string[], archivedAt: Date | null, context: RequestContext) {
-    const result = await authorizedWrite(this.db, context, [archivedAt ? "deal.archive" : "deal.restore"], this.db.update(deal).set({ archivedAt, updatedAt: new Date() }).where(inJsonArray(deal.id, ids)));
+  async bulkArchive(
+    ids: string[],
+    archivedAt: Date | null,
+    context: RequestContext,
+  ) {
+    const result = await authorizedWrite(
+      this.db,
+      context,
+      [archivedAt ? "deal.archive" : "deal.restore"],
+      this.db
+        .update(deal)
+        .set({ archivedAt, updatedAt: new Date() })
+        .where(inJsonArray(deal.id, ids)),
+    );
     return result.meta.changes;
   }
   activeMember(id: string) {
@@ -232,16 +409,65 @@ export class DealRepository {
   stage(id: string) {
     return this.db.query.dealStage.findFirst({ where: eq(dealStage.id, id) });
   }
-  async attachContact(dealId: string, contactId: string, role: string | null, context: RequestContext) {
-    const rows = await authorizedWrite(this.db, context, ["deal.update"], this.db.insert(dealContact).values({ dealId, contactId, role }).returning());
+  async attachContact(
+    dealId: string,
+    contactId: string,
+    role: string | null,
+    context: RequestContext,
+  ) {
+    const rows = await authorizedWrite(
+      this.db,
+      context,
+      ["deal.update"],
+      this.db
+        .insert(dealContact)
+        .values({ dealId, contactId, role })
+        .returning(),
+    );
     return rows[0]!;
   }
-  async setContactRole(dealId: string, contactId: string, role: string | null, context: RequestContext) {
-    const rows = await authorizedWrite(this.db, context, ["deal.update"], this.db.update(dealContact).set({ role }).where(and(eq(dealContact.dealId, dealId), eq(dealContact.contactId, contactId))).returning());
+  async setContactRole(
+    dealId: string,
+    contactId: string,
+    role: string | null,
+    context: RequestContext,
+  ) {
+    const rows = await authorizedWrite(
+      this.db,
+      context,
+      ["deal.update"],
+      this.db
+        .update(dealContact)
+        .set({ role })
+        .where(
+          and(
+            eq(dealContact.dealId, dealId),
+            eq(dealContact.contactId, contactId),
+          ),
+        )
+        .returning(),
+    );
     return rows[0];
   }
-  async detachContact(dealId: string, contactId: string, context: RequestContext) {
-    const rows = await authorizedWrite(this.db, context, ["deal.update"], this.db.delete(dealContact).where(and(eq(dealContact.dealId, dealId), eq(dealContact.contactId, contactId))).returning());
+  async detachContact(
+    dealId: string,
+    contactId: string,
+    context: RequestContext,
+  ) {
+    const rows = await authorizedWrite(
+      this.db,
+      context,
+      ["deal.update"],
+      this.db
+        .delete(dealContact)
+        .where(
+          and(
+            eq(dealContact.dealId, dealId),
+            eq(dealContact.contactId, contactId),
+          ),
+        )
+        .returning(),
+    );
     return rows[0];
   }
   async hasIncompatibleContact(dealId: string, companyId: string) {
@@ -274,7 +500,8 @@ export class DealRepository {
           like(deal.description, `%${input.q}%`),
         )!,
       );
-    if (input.stage.length) conditions.push(inJsonArray(deal.stageId, input.stage));
+    if (input.stage.length)
+      conditions.push(inJsonArray(deal.stageId, input.stage));
     if (input.company.length)
       conditions.push(inJsonArray(deal.companyId, input.company));
     if (input.owner.length)

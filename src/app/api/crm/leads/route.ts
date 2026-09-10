@@ -35,12 +35,16 @@ export function createLeadsGetHandler(root: CompositionRoot) {
 
 export function createLeadsPostHandler(root: CompositionRoot) {
   return createRouteHandler(root, {
-    input: leadCreateInputSchema.extend({ draftId: z.string().uuid().optional() }),
+    input: leadCreateInputSchema.extend({
+      draftId: z.string().uuid().optional(),
+    }),
     output: leadWriteOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
       const { draftId, ...data } = input;
-      const creation = draftId ? await root.drafts.prepareConsumption(context, "lead", draftId) : undefined;
+      const creation = draftId
+        ? await root.drafts.prepareConsumption(context, "lead", draftId)
+        : undefined;
       return root.leads.create(context, data, creation);
     },
   });
@@ -52,7 +56,11 @@ export function createLeadsPatchHandler(root: CompositionRoot) {
     output: leadBulkOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.leads.bulkArchive(context, input.ids, input.action === "bulk-restore");
+      return root.leads.bulkArchive(
+        context,
+        input.ids,
+        input.action === "bulk-restore",
+      );
     },
   });
 }

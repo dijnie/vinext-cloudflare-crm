@@ -27,4 +27,3 @@ Apply the visual system demonstrated by `../cloudflare.mhtml` across the CRM whi
 - Every existing CRM route remains reachable and functionally unchanged.
 - Mobile navigation, sheets, dialogs, forms, tables, and calendars remain usable without page-level horizontal overflow.
 - Typecheck, unit, integration, build, Cloudflare dry-run, and relevant browser suites pass.
-

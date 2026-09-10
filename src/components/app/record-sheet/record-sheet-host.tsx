@@ -3,12 +3,33 @@ import { ModuleReadOnlyBanner, useModules } from "../module-provider";
 import { pushListQuery } from "../list-navigation";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ArrowLeft, Close, OverflowMenuVertical, Edit, Archive, Undo } from "@carbon/icons-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  ArrowLeft,
+  Close,
+  OverflowMenuVertical,
+  Edit,
+  Archive,
+  Undo,
+} from "@carbon/icons-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { changeListState, entityPaths, entityTypeSchema } from "@/lib/listing/list-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  changeListState,
+  entityPaths,
+  entityTypeSchema,
+} from "@/lib/listing/list-state";
 import { stableIdSchema } from "@/lib/listing/list-contract";
 import { invalidateCrm } from "@/lib/listing/invalidation";
 import { getCrmDictionary } from "@/lib/i18n/crm-dictionary";
@@ -20,7 +41,13 @@ import { OrderSheet } from "../sales/order-sheet";
 import { EntityForm } from "../entity-form";
 import { ActivityTimeline } from "../activity-timeline";
 import { RecordFields } from "../fields/record-fields";
-import { crmRequest, displayValue, recordName, requestError, type CrmRecord } from "../record-types";
+import {
+  crmRequest,
+  displayValue,
+  recordName,
+  requestError,
+  type CrmRecord,
+} from "../record-types";
 import { LeadConversionPanel } from "../leads/lead-conversion-panel";
 import { RecordDetails } from "./record-details";
 import { CompanySheet } from "./company-sheet";
@@ -29,52 +56,550 @@ import { DealSheet } from "./deal-sheet";
 
 export function RecordSheetHost({ locale }: { locale: AppLocale }) {
   const { isEnabled } = useModules();
-  const search = useSearchParams(); const path = usePathname(); const labels = getCrmDictionary(locale);
-  const parsedType = entityTypeSchema.safeParse(search.get("recordType")); const parsedId = stableIdSchema.safeParse(search.get("recordId"));
-  const entity = parsedType.success ? parsedType.data : undefined; const id = parsedId.success ? parsedId.data : undefined; const open = Boolean(entity && id && (!search.has("tab") || ["details", "activities", "fields"].includes(search.get("tab") ?? "")));
+  const search = useSearchParams();
+  const path = usePathname();
+  const labels = getCrmDictionary(locale);
+  const parsedType = entityTypeSchema.safeParse(search.get("recordType"));
+  const parsedId = stableIdSchema.safeParse(search.get("recordId"));
+  const entity = parsedType.success ? parsedType.data : undefined;
+  const id = parsedId.success ? parsedId.data : undefined;
+  const open = Boolean(
+    entity &&
+    id &&
+    (!search.has("tab") ||
+      ["details", "activities", "fields"].includes(search.get("tab") ?? "")),
+  );
   const moduleEnabled = isEnabled(entity);
-  const [result, setResult] = useState<{ key: string; record?: CrmRecord; error?: string }>({ key: "" });
-  const [revision, setRevision] = useState(0); const [editing, setEditing] = useState(false); const [confirming, setConfirming] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const [stack, setStack] = useState<Array<{ href: string; position: number }>>([]);
-  const trigger = useRef<HTMLElement | null>(null); const heading = useRef<HTMLHeadingElement>(null); const key = `${entity}:${id}`;
-  const record = result.key === key ? result.record : undefined; const loadError = result.key === key ? result.error : undefined;
-  useEffect(() => { const invalidate = () => setRevision(value => value + 1); const capture = (event: Event) => { trigger.current = (event as CustomEvent<HTMLElement>).detail; }; window.addEventListener("crm:invalidate", invalidate); window.addEventListener("crm:record-trigger", capture); return () => { window.removeEventListener("crm:invalidate", invalidate); window.removeEventListener("crm:record-trigger", capture); }; }, []);
-  useEffect(() => { setEditing(false); setConfirming(false); setError(""); }, [entity, id]);
-  useEffect(() => { if (!entity || !id) return; const controller = new AbortController(); setResult(previous => previous.key === key ? previous : { key }); crmRequest<CrmRecord>(`/api/crm/${entityPaths[entity]}/${id}`, { signal: controller.signal }).then(value => setResult({ key, record: value })).catch(reason => { if (!controller.signal.aborted) setResult(previous => ({ key, ...(previous.key === key && !(reason instanceof Error && ["401", "403", "404"].includes(reason.message)) ? { record: previous.record } : {}), error: reason instanceof Error && reason.message === "404" ? labels.missing : labels.error })); }); return () => controller.abort(); }, [entity, id, revision, labels]);
-  useEffect(() => { if (open) heading.current?.focus(); }, [key, Boolean(record), open]);
+  const [result, setResult] = useState<{
+    key: string;
+    record?: CrmRecord;
+    error?: string;
+  }>({ key: "" });
+  const [revision, setRevision] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [stack, setStack] = useState<Array<{ href: string; position: number }>>(
+    [],
+  );
+  const trigger = useRef<HTMLElement | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const key = `${entity}:${id}`;
+  const record = result.key === key ? result.record : undefined;
+  const loadError = result.key === key ? result.error : undefined;
+  useEffect(() => {
+    const invalidate = () => setRevision((value) => value + 1);
+    const capture = (event: Event) => {
+      trigger.current = (event as CustomEvent<HTMLElement>).detail;
+    };
+    window.addEventListener("crm:invalidate", invalidate);
+    window.addEventListener("crm:record-trigger", capture);
+    return () => {
+      window.removeEventListener("crm:invalidate", invalidate);
+      window.removeEventListener("crm:record-trigger", capture);
+    };
+  }, []);
+  useEffect(() => {
+    setEditing(false);
+    setConfirming(false);
+    setError("");
+  }, [entity, id]);
+  useEffect(() => {
+    if (!entity || !id) return;
+    const controller = new AbortController();
+    setResult((previous) => (previous.key === key ? previous : { key }));
+    crmRequest<CrmRecord>(`/api/crm/${entityPaths[entity]}/${id}`, {
+      signal: controller.signal,
+    })
+      .then((value) => setResult({ key, record: value }))
+      .catch((reason) => {
+        if (!controller.signal.aborted)
+          setResult((previous) => ({
+            key,
+            ...(previous.key === key &&
+            !(
+              reason instanceof Error &&
+              ["401", "403", "404"].includes(reason.message)
+            )
+              ? { record: previous.record }
+              : {}),
+            error:
+              reason instanceof Error && reason.message === "404"
+                ? labels.missing
+                : labels.error,
+          }));
+      });
+    return () => controller.abort();
+  }, [entity, id, revision, labels]);
+  useEffect(() => {
+    if (open) heading.current?.focus();
+  }, [key, Boolean(record), open]);
   useEffect(() => {
     const reconcile = () => {
       const stored = window.history.state?.crmRecordTrail;
-      const trail = Array.isArray(stored) ? stored.filter((value: unknown): value is { href: string; position: number } => Boolean(value) && typeof value === "object" && typeof (value as { href?: unknown }).href === "string" && Number.isInteger((value as { position?: unknown }).position)) : [];
+      const trail = Array.isArray(stored)
+        ? stored.filter(
+            (value: unknown): value is { href: string; position: number } =>
+              Boolean(value) &&
+              typeof value === "object" &&
+              typeof (value as { href?: unknown }).href === "string" &&
+              Number.isInteger((value as { position?: unknown }).position),
+          )
+        : [];
       setStack(open ? trail : []);
     };
     window.addEventListener("crm:record-nested", reconcile);
     window.addEventListener("popstate", reconcile);
     reconcile();
-    return () => { window.removeEventListener("crm:record-nested", reconcile); window.removeEventListener("popstate", reconcile); };
+    return () => {
+      window.removeEventListener("crm:record-nested", reconcile);
+      window.removeEventListener("popstate", reconcile);
+    };
   }, [key, open, search]);
   function back() {
     const previous = stack.at(-1);
     const position = window.history.state?.crmRecordPosition;
-    if (previous && Number.isInteger(position) && position > previous.position) window.history.go(previous.position - position);
+    if (previous && Number.isInteger(position) && position > previous.position)
+      window.history.go(previous.position - position);
   }
   function changeTab(tab: string) {
-    const position = Number.isInteger(window.history.state?.crmRecordPosition) ? window.history.state.crmRecordPosition as number : 0;
+    const position = Number.isInteger(window.history.state?.crmRecordPosition)
+      ? (window.history.state.crmRecordPosition as number)
+      : 0;
     const previous = window.location.href;
-    pushListQuery(`${path}?${changeListState(new URLSearchParams(search.toString()), { tab })}`);
-    if (window.location.href !== previous) window.history.replaceState({ ...window.history.state, crmRecordPosition: position + 1, crmRecordTrail: stack }, "", window.location.href);
+    pushListQuery(
+      `${path}?${changeListState(new URLSearchParams(search.toString()), { tab })}`,
+    );
+    if (window.location.href !== previous)
+      window.history.replaceState(
+        {
+          ...window.history.state,
+          crmRecordPosition: position + 1,
+          crmRecordTrail: stack,
+        },
+        "",
+        window.location.href,
+      );
   }
-  function close() { setStack([]); pushListQuery(`${path}?${changeListState(new URLSearchParams(search.toString()), { recordType: null, recordId: null, tab: null })}`); }
-  async function archive() { if (!entity || !id || !record || !moduleEnabled) return; setBusy(true); setError(""); try { await crmRequest(`/api/crm/${entityPaths[entity]}/${id}`, { method: "PATCH", body: JSON.stringify({ action: record.archivedAt ? "restore" : "archive" }) }); setConfirming(false); invalidateCrm(entity); } catch (reason) { setError(requestError(reason, labels)); } finally { setBusy(false); } }
-  return <Dialog open={open} onOpenChange={value => { if (!value && !busy) close(); }}><DialogContent variant="sheet" sheetSize="2xl" showCloseButton={false} closeLabel={labels.close} onEscapeKeyDown={event => { if (event.target instanceof HTMLElement && event.target.closest("[data-inline-record-editor]")) event.preventDefault(); }} onOpenAutoFocus={event => { event.preventDefault(); heading.current?.focus(); }} onCloseAutoFocus={event => { event.preventDefault(); const target = trigger.current?.isConnected ? trigger.current : document.querySelector<HTMLElement>("[data-list-heading]") || document.getElementById("main-content"); target?.focus(); }}>
-    <div className="flex shrink-0 items-start gap-3 border-b px-5 py-4 sm:px-6">
-      {stack.length > 0 && <Button variant="ghost" size="icon-sm" aria-label={locale === "vi" ? "Quay lại" : "Back"} onClick={back}><ArrowLeft size={16} /></Button>}
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-lg font-semibold text-primary" aria-hidden="true">{record ? recordName(record).slice(0, 1).toUpperCase() : "—"}</div>
-      <div className="min-w-0 flex-1 space-y-0.5 pt-0.5"><DialogTitle ref={heading} tabIndex={-1} className="break-words text-lg leading-6">{record ? recordName(record) : loadError ?? labels.loading}</DialogTitle><DialogDescription className="break-words text-xs">{record ? [entity === "company" ? record.domain : entity === "contact" ? record.title : record.company?.name, entity === "company" ? record.city : record.email, entity === "company" ? record.industry : null].filter(value => typeof value === "string" && value).join(" · ") || labels[entity!] : entity ? labels[entity] : labels.details}</DialogDescription>{record?.archivedAt && <Badge variant="secondary">{labels.archived}</Badge>}</div>
-      <div className="flex shrink-0 items-center gap-1">{record && !editing && moduleEnabled && (entity !== "order" || record.state === "draft" || record.state === "cancelled") && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={locale === "vi" ? "Thao tác" : "More actions"}><OverflowMenuVertical size={16} /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{(entity !== "order" || record.state === "draft") && <DropdownMenuItem onSelect={() => setEditing(true)}><Edit size={16} />{labels.edit}</DropdownMenuItem>}<DropdownMenuItem onSelect={() => setConfirming(true)}>{record.archivedAt ? <Undo size={16} /> : <Archive size={16} />}{record.archivedAt ? labels.restore : labels.archive}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}<Button variant="ghost" size="icon-sm" aria-label={labels.close} disabled={busy} onClick={close}><Close size={16} /></Button></div>
-    </div>
-    {record && !editing && <dl className="grid shrink-0 grid-cols-2 border-b bg-muted/25 sm:flex sm:divide-x">{(entity === "order" ? [[labels.labels.state, displayValue(record, "state", locale, labels)], [labels.labels.originalMinor, displayValue(record, "originalMinor", locale, labels)], [labels.labels.balanceMinor, displayValue(record, "balanceMinor", locale, labels)]] : entity === "deal" ? [[labels.labels.amount, displayValue(record, "amount", locale, labels)], [labels.labels.stageId, displayValue(record, "stage", locale, labels)], [labels.labels.expectedCloseAt, displayValue(record, "expectedCloseAt", locale, labels)]] : entity === "product" ? [[labels.labels.kind, displayValue(record, "kind", locale, labels)], [labels.labels.priceMinor, displayValue(record, "priceMinor", locale, labels)]] : entity === "lead" ? [[labels.labels.source, displayValue(record, "source", locale, labels)], [labels.labels.status, displayValue(record, "status", locale, labels)]] : [[labels.deal, String(record.deals?.filter(deal => !deal.archivedAt && deal.closedState === "open").length ?? 0)], [entity === "company" ? labels.contact : labels.company, entity === "company" ? String(record.contacts?.length ?? 0) : record.company?.name ?? "—"]]).concat([[labels.labels.ownerMembershipId, displayValue(record, "owner", locale, labels)]]).map(([label, value]) => <div key={label} className="flex min-w-0 flex-1 flex-col gap-1 px-5 py-2.5"><dt className="truncate text-xs leading-5 text-muted-foreground">{label}</dt><dd className="truncate text-sm font-medium leading-5 tabular-nums">{value}</dd></div>)}</dl>}
-    <div className="min-h-0 flex-1 overflow-auto">{!record && !loadError && <p role="status">{labels.loading}</p>}{loadError && <div role="alert" className="space-y-3"><p>{loadError}</p><Button variant="outline" onClick={() => setRevision(value => value + 1)}>{labels.retry}</Button></div>}{record && entity && <ModuleReadOnlyBanner entity={entity} />}{record && entity && (editing ? <div className="p-5">{entity === "product" ? <ProductForm key={key} locale={locale} record={record} readOnly={Boolean(loadError)} labels={labels} onSaved={() => setEditing(false)} onCancel={() => setEditing(false)} /> : entity === "order" ? <OrderForm key={key} locale={locale} record={record} readOnly={Boolean(loadError)} labels={labels} onSaved={() => setEditing(false)} onCancel={() => setEditing(false)} /> : <EntityForm key={key} entity={entity} record={record} readOnly={Boolean(loadError)} labels={labels} onSaved={() => setEditing(false)} onCancel={() => setEditing(false)} />}</div> : <><nav aria-label={labels.details} className="sticky top-0 z-10 flex gap-6 border-b bg-background/95 px-5 backdrop-blur sm:px-6">{(["details", "activities", "fields"] as const).map(tab => <Button key={tab} variant="ghost" className={`h-11 rounded-none border-b-2 px-0 text-sm hover:bg-transparent ${(search.get("tab") ?? "details") === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground"}`} aria-current={(search.get("tab") ?? "details") === tab ? "page" : undefined} onClick={() => changeTab(tab)}>{labels[tab]}</Button>)}</nav>{search.get("tab") === "fields" ? <div className="p-5"><RecordFields key={key} entity={entity} recordId={record.id} labels={labels} /></div> : search.get("tab") === "activities" ? <div className="p-5"><ActivityTimeline key={key} entity={entity} recordId={record.id} companyId={record.company?.id ?? (typeof record.companyId === "string" ? record.companyId : undefined)} locale={locale} labels={labels} /></div> : entity === "company" ? <CompanySheet record={record} locale={locale} labels={labels} /> : entity === "contact" ? <ContactSheet record={record} locale={locale} labels={labels} /> : entity === "lead" ? <><LeadConversionPanel record={record} locale={locale} /><RecordDetails entity="lead" record={record} locale={locale} labels={labels} /></> : entity === "product" ? <ProductSheet record={record} locale={locale} labels={labels} readOnly={Boolean(loadError)} /> : entity === "order" ? <OrderSheet record={record} locale={locale} labels={labels} readOnly={Boolean(loadError)} /> : <DealSheet record={record} locale={locale} labels={labels} />}</>)}</div>
-    <Dialog open={confirming} onOpenChange={value => { if (!busy) setConfirming(value); }}><DialogContent closeLabel={labels.close}><DialogTitle>{record?.archivedAt ? labels.restore : labels.archive}</DialogTitle><DialogDescription>{record?.archivedAt ? labels.restoreConfirm : labels.archiveConfirm}</DialogDescription>{error && <p role="alert" className="text-destructive">{error}</p>}<div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={() => setConfirming(false)}>{labels.cancel}</Button><Button disabled={busy || !moduleEnabled} onClick={archive}>{busy ? labels.loading : labels.confirm}</Button></div></DialogContent></Dialog>
-  </DialogContent></Dialog>;
+  function close() {
+    setStack([]);
+    pushListQuery(
+      `${path}?${changeListState(new URLSearchParams(search.toString()), { recordType: null, recordId: null, tab: null })}`,
+    );
+  }
+  async function archive() {
+    if (!entity || !id || !record || !moduleEnabled) return;
+    setBusy(true);
+    setError("");
+    try {
+      await crmRequest(`/api/crm/${entityPaths[entity]}/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: record.archivedAt ? "restore" : "archive",
+        }),
+      });
+      setConfirming(false);
+      invalidateCrm(entity);
+    } catch (reason) {
+      setError(requestError(reason, labels));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!value && !busy) close();
+      }}
+    >
+      <DialogContent
+        variant="sheet"
+        sheetSize="2xl"
+        showCloseButton={false}
+        closeLabel={labels.close}
+        onEscapeKeyDown={(event) => {
+          if (
+            event.target instanceof HTMLElement &&
+            event.target.closest("[data-inline-record-editor]")
+          )
+            event.preventDefault();
+        }}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          heading.current?.focus();
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          const target = trigger.current?.isConnected
+            ? trigger.current
+            : document.querySelector<HTMLElement>("[data-list-heading]") ||
+              document.getElementById("main-content");
+          target?.focus();
+        }}
+      >
+        <div className="flex shrink-0 items-start gap-3 border-b px-5 py-4 sm:px-6">
+          {stack.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={locale === "vi" ? "Quay lại" : "Back"}
+              onClick={back}
+            >
+              <ArrowLeft size={16} />
+            </Button>
+          )}
+          <div
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-lg font-semibold text-primary"
+            aria-hidden="true"
+          >
+            {record ? recordName(record).slice(0, 1).toUpperCase() : "—"}
+          </div>
+          <div className="min-w-0 flex-1 space-y-0.5 pt-0.5">
+            <DialogTitle
+              ref={heading}
+              tabIndex={-1}
+              className="break-words text-lg leading-6"
+            >
+              {record ? recordName(record) : (loadError ?? labels.loading)}
+            </DialogTitle>
+            <DialogDescription className="break-words text-xs">
+              {record
+                ? [
+                    entity === "company"
+                      ? record.domain
+                      : entity === "contact"
+                        ? record.title
+                        : record.company?.name,
+                    entity === "company" ? record.city : record.email,
+                    entity === "company" ? record.industry : null,
+                  ]
+                    .filter((value) => typeof value === "string" && value)
+                    .join(" · ") || labels[entity!]
+                : entity
+                  ? labels[entity]
+                  : labels.details}
+            </DialogDescription>
+            {record?.archivedAt && (
+              <Badge variant="secondary">{labels.archived}</Badge>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {record &&
+              !editing &&
+              moduleEnabled &&
+              (entity !== "order" ||
+                record.state === "draft" ||
+                record.state === "cancelled") && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={locale === "vi" ? "Thao tác" : "More actions"}
+                    >
+                      <OverflowMenuVertical size={16} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {(entity !== "order" || record.state === "draft") && (
+                      <DropdownMenuItem onSelect={() => setEditing(true)}>
+                        <Edit size={16} />
+                        {labels.edit}
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onSelect={() => setConfirming(true)}>
+                      {record.archivedAt ? (
+                        <Undo size={16} />
+                      ) : (
+                        <Archive size={16} />
+                      )}
+                      {record.archivedAt ? labels.restore : labels.archive}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={labels.close}
+              disabled={busy}
+              onClick={close}
+            >
+              <Close size={16} />
+            </Button>
+          </div>
+        </div>
+        {record && !editing && (
+          <dl className="grid shrink-0 grid-cols-2 border-b bg-muted/25 sm:flex sm:divide-x">
+            {(entity === "order"
+              ? [
+                  [
+                    labels.labels.state,
+                    displayValue(record, "state", locale, labels),
+                  ],
+                  [
+                    labels.labels.originalMinor,
+                    displayValue(record, "originalMinor", locale, labels),
+                  ],
+                  [
+                    labels.labels.balanceMinor,
+                    displayValue(record, "balanceMinor", locale, labels),
+                  ],
+                ]
+              : entity === "deal"
+                ? [
+                    [
+                      labels.labels.amount,
+                      displayValue(record, "amount", locale, labels),
+                    ],
+                    [
+                      labels.labels.stageId,
+                      displayValue(record, "stage", locale, labels),
+                    ],
+                    [
+                      labels.labels.expectedCloseAt,
+                      displayValue(record, "expectedCloseAt", locale, labels),
+                    ],
+                  ]
+                : entity === "product"
+                  ? [
+                      [
+                        labels.labels.kind,
+                        displayValue(record, "kind", locale, labels),
+                      ],
+                      [
+                        labels.labels.priceMinor,
+                        displayValue(record, "priceMinor", locale, labels),
+                      ],
+                    ]
+                  : entity === "lead"
+                    ? [
+                        [
+                          labels.labels.source,
+                          displayValue(record, "source", locale, labels),
+                        ],
+                        [
+                          labels.labels.status,
+                          displayValue(record, "status", locale, labels),
+                        ],
+                      ]
+                    : [
+                        [
+                          labels.deal,
+                          String(
+                            record.deals?.filter(
+                              (deal) =>
+                                !deal.archivedAt && deal.closedState === "open",
+                            ).length ?? 0,
+                          ),
+                        ],
+                        [
+                          entity === "company"
+                            ? labels.contact
+                            : labels.company,
+                          entity === "company"
+                            ? String(record.contacts?.length ?? 0)
+                            : (record.company?.name ?? "—"),
+                        ],
+                      ]
+            )
+              .concat([
+                [
+                  labels.labels.ownerMembershipId,
+                  displayValue(record, "owner", locale, labels),
+                ],
+              ])
+              .map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex min-w-0 flex-1 flex-col gap-1 px-5 py-2.5"
+                >
+                  <dt className="truncate text-xs leading-5 text-muted-foreground">
+                    {label}
+                  </dt>
+                  <dd className="truncate text-sm font-medium leading-5 tabular-nums">
+                    {value}
+                  </dd>
+                </div>
+              ))}
+          </dl>
+        )}
+        <div className="min-h-0 flex-1 overflow-auto">
+          {!record && !loadError && <p role="status">{labels.loading}</p>}
+          {loadError && (
+            <div role="alert" className="space-y-3">
+              <p>{loadError}</p>
+              <Button
+                variant="outline"
+                onClick={() => setRevision((value) => value + 1)}
+              >
+                {labels.retry}
+              </Button>
+            </div>
+          )}
+          {record && entity && <ModuleReadOnlyBanner entity={entity} />}
+          {record &&
+            entity &&
+            (editing ? (
+              <div className="p-5">
+                {entity === "product" ? (
+                  <ProductForm
+                    key={key}
+                    locale={locale}
+                    record={record}
+                    readOnly={Boolean(loadError)}
+                    labels={labels}
+                    onSaved={() => setEditing(false)}
+                    onCancel={() => setEditing(false)}
+                  />
+                ) : entity === "order" ? (
+                  <OrderForm
+                    key={key}
+                    locale={locale}
+                    record={record}
+                    readOnly={Boolean(loadError)}
+                    labels={labels}
+                    onSaved={() => setEditing(false)}
+                    onCancel={() => setEditing(false)}
+                  />
+                ) : (
+                  <EntityForm
+                    key={key}
+                    entity={entity}
+                    record={record}
+                    readOnly={Boolean(loadError)}
+                    labels={labels}
+                    onSaved={() => setEditing(false)}
+                    onCancel={() => setEditing(false)}
+                  />
+                )}
+              </div>
+            ) : (
+              <>
+                <nav
+                  aria-label={labels.details}
+                  className="sticky top-0 z-10 flex gap-6 border-b bg-background/95 px-5 backdrop-blur sm:px-6"
+                >
+                  {(["details", "activities", "fields"] as const).map((tab) => (
+                    <Button
+                      key={tab}
+                      variant="ghost"
+                      className={`h-11 rounded-none border-b-2 px-0 text-sm hover:bg-transparent ${(search.get("tab") ?? "details") === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground"}`}
+                      aria-current={
+                        (search.get("tab") ?? "details") === tab
+                          ? "page"
+                          : undefined
+                      }
+                      onClick={() => changeTab(tab)}
+                    >
+                      {labels[tab]}
+                    </Button>
+                  ))}
+                </nav>
+                {search.get("tab") === "fields" ? (
+                  <div className="p-5">
+                    <RecordFields
+                      key={key}
+                      entity={entity}
+                      recordId={record.id}
+                      labels={labels}
+                    />
+                  </div>
+                ) : search.get("tab") === "activities" ? (
+                  <div className="p-5">
+                    <ActivityTimeline
+                      key={key}
+                      entity={entity}
+                      recordId={record.id}
+                      companyId={
+                        record.company?.id ??
+                        (typeof record.companyId === "string"
+                          ? record.companyId
+                          : undefined)
+                      }
+                      locale={locale}
+                      labels={labels}
+                    />
+                  </div>
+                ) : entity === "company" ? (
+                  <CompanySheet
+                    record={record}
+                    locale={locale}
+                    labels={labels}
+                  />
+                ) : entity === "contact" ? (
+                  <ContactSheet
+                    record={record}
+                    locale={locale}
+                    labels={labels}
+                  />
+                ) : entity === "lead" ? (
+                  <>
+                    <LeadConversionPanel record={record} locale={locale} />
+                    <RecordDetails
+                      entity="lead"
+                      record={record}
+                      locale={locale}
+                      labels={labels}
+                    />
+                  </>
+                ) : entity === "product" ? (
+                  <ProductSheet
+                    record={record}
+                    locale={locale}
+                    labels={labels}
+                    readOnly={Boolean(loadError)}
+                  />
+                ) : entity === "order" ? (
+                  <OrderSheet
+                    record={record}
+                    locale={locale}
+                    labels={labels}
+                    readOnly={Boolean(loadError)}
+                  />
+                ) : (
+                  <DealSheet record={record} locale={locale} labels={labels} />
+                )}
+              </>
+            ))}
+        </div>
+        <Dialog
+          open={confirming}
+          onOpenChange={(value) => {
+            if (!busy) setConfirming(value);
+          }}
+        >
+          <DialogContent closeLabel={labels.close}>
+            <DialogTitle>
+              {record?.archivedAt ? labels.restore : labels.archive}
+            </DialogTitle>
+            <DialogDescription>
+              {record?.archivedAt
+                ? labels.restoreConfirm
+                : labels.archiveConfirm}
+            </DialogDescription>
+            {error && (
+              <p role="alert" className="text-destructive">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => setConfirming(false)}
+              >
+                {labels.cancel}
+              </Button>
+              <Button disabled={busy || !moduleEnabled} onClick={archive}>
+                {busy ? labels.loading : labels.confirm}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </DialogContent>
+    </Dialog>
+  );
 }

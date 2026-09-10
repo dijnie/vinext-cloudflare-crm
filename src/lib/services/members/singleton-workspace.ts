@@ -1,11 +1,7 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import type { AppDatabase } from "@/lib/db/database";
-import {
-  singletonMembership,
-  singletonWorkspace,
-  user,
-} from "@/lib/db/schema";
+import { singletonMembership, singletonWorkspace, user } from "@/lib/db/schema";
 import { MemberService } from "@/lib/services/members/member-service";
 import type { RequestContext } from "@/lib/http/request-context";
 

@@ -1,1 +1,1 @@
-export {GET,POST} from "../../leads/route";
+export { GET, POST } from "../../leads/route";

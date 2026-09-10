@@ -55,17 +55,27 @@ async function clearState() {
     env.DB.prepare(
       "INSERT OR IGNORE INTO singleton_membership (user_id, role, status, created_at, updated_at) VALUES ('sentinel-owner', 'owner', 'active', 0, 0)",
     ),
-    env.DB.prepare("UPDATE singleton_membership SET role = 'owner', status = 'active' WHERE user_id = 'sentinel-owner'"),
+    env.DB.prepare(
+      "UPDATE singleton_membership SET role = 'owner', status = 'active' WHERE user_id = 'sentinel-owner'",
+    ),
     env.DB.prepare(
       "UPDATE singleton_membership SET role = 'member' WHERE user_id != 'sentinel-owner' AND role = 'owner'",
     ),
-    env.DB.prepare("DELETE FROM singleton_membership WHERE user_id != 'sentinel-owner'"),
-    env.DB.prepare("UPDATE singleton_workspace SET owner_user_id = 'sentinel-owner'"),
+    env.DB.prepare(
+      "DELETE FROM singleton_membership WHERE user_id != 'sentinel-owner'",
+    ),
+    env.DB.prepare(
+      "UPDATE singleton_workspace SET owner_user_id = 'sentinel-owner'",
+    ),
     env.DB.prepare("DELETE FROM user WHERE id != 'sentinel-owner'"),
   ]);
 }
 
-async function addUser(id: string, role: "owner" | "member", status: "active" | "revoked" = "active") {
+async function addUser(
+  id: string,
+  role: "owner" | "member",
+  status: "active" | "revoked" = "active",
+) {
   const now = new Date();
   await db.insert(user).values({
     id,
@@ -92,19 +102,43 @@ describe.sequential("singleton membership foundation", () => {
     const events: Array<{ code: string; outcome: string }> = [];
     const auditedService = new MemberService(db, (event) => events.push(event));
 
-    await auditedService.changeRole(context("sentinel-owner", "owner"), "member-a", "owner");
-    await auditedService.changeRole(context("member-a", "owner"), "sentinel-owner", "member");
+    await auditedService.changeRole(
+      context("sentinel-owner", "owner"),
+      "member-a",
+      "owner",
+    );
+    await auditedService.changeRole(
+      context("member-a", "owner"),
+      "sentinel-owner",
+      "member",
+    );
     await expect(
-      auditedService.changeRole(context("member-a", "owner"), "member-a", "member"),
+      auditedService.changeRole(
+        context("member-a", "owner"),
+        "member-a",
+        "member",
+      ),
     ).rejects.toMatchObject({ status: 409, code: "conflict" });
 
     await auditedService.remove(context("member-a", "owner"), "sentinel-owner");
-    await auditedService.restore(context("member-a", "owner"), "sentinel-owner");
+    await auditedService.restore(
+      context("member-a", "owner"),
+      "sentinel-owner",
+    );
     expect(events).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "membership.role_changed", outcome: "succeeded" }),
-        expect.objectContaining({ code: "membership.removed", outcome: "succeeded" }),
-        expect.objectContaining({ code: "membership.restored", outcome: "succeeded" }),
+        expect.objectContaining({
+          code: "membership.role_changed",
+          outcome: "succeeded",
+        }),
+        expect.objectContaining({
+          code: "membership.removed",
+          outcome: "succeeded",
+        }),
+        expect.objectContaining({
+          code: "membership.restored",
+          outcome: "succeeded",
+        }),
       ]),
     );
     expect(
@@ -117,7 +151,11 @@ describe.sequential("singleton membership foundation", () => {
   it("rejects membership management by a member", async () => {
     await addUser("member-a", "member");
     await expect(
-      service.changeRole(context("member-a", "member"), "sentinel-owner", "member"),
+      service.changeRole(
+        context("member-a", "member"),
+        "sentinel-owner",
+        "member",
+      ),
     ).rejects.toMatchObject({ status: 403, code: "owner_required" });
   });
 
@@ -130,7 +168,9 @@ describe.sequential("singleton membership foundation", () => {
       .set({ role: "member", updatedAt: new Date() })
       .where(eq(singletonMembership.userId, "sentinel-owner"));
 
-    await expect(service.remove(staleContext, "member-a", "owner-b")).rejects.toMatchObject({
+    await expect(
+      service.remove(staleContext, "member-a", "owner-b"),
+    ).rejects.toMatchObject({
       status: 403,
       code: "owner_required",
     });
@@ -220,19 +260,32 @@ describe.sequential("singleton membership foundation", () => {
 
     await service.remove(context("sentinel-owner", "owner"), "member-a");
 
-    expect(await db.query.company.findFirst()).toMatchObject({ ownerMembershipId: "sentinel-owner" });
-    expect(await db.query.contact.findFirst()).toMatchObject({ ownerMembershipId: "sentinel-owner" });
-    expect(await db.query.deal.findFirst()).toMatchObject({ ownerMembershipId: "sentinel-owner" });
+    expect(await db.query.company.findFirst()).toMatchObject({
+      ownerMembershipId: "sentinel-owner",
+    });
+    expect(await db.query.contact.findFirst()).toMatchObject({
+      ownerMembershipId: "sentinel-owner",
+    });
+    expect(await db.query.deal.findFirst()).toMatchObject({
+      ownerMembershipId: "sentinel-owner",
+    });
     expect(await db.query.customFieldValue.findFirst()).toMatchObject({
       userMembershipId: "sentinel-owner",
     });
-    expect(await db.query.savedView.findFirst()).toMatchObject({ ownerMembershipId: null, creatorUserId: "member-a" });
+    expect(await db.query.savedView.findFirst()).toMatchObject({
+      ownerMembershipId: null,
+      creatorUserId: "member-a",
+    });
     expect(await db.select().from(activityVisibility)).toHaveLength(0);
     expect(await db.select().from(session)).toHaveLength(0);
-    expect(await db.query.activity.findFirst()).toMatchObject({ authorUserId: "member-a" });
-    expect(await db.query.singletonMembership.findFirst({
-      where: eq(singletonMembership.userId, "member-a"),
-    })).toMatchObject({ status: "revoked" });
+    expect(await db.query.activity.findFirst()).toMatchObject({
+      authorUserId: "member-a",
+    });
+    expect(
+      await db.query.singletonMembership.findFirst({
+        where: eq(singletonMembership.userId, "member-a"),
+      }),
+    ).toMatchObject({ status: "revoked" });
   });
 
   it("keeps revoked users out of automatic enrollment", async () => {

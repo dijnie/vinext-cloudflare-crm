@@ -15,4 +15,3 @@
 ## Risk and rollback
 
 Visual fixes must not weaken tests or alter business contracts. Each earlier phase remains independently revertible.
-

@@ -1,7 +1,13 @@
 import { recordFieldsShape } from "../shared/record-fields-contract";
 import { z } from "zod";
-import { currencyCodeSchema, dealConversionOutputSchema } from "@/lib/services/currencies/currency-contracts";
-import { fieldDefinitionSchema, fieldValuesSchema } from "@/lib/services/custom-fields/field-contracts";
+import {
+  currencyCodeSchema,
+  dealConversionOutputSchema,
+} from "@/lib/services/currencies/currency-contracts";
+import {
+  fieldDefinitionSchema,
+  fieldValuesSchema,
+} from "@/lib/services/custom-fields/field-contracts";
 
 import {
   bulkArchiveInputSchema,

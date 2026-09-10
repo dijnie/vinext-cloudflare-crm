@@ -23,18 +23,20 @@ describe("member policy", () => {
   });
 
   it("requires another member for self-removal", () => {
-    expect(() => resolveRemovalReplacement(context("owner"), "actor")).toThrowError(
-      expect.objectContaining({ status: 409, code: "conflict" }),
-    );
+    expect(() =>
+      resolveRemovalReplacement(context("owner"), "actor"),
+    ).toThrowError(expect.objectContaining({ status: 409, code: "conflict" }));
     expect(() =>
       resolveRemovalReplacement(context("owner"), "actor", null),
     ).toThrowError(expect.objectContaining({ status: 409, code: "conflict" }));
-    expect(resolveRemovalReplacement(context("owner"), "actor", "owner-b")).toBe(
-      "owner-b",
-    );
+    expect(
+      resolveRemovalReplacement(context("owner"), "actor", "owner-b"),
+    ).toBe("owner-b");
   });
 
   it("allows an owner to clear another member's references", () => {
-    expect(resolveRemovalReplacement(context("owner"), "target", null)).toBeNull();
+    expect(
+      resolveRemovalReplacement(context("owner"), "target", null),
+    ).toBeNull();
   });
 });

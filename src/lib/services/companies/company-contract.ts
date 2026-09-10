@@ -1,6 +1,9 @@
 import { recordFieldsShape } from "../shared/record-fields-contract";
 import { z } from "zod";
-import { fieldDefinitionSchema, fieldValuesSchema } from "@/lib/services/custom-fields/field-contracts";
+import {
+  fieldDefinitionSchema,
+  fieldValuesSchema,
+} from "@/lib/services/custom-fields/field-contracts";
 
 import {
   bulkArchiveInputSchema,

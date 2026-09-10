@@ -27,7 +27,13 @@ export function appointmentDaySegment<T extends AppointmentSpan>(
   row: T,
   day: string,
   timeZone: string,
-): { day: string; row: T; start: number; end: number; startsAt: string } | null {
+): {
+  day: string;
+  row: T;
+  start: number;
+  end: number;
+  startsAt: string;
+} | null {
   const { from, to } = calendarInstantRange(
       day,
       Temporal.PlainDate.from(day).add({ days: 1 }).toString(),
@@ -41,7 +47,10 @@ export function appointmentDaySegment<T extends AppointmentSpan>(
 
   const startsAt = new Date(start).toISOString(),
     visibleStart = localMinutes(startsAt, timeZone),
-    localEnd = end === dayEndMs ? 1440 : localMinutes(new Date(end).toISOString(), timeZone),
+    localEnd =
+      end === dayEndMs
+        ? 1440
+        : localMinutes(new Date(end).toISOString(), timeZone),
     visibleEnd = Math.min(
       1440,
       Math.max(localEnd, visibleStart + (end - start) / 60000),

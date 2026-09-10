@@ -21,7 +21,25 @@ const crmTables = [
   "exchange_rate",
   "review",
   "reporting_goal",
-  "webform_config", "webform_submission", "webform_rate_bucket", "integration_app", "integration_app_audit", "integration_event", "integration_outbox", "webhook_endpoint", "email_template", "automation_rule", "automation_run", "customer_segment", "customer_segment_member", "ai_setting", "workspace_profile", "workspace_deletion_request", "workspace_deletion_object", "configuration_copy_audit", "workspace_deletion_guard",
+  "webform_config",
+  "webform_submission",
+  "webform_rate_bucket",
+  "integration_app",
+  "integration_app_audit",
+  "integration_event",
+  "integration_outbox",
+  "webhook_endpoint",
+  "email_template",
+  "automation_rule",
+  "automation_run",
+  "customer_segment",
+  "customer_segment_member",
+  "ai_setting",
+  "workspace_profile",
+  "workspace_deletion_request",
+  "workspace_deletion_object",
+  "configuration_copy_audit",
+  "workspace_deletion_guard",
   "saved_view",
   "scheduled_due_fence",
 ];
@@ -139,8 +157,13 @@ describe("CRM baseline migration", () => {
     ).all<{ name: string }>();
     const names = tables.results.map((row) => row.name);
     for (const table of [
-      "customers", "subscriptions", "features", "subscription_features", "customer_subscriptions",
-    ]) expect(names, table).not.toContain(table);
+      "customers",
+      "subscriptions",
+      "features",
+      "subscription_features",
+      "customer_subscriptions",
+    ])
+      expect(names, table).not.toContain(table);
   });
 
   it("seeds stable stages and singleton settings only", async () => {

@@ -1,11 +1,17 @@
 import { applyD1Migrations, env } from "cloudflare:test";
 import { expect, it } from "vitest";
-import { DEFAULT_PROFILE_ID, PERMISSIONS } from "@/lib/services/permissions/access-contracts";
+import {
+  DEFAULT_PROFILE_ID,
+  PERMISSIONS,
+} from "@/lib/services/permissions/access-contracts";
 
 it("adds access profiles without rewriting existing identity, CRM, history or conversion data", async () => {
   const db = env.UPGRADE_DB;
   await applyD1Migrations(db, env.TEST_MIGRATIONS.slice(0, 5));
-  expect((await db.prepare("SELECT name FROM d1_migrations ORDER BY id").all()).results).toHaveLength(5);
+  expect(
+    (await db.prepare("SELECT name FROM d1_migrations ORDER BY id").all())
+      .results,
+  ).toHaveLength(5);
   const fixtures = [
     "INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES ('owner','Owner','owner@upgrade.invalid',1,101,102),('member','Member','member@upgrade.invalid',1,103,104),('revoked','Revoked','revoked@upgrade.invalid',1,105,106)",
     "INSERT INTO singleton_membership(user_id,role,status,created_at,updated_at) VALUES ('owner','owner','active',101,102),('member','member','active',103,104),('revoked','member','revoked',105,106)",
@@ -26,26 +32,116 @@ it("adds access profiles without rewriting existing identity, CRM, history or co
     "INSERT INTO exchange_rate(id,base_currency,quote_currency,rate,as_of,source,created_at,updated_at) VALUES ('rate','USD','EUR','0.95',132,'manual',133,134)",
     "INSERT INTO deal_conversion(version,deal_id,money_revision,amount_minor,currency,base_amount_minor,base_currency,fx_rate,fx_rate_at,rate_source) VALUES ('initial','deal',0,10000,'USD',10000,'USD','1',135,'identity')",
   ];
-  await db.batch(fixtures.map(query => db.prepare(query)));
-  const tables = ["user", "account", "session", "singleton_workspace", "singleton_membership", "company", "contact", "deal", "deal_contact", "activity", "activity_visibility", "saved_view", "custom_field_definition", "custom_field_value", "exchange_rate", "deal_conversion", "crm_setting", "deal_stage"];
-  const before = await Promise.all(tables.map(async table => (await db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results));
+  await db.batch(fixtures.map((query) => db.prepare(query)));
+  const tables = [
+    "user",
+    "account",
+    "session",
+    "singleton_workspace",
+    "singleton_membership",
+    "company",
+    "contact",
+    "deal",
+    "deal_contact",
+    "activity",
+    "activity_visibility",
+    "saved_view",
+    "custom_field_definition",
+    "custom_field_value",
+    "exchange_rate",
+    "deal_conversion",
+    "crm_setting",
+    "deal_stage",
+  ];
+  const before = await Promise.all(
+    tables.map(
+      async (table) =>
+        (await db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all())
+          .results,
+    ),
+  );
   await applyD1Migrations(db, env.TEST_MIGRATIONS.slice(5, 6));
   for (const [index, table] of tables.entries()) {
-    expect((await db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results, table).toEqual(before[index]);
+    expect(
+      (await db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).results,
+      table,
+    ).toEqual(before[index]);
   }
-  expect((await db.prepare("SELECT membership_id,profile_id FROM membership_access ORDER BY membership_id").all()).results).toEqual([
+  expect(
+    (
+      await db
+        .prepare(
+          "SELECT membership_id,profile_id FROM membership_access ORDER BY membership_id",
+        )
+        .all()
+    ).results,
+  ).toEqual([
     { membership_id: "member", profile_id: DEFAULT_PROFILE_ID },
     { membership_id: "owner", profile_id: DEFAULT_PROFILE_ID },
     { membership_id: "revoked", profile_id: DEFAULT_PROFILE_ID },
   ]);
-  expect((await db.prepare("SELECT permission FROM access_grant ORDER BY permission").all<{ permission: string }>()).results.map(row => row.permission)).toEqual(PERMISSIONS.filter(permission => !permission.endsWith(".export") && !["lead","product","order","inventory","entitlement","appointment","task","ticket","contract","review","report","webform","integration","automation","segment","template","workspace","ai"].some(prefix=>permission.startsWith(`${prefix}.`))).sort());
-  expect((await db.prepare("SELECT * FROM member_branch").all()).results).toEqual([]);
-  expect(await db.prepare("SELECT default_branch_id FROM branch_setting WHERE id='settings'").first("default_branch_id")).toBe("default-branch");
+  expect(
+    (
+      await db
+        .prepare("SELECT permission FROM access_grant ORDER BY permission")
+        .all<{ permission: string }>()
+    ).results.map((row) => row.permission),
+  ).toEqual(
+    PERMISSIONS.filter(
+      (permission) =>
+        !permission.endsWith(".export") &&
+        ![
+          "lead",
+          "product",
+          "order",
+          "inventory",
+          "entitlement",
+          "appointment",
+          "task",
+          "ticket",
+          "contract",
+          "review",
+          "report",
+          "webform",
+          "integration",
+          "automation",
+          "segment",
+          "template",
+          "workspace",
+          "ai",
+        ].some((prefix) => permission.startsWith(`${prefix}.`)),
+    ).sort(),
+  );
+  expect(
+    (await db.prepare("SELECT * FROM member_branch").all()).results,
+  ).toEqual([]);
+  expect(
+    await db
+      .prepare(
+        "SELECT default_branch_id FROM branch_setting WHERE id='settings'",
+      )
+      .first("default_branch_id"),
+  ).toBe("default-branch");
   await db.batch([
-    db.prepare("INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES ('new','New','new@upgrade.invalid',1,136,137)"),
-    db.prepare("INSERT INTO singleton_membership(user_id,role,status,created_at,updated_at) VALUES ('new','member','active',136,137)"),
+    db.prepare(
+      "INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES ('new','New','new@upgrade.invalid',1,136,137)",
+    ),
+    db.prepare(
+      "INSERT INTO singleton_membership(user_id,role,status,created_at,updated_at) VALUES ('new','member','active',136,137)",
+    ),
   ]);
-  expect(await db.prepare("SELECT profile_id FROM membership_access WHERE membership_id='new'").first("profile_id")).toBe(DEFAULT_PROFILE_ID);
-  expect((await db.prepare("PRAGMA foreign_key_check").all()).results).toEqual([]);
-  expect((await db.prepare("SELECT name FROM d1_migrations ORDER BY id").all()).results).toHaveLength(6);
+  expect(
+    await db
+      .prepare(
+        "SELECT profile_id FROM membership_access WHERE membership_id='new'",
+      )
+      .first("profile_id"),
+  ).toBe(DEFAULT_PROFILE_ID);
+  expect((await db.prepare("PRAGMA foreign_key_check").all()).results).toEqual(
+    [],
+  );
+  expect(
+    (await db.prepare("SELECT name FROM d1_migrations ORDER BY id").all())
+      .results,
+  ).toHaveLength(6);
 });

@@ -28,11 +28,36 @@ export const dealStageCatalogSchema = z.object({
 });
 const revision = z.number().int().nonnegative();
 export const dealStageMutationSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("create"), revision, label: labelSchema, closedState: dealStageClosedStateSchema }).strict(),
-  z.object({ action: z.literal("relabel"), revision, id: dealStageSchema, label: labelSchema.nullable() }).strict(),
-  z.object({ action: z.literal("reorder"), revision, id: dealStageSchema, beforeId: dealStageSchema.nullable() }).strict(),
-  z.object({ action: z.literal("archive"), revision, id: dealStageSchema }).strict(),
-  z.object({ action: z.literal("restore"), revision, id: dealStageSchema }).strict(),
+  z
+    .object({
+      action: z.literal("create"),
+      revision,
+      label: labelSchema,
+      closedState: dealStageClosedStateSchema,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("relabel"),
+      revision,
+      id: dealStageSchema,
+      label: labelSchema.nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("reorder"),
+      revision,
+      id: dealStageSchema,
+      beforeId: dealStageSchema.nullable(),
+    })
+    .strict(),
+  z
+    .object({ action: z.literal("archive"), revision, id: dealStageSchema })
+    .strict(),
+  z
+    .object({ action: z.literal("restore"), revision, id: dealStageSchema })
+    .strict(),
 ]);
 export type DealStage = z.infer<typeof dealStageOutputSchema>;
 export type DealStageCatalog = z.infer<typeof dealStageCatalogSchema>;

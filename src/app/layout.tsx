@@ -34,7 +34,11 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { width: "device-width" };
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const locale = (await headers()).get("x-app-locale") === "en" ? "en" : "vi";
   return (
     <html lang={locale} suppressHydrationWarning>

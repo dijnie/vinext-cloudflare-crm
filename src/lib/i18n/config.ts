@@ -17,11 +17,20 @@ export function savedLocale(value: string | undefined): AppLocale {
   return isAppLocale(value) ? value : DEFAULT_LOCALE;
 }
 
-export function canonicalWorkspacePath(locale: AppLocale, slug: string, search = "", suffix = "/companies"): string {
+export function canonicalWorkspacePath(
+  locale: AppLocale,
+  slug: string,
+  search = "",
+  suffix = "/companies",
+): string {
   return `/${locale}/${slug}${suffix}${search}`;
 }
 
-export function localizedPath(pathname: string, locale: AppLocale, search = ""): string {
+export function localizedPath(
+  pathname: string,
+  locale: AppLocale,
+  search = "",
+): string {
   const segments = pathname.split("/");
   if (isAppLocale(segments[1])) segments[1] = locale;
   else segments.splice(1, 0, locale);

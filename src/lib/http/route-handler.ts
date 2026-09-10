@@ -4,7 +4,11 @@ import type { CompositionRoot } from "../composition-root";
 import { HttpError, isHttpError } from "./http-errors";
 import { requireRequestContext, type RequestContext } from "./request-context";
 import { applySecurityHeaders } from "./security-headers";
-import { assertSafeMutationOrigin, assertSafeMutationRequest, parseJsonInput } from "./validation";
+import {
+  assertSafeMutationOrigin,
+  assertSafeMutationRequest,
+  parseJsonInput,
+} from "./validation";
 
 export interface RouteHandlerOptions<TInput, TResult> {
   input?: ZodType<TInput>;
@@ -46,7 +50,8 @@ export function createRouteHandler<TInput = undefined, TResult = unknown>(
       }
       if (options.unsafe) {
         const baseUrl = root["env"]["AUTH_BASE_URL"];
-        if (options.rawBody) assertSafeMutationOrigin(request, new URL(baseUrl).origin);
+        if (options.rawBody)
+          assertSafeMutationOrigin(request, new URL(baseUrl).origin);
         else await assertSafeMutationRequest(request, new URL(baseUrl).origin);
       }
       const input = options.input
@@ -55,7 +60,8 @@ export function createRouteHandler<TInput = undefined, TResult = unknown>(
       const handled = await options.handle({ context, input, request, root });
       const result = options.output ? options.output.parse(handled) : handled;
       if (options.rawResponse) {
-        if (!(result instanceof Response)) throw new Error("Raw handler must return Response");
+        if (!(result instanceof Response))
+          throw new Error("Raw handler must return Response");
         return withSecurityHeaders(result);
       }
       return withSecurityHeaders(Response.json(result));

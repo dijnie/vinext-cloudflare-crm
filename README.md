@@ -553,7 +553,6 @@ instant conditions compare exact milliseconds, independently of display settings
 as displayed values. Over-complex query combinations are rejected before their
 statements exceed database limits; no conditions are silently discarded.
 
-
 Date fields can opt into time editing with `config.dateTime`. Existing date-only
 fields keep UTC-day editing and display. Changing the flag never rewrites stored
 values. Time-enabled fields expose the business calendar's timezone and revision
@@ -566,7 +565,6 @@ reject date-only writes. UI requests include `calendarRevision`; a settings chan
 before the atomic write returns a conflict so the editor can reload. Direct API
 clients that already own an absolute instant can omit that optional revision.
 Saved UTC-day conditions retain their meaning when date display settings change.
-
 
 File fields store up to ten ordered attachment IDs. Bytes live in the private
 `CRM_FILES` R2 binding; D1 stores filenames, sizes, immutable record/field anchors
@@ -659,7 +657,6 @@ Once custom stage IDs are used, an older application restricted to the seven
 legacy IDs cannot safely read all records/history/filters. Preserve the additive
 schema and use a forward fix instead of reverting to that incompatible reader.
 
-
 Leads use the same shared-member access, 17 custom field types, private R2 files,
 record reservations, layouts and saved views as other records. Each lead records
 its creator, source, status, assignee and collaborators. Collaborators are an
@@ -696,7 +693,6 @@ and [conversion contracts](src/lib/services/conversions/lead-conversion-contract
 After lead writes, older three-entity application versions are incompatible; preserve
 records and apply a forward fix. Local validation does not authorize remote schema
 changes or deployment.
-
 
 The catalog at `/{locale}/{workspaceSlug}/products` stores products, services and
 packages. Every record starts with a real default variant; variants carry SKU,

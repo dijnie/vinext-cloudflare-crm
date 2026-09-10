@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { runScheduled, type ScheduledServices } from "../../worker/scheduled-runner";
+import {
+  runScheduled,
+  type ScheduledServices,
+} from "../../worker/scheduled-runner";
 
 describe("scheduled runner", () => {
   it("continues later stages when an earlier stage fails", async () => {
@@ -25,12 +28,18 @@ describe("scheduled runner", () => {
         }),
       },
     };
-    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const error = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
 
     await runScheduled(root, { send: vi.fn() });
 
     expect(calls).toEqual(["cleanup", "rewrap", "dispatch", "deliver"]);
-    expect(error).toHaveBeenCalledWith("Scheduled CRM stage failed", "workspace-cleanup", "cleanup failed");
+    expect(error).toHaveBeenCalledWith(
+      "Scheduled CRM stage failed",
+      "workspace-cleanup",
+      "cleanup failed",
+    );
     error.mockRestore();
   });
 });

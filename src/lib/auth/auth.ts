@@ -22,14 +22,20 @@ const GENERIC_AUTH_ERROR = "Unable to continue";
 function parseCanonicalOrigin(value: string): URL {
   const url = new URL(value);
   if (
-    (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) ||
+    (url.protocol !== "https:" &&
+      !(
+        url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+      )) ||
     url.username ||
     url.password ||
     url.pathname !== "/" ||
     url.search ||
     url.hash
   ) {
-    throw new Error("Auth base URL must be a canonical HTTPS origin or HTTP loopback origin");
+    throw new Error(
+      "Auth base URL must be a canonical HTTPS origin or HTTP loopback origin",
+    );
   }
   return url;
 }

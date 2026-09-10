@@ -1,71 +1,1201 @@
-import {env} from "cloudflare:test";
-import {beforeEach,describe,expect,it,vi} from "vitest";
-import {createCompositionRoot,type RuntimeEnv} from "@/lib/composition-root";
-import type {AppDatabase} from "@/lib/db/database";
-import type {AuthEmailAdapter} from "@/lib/email/email-adapter";
-import type {RequestContext} from "@/lib/http/request-context";
-import {IntegrationService} from "@/lib/services/integrations/integration-service";
-import {ticketDetailSchema} from "@/lib/services/tickets/ticket-contract";
+import { env } from "cloudflare:test";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createCompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
+import type { AppDatabase } from "@/lib/db/database";
+import type { AuthEmailAdapter } from "@/lib/email/email-adapter";
+import type { RequestContext } from "@/lib/http/request-context";
+import { IntegrationService } from "@/lib/services/integrations/integration-service";
+import { ticketDetailSchema } from "@/lib/services/tickets/ticket-contract";
 
-const adapter:AuthEmailAdapter={async sendVerification(){},async sendPasswordReset(){}};
-async function legacyCipher(secret:string,value:string){const encoder=new TextEncoder(),iv=crypto.getRandomValues(new Uint8Array(12)),key=await crypto.subtle.importKey("raw",await crypto.subtle.digest("SHA-256",encoder.encode(secret)),"AES-GCM",false,["encrypt"]),cipher=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,encoder.encode(value)),hex=(input:ArrayBuffer)=>[...new Uint8Array(input)].map(byte=>byte.toString(16).padStart(2,"0")).join("");return `${hex(iv.buffer)}.${hex(cipher)}`;}
-async function setup(){const id=crypto.randomUUID(),now=Date.now();await env.DB.prepare("INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES(?,?,?,1,?,?)").bind(id,"Integration owner",`${id}@example.com`,now,now).run();await env.DB.prepare("INSERT INTO singleton_membership(user_id,role,status,created_at,updated_at) VALUES(?,'owner','active',?,?)").bind(id,now,now).run();return{root:createCompositionRoot(env as unknown as RuntimeEnv,adapter),context:{userId:id,membershipId:id,role:"owner",user:{name:"Integration owner",email:`${id}@example.com`},requestId:crypto.randomUUID()} as RequestContext};}
-async function addBackupOwner(){const id=crypto.randomUUID(),now=Date.now();await env.DB.batch([env.DB.prepare("INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES(?,?,?,1,?,?)").bind(id,"Backup owner",`${id}@example.com`,now,now),env.DB.prepare("INSERT INTO singleton_membership(user_id,role,status,created_at,updated_at) VALUES(?,'owner','active',?,?)").bind(id,now,now)]);}
-function revokeAtNativeBatch(db:AppDatabase,userId:string){const native=db.$client,racedClient=new Proxy(native,{get(target,property){if(property==="batch")return async(statements:D1PreparedStatement[])=>{await env.DB.prepare("UPDATE singleton_membership SET status='revoked' WHERE user_id=?").bind(userId).run();return target.batch(statements);};const value=Reflect.get(target,property);return typeof value==="function"?value.bind(target):value;}}),racedDb=new Proxy(db,{get(target,property){if(property==="$client")return racedClient;const value=Reflect.get(target,property);return typeof value==="function"?value.bind(target):value;}});return new IntegrationService(racedDb,"test-secret","ab".repeat(32));}
+const adapter: AuthEmailAdapter = {
+  async sendVerification() {},
+  async sendPasswordReset() {},
+};
+async function legacyCipher(secret: string, value: string) {
+  const encoder = new TextEncoder(),
+    iv = crypto.getRandomValues(new Uint8Array(12)),
+    key = await crypto.subtle.importKey(
+      "raw",
+      await crypto.subtle.digest("SHA-256", encoder.encode(secret)),
+      "AES-GCM",
+      false,
+      ["encrypt"],
+    ),
+    cipher = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      encoder.encode(value),
+    ),
+    hex = (input: ArrayBuffer) =>
+      [...new Uint8Array(input)]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+  return `${hex(iv.buffer)}.${hex(cipher)}`;
+}
+async function setup() {
+  const id = crypto.randomUUID(),
+    now = Date.now();
+  await env.DB.prepare(
+    "INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES(?,?,?,1,?,?)",
+  )
+    .bind(id, "Integration owner", `${id}@example.com`, now, now)
+    .run();
+  await env.DB.prepare(
+    "INSERT INTO singleton_membership(user_id,role,status,created_at,updated_at) VALUES(?,'owner','active',?,?)",
+  )
+    .bind(id, now, now)
+    .run();
+  return {
+    root: createCompositionRoot(env as unknown as RuntimeEnv, adapter),
+    context: {
+      userId: id,
+      membershipId: id,
+      role: "owner",
+      user: { name: "Integration owner", email: `${id}@example.com` },
+      requestId: crypto.randomUUID(),
+    } as RequestContext,
+  };
+}
+async function addBackupOwner() {
+  const id = crypto.randomUUID(),
+    now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO user(id,name,email,email_verified,created_at,updated_at) VALUES(?,?,?,1,?,?)",
+    ).bind(id, "Backup owner", `${id}@example.com`, now, now),
+    env.DB.prepare(
+      "INSERT INTO singleton_membership(user_id,role,status,created_at,updated_at) VALUES(?,'owner','active',?,?)",
+    ).bind(id, now, now),
+  ]);
+}
+function revokeAtNativeBatch(db: AppDatabase, userId: string) {
+  const native = db.$client,
+    racedClient = new Proxy(native, {
+      get(target, property) {
+        if (property === "batch")
+          return async (statements: D1PreparedStatement[]) => {
+            await env.DB.prepare(
+              "UPDATE singleton_membership SET status='revoked' WHERE user_id=?",
+            )
+              .bind(userId)
+              .run();
+            return target.batch(statements);
+          };
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }),
+    racedDb = new Proxy(db, {
+      get(target, property) {
+        if (property === "$client") return racedClient;
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  return new IntegrationService(racedDb, "test-secret", "ab".repeat(32));
+}
 
-describe("integration operations",()=>{
- it("preserves app list field names and numeric timestamps", async () => {
-  const {root,context}=await setup();
-  const createdContact=await root.contacts.create(context,{firstName:"Query contract",email:"query-contract@example.com"});
-  const app=await root.integrations.createApp(context,{name:"Query contract",grants:["contacts.read","leads.read","leads.create"]});
-  const createdLead=await root.integrations.appCreateLead(app.token,{operationKey:"query-contract",firstName:"Query lead",sourceId:"manual"});
-  const contactRow=(await root.integrations.appContacts(app.token)).find(row=>row.id===createdContact!.id);
-  const leadRow=(await root.integrations.appLeads(app.token)).find(row=>row.id===createdLead.id);
-  expect(contactRow).toEqual(await env.DB.prepare("SELECT id,first_name AS firstName,last_name AS lastName,email,phone,company_id AS companyId,updated_at AS updatedAt FROM contact WHERE id=?").bind(createdContact!.id).first());
-  expect(leadRow).toEqual(await env.DB.prepare("SELECT id,first_name AS firstName,last_name AS lastName,email,phone,source_id AS sourceId,status_id AS statusId,owner_membership_id AS ownerMembershipId,updated_at AS updatedAt FROM lead WHERE id=?").bind(createdLead.id).first());
-  expect(typeof contactRow!.updatedAt).toBe("number");
-  expect(typeof leadRow!.updatedAt).toBe("number");
- });
- beforeEach(async()=>{for(const table of ["automation_run","automation_rule","integration_event","integration_outbox","webhook_endpoint","integration_app_audit","integration_app","email_template","customer_segment_member","customer_segment"]){await env.DB.prepare(`DELETE FROM ${table}`).run();}});
- it("deduplicates app events, scopes ordering by subject and rejects revoked tokens",async()=>{const{root,context}=await setup(),app=await root.integrations.createApp(context,{name:"Reviews",grants:["events.write"]}),latest={externalId:"evt-new",subjectId:"review-1",type:"review.updated",occurredAt:"2026-09-06T12:00:00.000Z",payload:{rating:5}},old={externalId:"evt-old",subjectId:"review-1",type:"review.updated",occurredAt:"2026-09-05T12:00:00.000Z",payload:{rating:3}};expect(await root.integrations.receive(app.token,latest)).toMatchObject({state:"received",replayed:false});expect(await root.integrations.receive(app.token,latest)).toMatchObject({state:"received",replayed:true});expect(await root.integrations.receive(app.token,old)).toMatchObject({state:"superseded"});expect(await root.integrations.receive(app.token,{...old,externalId:"evt-other",subjectId:"review-2"})).toMatchObject({state:"received"});await expect(root.integrations.receive(app.token,{...latest,payload:{rating:1}})).rejects.toMatchObject({status:409});await root.integrations.revokeApp(context,app.id,0);await expect(root.integrations.receive(app.token,{...latest,externalId:"evt-after"})).rejects.toMatchObject({status:401});});
- it("signs webhook delivery and retries failures without duplicating events",async()=>{const{root,context}=await setup();await root.integrations.createEndpoint(context,{name:"Local receiver",url:"https://receiver.invalid/hooks",events:["lead.created"]});const queued=await root.integrations.queue("lead.created","lead-1","lead-event-1",{id:"lead-1"},new Date("2026-09-06T12:00:00Z"));expect(queued).toHaveLength(1);expect(await root.integrations.queue("lead.created","lead-1","lead-event-1",{id:"lead-1"})).toHaveLength(1);expect((await env.DB.prepare("SELECT count(*) count FROM integration_event WHERE direction='outbound'").first())!.count).toBe(1);const send=vi.fn().mockResolvedValueOnce({status:503}).mockResolvedValueOnce({status:204}),start=new Date(Date.now()+1000);expect(await root.integrations.deliverDue({send},start)).toEqual([{id:queued[0],delivered:false}]);const retryAt=await env.DB.prepare("SELECT next_attempt_at FROM integration_event WHERE id=?").bind(queued[0]).first<{next_attempt_at:number}>();expect(await root.integrations.deliverDue({send},new Date(retryAt!.next_attempt_at))).toEqual([{id:queued[0],delivered:true}]);expect(send).toHaveBeenCalledTimes(2);expect(send.mock.calls[0]![0].headers.get("x-crm-delivery-id")).toBe(queued[0]);expect(send.mock.calls[0]![0].headers.get("x-crm-signature")).toMatch(/^[a-f0-9]{64}$/);});
- it("claims webhook deliveries before the external side effect and stops after attempt twenty",async()=>{const{root,context}=await setup(),endpoint=await root.integrations.createEndpoint(context,{name:"Concurrent receiver",url:"https://receiver.invalid/hooks",events:["lead.created"]}),queued=await root.integrations.queue("lead.created","lead-2","lead-event-2",{id:"lead-2"}),send=vi.fn().mockResolvedValue({status:204}),now=new Date(Date.now()+1000);const results=(await Promise.all([root.integrations.deliverDue({send},now),root.integrations.deliverDue({send},now)])).flat();expect(results).toEqual([{id:queued[0],delivered:true}]);expect(send).toHaveBeenCalledTimes(1);const exhausted=await root.integrations.queue("lead.created","lead-3","lead-event-3",{id:"lead-3"});await env.DB.prepare("UPDATE integration_event SET attempts=19,next_attempt_at=? WHERE id=?").bind(now.getTime(),exhausted[0]).run();expect(await root.integrations.deliverDue({send:vi.fn().mockResolvedValue({status:503})},now)).toEqual([{id:exhausted[0],delivered:false}]);expect(await env.DB.prepare("SELECT attempts,state,next_attempt_at FROM integration_event WHERE id=?").bind(exhausted[0]).first()).toEqual({attempts:20,state:"failed",next_attempt_at:null});const crashed=await root.integrations.queue("lead.created","lead-crashed","lead-crashed-event",{id:"lead-crashed"});await env.DB.prepare("UPDATE integration_event SET state='delivering',attempts=20,next_attempt_at=? WHERE id=?").bind(now.getTime(),crashed[0]).run();expect(await root.integrations.deliverDue({send:vi.fn().mockResolvedValue({status:204})},now)).toEqual([{id:crashed[0],delivered:true}]);await root.integrations.disableEndpoint(context,endpoint.id,0);expect((await root.integrations.dashboard(context)).endpoints.find(item=>item.id===endpoint.id)?.active).toBe(false);});
- it("contains corrupt webhook secrets and continues unrelated deliveries",async()=>{const{root,context}=await setup(),broken=await root.integrations.createEndpoint(context,{name:"Broken receiver",url:"https://broken.invalid/hooks",events:["lead.created"]});await root.integrations.createEndpoint(context,{name:"Healthy receiver",url:"https://healthy.invalid/hooks",events:["lead.created"]});const queued=await root.integrations.queue("lead.created","lead-corrupt","lead-corrupt-event",{id:"lead-corrupt"}),now=new Date(Date.now()+1000),send=vi.fn().mockResolvedValue({status:204});await env.DB.prepare("UPDATE webhook_endpoint SET secret_ciphertext='invalid' WHERE id=?").bind(broken.id).run();const delivered=await root.integrations.deliverDue({send},now);expect(delivered).toHaveLength(2);expect(delivered.filter(result=>result.delivered)).toHaveLength(1);expect(send).toHaveBeenCalledTimes(1);expect(await env.DB.prepare("SELECT state,last_error FROM integration_event WHERE endpoint_id=?").bind(broken.id).first()).toMatchObject({state:"failed",last_error:"Webhook secret ciphertext cannot be decrypted"});});
- it("delivers legacy webhook secrets and re-encrypts them before auth rotation", async () => {
-  const {root,context}=await setup(), legacyAuth="legacy-auth-secret-with-at-least-32-chars", currentKey="ab".repeat(32);
-  const service=new IntegrationService(root.db,legacyAuth,currentKey);
-  const created=await service.createEndpoint(context,{name:"Receiver",url:"https://receiver.invalid/hooks",events:["lead.created"]});
-  await env.DB.prepare("UPDATE webhook_endpoint SET secret_ciphertext=? WHERE id=?").bind(await legacyCipher(legacyAuth,created.secret),created.id).run();
-  await service.queue("lead.created","legacy-lead","legacy-delivery",{id:"legacy-lead"});
-  expect(await service.deliverDue({send:vi.fn().mockResolvedValue({status:204})},new Date(Date.now()+1000))).toEqual([expect.objectContaining({delivered:true})]);
-  const stored=await env.DB.prepare("SELECT secret_ciphertext FROM webhook_endpoint WHERE id=?").bind(created.id).first<{secret_ciphertext:string}>();
-  expect(stored!.secret_ciphertext).toMatch(/^v1\.[0-9a-f]{16}\./);
-  await service.queue("lead.created","rotated-lead","rotated-delivery",{id:"rotated-lead"});
-  const afterAuthRotation=new IntegrationService(root.db,"new-auth-secret-with-at-least-32-characters",currentKey);
-  expect(await afterAuthRotation.deliverDue({send:vi.fn().mockResolvedValue({status:204})},new Date(Date.now()+2000))).toEqual([expect.objectContaining({delivered:true})]);
- });
- it("rewraps legacy idle and disabled endpoints in scheduled batches", async () => {
-  const {root,context}=await setup(), legacyAuth="legacy-auth-secret-with-at-least-32-chars";
-  const service=new IntegrationService(root.db,legacyAuth,"ab".repeat(32));
-  const created=await service.createEndpoint(context,{name:"Idle receiver",url:"https://idle.invalid/hooks",events:["lead.created"]});
-  await service.disableEndpoint(context,created.id,0);
-  await env.DB.prepare("UPDATE webhook_endpoint SET secret_ciphertext=? WHERE id=?").bind(await legacyCipher(legacyAuth,created.secret),created.id).run();
-  expect(await service.rewrapWebhookSecrets()).toEqual({processed:1,failed:0,remaining:0});
-  expect(await service.rewrapWebhookSecrets()).toEqual({processed:0,failed:0,remaining:0});
-  const stored=await env.DB.prepare("SELECT secret_ciphertext FROM webhook_endpoint WHERE id=?").bind(created.id).first<{secret_ciphertext:string}>();
-  expect(stored!.secret_ciphertext).toMatch(/^v1\.[0-9a-f]{16}\./);
- });
- it("previews templates only when all required variables exist",async()=>{const{root,context}=await setup(),template=await root.integrations.createTemplate(context,{name:"Welcome",subject:"Hello {{name}}",body:"Account: {{account}}",requiredVariables:["name","account"]});await expect(root.integrations.previewTemplate(context,template.id,{name:"Lan"})).rejects.toMatchObject({status:400});expect(await root.integrations.previewTemplate(context,template.id,{name:"Lan",account:"ACME"})).toEqual({subject:"Hello Lan",body:"Account: ACME",missing:[]});});
- it("limits automation depth and executes matching create events with stored active authority",async()=>{const{root,context}=await setup(),lead=await root.leads.create(context,{firstName:"Assigned",sourceId:"manual",statusId:"new",collaboratorMembershipIds:[]}),rule=await root.integrations.createAutomation(context,{name:"Assign website leads",eventType:"lead.created",condition:{field:"source",equals:"website"},action:{type:"set-lead-owner",leadIdField:"leadId",membershipId:context.membershipId},enabled:true,maxDepth:2});expect(await root.integrations.executeAutomation({id:"looped",type:"lead.created",depth:2,payload:{source:"website",leadId:lead.id}})).toEqual([expect.objectContaining({ruleId:rule.id,status:"skipped",reason:"loop_cap"})]);expect(await root.integrations.emit("lead.created",lead.id,"valid",{source:"website",leadId:lead.id})).toMatchObject({automations:[expect.objectContaining({status:"completed",ownerMembershipId:context.membershipId})]});expect(await root.integrations.emit("lead.created",lead.id,"valid",{source:"website",leadId:lead.id})).toMatchObject({automations:[expect.objectContaining({status:"completed",replayed:true})]});});
- it("runs task, field, notification and webhook actions, supports toggles, and records failures",async()=>{const{root,context}=await setup(),lead=await root.leads.create(context,{firstName:"Actions",sourceId:"manual",statusId:"new",collaboratorMembershipIds:[]}),base={eventType:"action.test",condition:{field:"run",equals:true},enabled:true,maxDepth:3};const field=await root.integrations.createAutomation(context,{...base,name:"Update field",action:{type:"update-lead-field",leadIdField:"leadId",field:"title",value:"Qualified"}});expect(await root.integrations.executeAutomation({id:"field-event",type:base.eventType,depth:0,payload:{run:true,leadId:lead.id}})).toEqual([expect.objectContaining({status:"completed",field:"title"})]);expect(await env.DB.prepare("SELECT title FROM lead WHERE id=?").bind(lead.id).first()).toEqual({title:"Qualified"});await root.integrations.setAutomationEnabled(context,field.id,0,false);expect(await root.integrations.executeAutomation({id:"disabled-event",type:base.eventType,depth:0,payload:{run:true,leadId:lead.id}})).toEqual([]);const task=await root.integrations.createAutomation(context,{...base,eventType:"task.test",name:"Create task",action:{type:"create-task",leadIdField:"leadId",membershipId:context.membershipId,subject:"Follow up",dueOffsetMinutes:5}}),taskResult=await root.integrations.executeAutomation({id:"task-event",type:"task.test",depth:0,payload:{run:true,leadId:lead.id}});expect(taskResult).toEqual([expect.objectContaining({ruleId:task.id,status:"completed",taskId:expect.any(String)})]);expect(await env.DB.prepare("SELECT count(*) count FROM task_record WHERE activity_id=?").bind((taskResult[0] as unknown as {taskId:string}).taskId).first()).toEqual({count:1});const notify=await root.integrations.createAutomation(context,{...base,eventType:"notify.test",name:"Notify",action:{type:"notify-internal",subjectIdField:"leadId",membershipId:context.membershipId,title:"Check lead"}}),notifyResult=await root.integrations.executeAutomation({id:"notify-event",type:"notify.test",depth:0,payload:{run:true,leadId:lead.id}});expect(notifyResult).toEqual([expect.objectContaining({ruleId:notify.id,status:"completed",notificationId:expect.any(String)})]);expect(await env.DB.prepare("SELECT kind,title FROM notification WHERE id=?").bind((notifyResult[0] as unknown as {notificationId:string}).notificationId).first()).toEqual({kind:"automation",title:"Check lead"});expect(await env.DB.prepare("SELECT count(*) count FROM task_record").first()).toEqual({count:1});await root.integrations.createEndpoint(context,{name:"Action hook",url:"https://receiver.invalid/hooks",events:["automation.output"]});const webhook=await root.integrations.createAutomation(context,{...base,eventType:"webhook.test",name:"Emit hook",action:{type:"emit-webhook",subjectIdField:"leadId",eventType:"automation.output"}});expect(await root.integrations.executeAutomation({id:"webhook-event",type:"webhook.test",depth:0,payload:{run:true,leadId:lead.id}})).toEqual([expect.objectContaining({ruleId:webhook.id,status:"completed"})]);const template=await root.integrations.createTemplate(context,{name:"Unavailable email",subject:"Hello",body:"Body",requiredVariables:[]}),email=await root.integrations.createAutomation(context,{...base,eventType:"email.test",name:"Email",action:{type:"send-email",templateId:template.id,recipientField:"email"}});expect(await root.integrations.executeAutomation({id:"email-event",type:"email.test",depth:0,payload:{run:true,email:"a@example.com"}})).toEqual([expect.objectContaining({ruleId:email.id,status:"failed"})]);expect(await root.integrations.executeAutomation({id:"email-event",type:"email.test",depth:0,payload:{run:true,email:"a@example.com"}})).toEqual([expect.objectContaining({ruleId:email.id,status:"failed",replayed:false})]);expect(await env.DB.prepare("SELECT status,attempts FROM automation_run WHERE rule_id=? AND event_id='email-event'").bind(email.id).first()).toEqual({status:"failed",attempts:2});});
- it("emits stable due events for the scheduled runner",async()=>{const{root,context}=await setup();await root.integrations.createEndpoint(context,{name:"Due receiver",url:"https://receiver.invalid/hooks",events:["ticket.due"]});const ticket=await root.tickets.create(context,{operationKey:crypto.randomUUID(),subject:"Overdue",priority:"normal",source:"manual",collaboratorMembershipIds:[],dueAt:"2026-09-01T00:00:00.000Z"});expect(await env.DB.prepare("SELECT count(*) count FROM integration_outbox WHERE external_id LIKE 'ticket.due:%'").first()).toEqual({count:1});await root.integrations.dispatchOutbox(new Date("2026-09-06T00:00:01.000Z"));expect(await env.DB.prepare("SELECT event_type,subject_id,count(*) count FROM integration_event WHERE direction='outbound' GROUP BY event_type,subject_id").first()).toEqual({event_type:"ticket.due",subject_id:ticket.id,count:1});});
- it("dispatches scheduled due work in bounded pages without historical scans",async()=>{const{root,context}=await setup(),now=new Date("2026-09-06T00:00:00.000Z");for(let index=0;index<25;index++)await root.tickets.create(context,{operationKey:crypto.randomUUID(),subject:`Overdue ${index}`,priority:"normal",source:"manual",collaboratorMembershipIds:[],dueAt:"2026-09-01T00:00:00.000Z"});expect(await env.DB.prepare("SELECT count(*) count FROM integration_outbox WHERE external_id LIKE 'ticket.due:%'").first()).toEqual({count:25});expect(await root.integrations.dispatchOutbox(now)).toHaveLength(20);expect(await root.integrations.dispatchOutbox(now)).toHaveLength(5);expect(await root.integrations.dispatchOutbox(now)).toHaveLength(0);expect(await env.DB.prepare("SELECT count(*) count FROM integration_outbox WHERE external_id LIKE 'ticket.due:%' AND state='delivered'").first()).toEqual({count:25});});
- it("replaces rescheduled due work and drops cancelled or stale claimed work",async()=>{const{root,context}=await setup(),first="2026-09-01T00:00:00.000Z",second="2026-09-02T00:00:00.000Z",ticket=await root.tickets.create(context,{operationKey:crypto.randomUUID(),subject:"Rescheduled",priority:"normal",source:"manual",collaboratorMembershipIds:[],dueAt:first});await env.DB.prepare("UPDATE ticket SET due_at=?,updated_at=updated_at+1 WHERE id=?").bind(Date.parse(second),ticket.id).run();expect(await env.DB.prepare("SELECT external_id,state FROM integration_outbox WHERE event_type='ticket.due' AND subject_id=?").bind(ticket.id).all()).toMatchObject({results:[{external_id:`ticket.due:${ticket.id}:${Date.parse(second)}`,state:"pending"}]});await env.DB.prepare("UPDATE integration_outbox SET state='dispatching',attempts=1 WHERE event_type='ticket.due' AND subject_id=?").bind(ticket.id).run();await env.DB.prepare("UPDATE ticket SET status='resolved',updated_at=updated_at+1 WHERE id=?").bind(ticket.id).run();expect(await env.DB.prepare("SELECT count(*) count FROM integration_outbox WHERE event_type='ticket.due' AND subject_id=?").bind(ticket.id).first()).toEqual({count:0});const staleId=crypto.randomUUID();await env.DB.prepare("INSERT INTO integration_outbox(id,event_type,subject_id,external_id,payload_json,state,attempts,next_attempt_at,created_at,updated_at) VALUES(?,?,?,?,?,'dispatching',1,?,?,?)").bind(staleId,"ticket.due",ticket.id,`ticket.due:${ticket.id}:${Date.parse(second)}`,JSON.stringify({ticketId:ticket.id}),Date.parse(second),Date.parse(second),Date.parse(second)).run();expect(await root.integrations.dispatchOutbox(new Date("2026-09-06T00:00:00.000Z"))).toEqual([{id:staleId,delivered:false}]);expect(await env.DB.prepare("SELECT count(*) count FROM integration_outbox WHERE id=?").bind(staleId).first()).toEqual({count:0});expect(await env.DB.prepare("SELECT count(*) count FROM integration_event WHERE event_type='ticket.due' AND subject_id=?").bind(ticket.id).first()).toEqual({count:0});});
- it("keeps a due event after its atomic dispatch fence wins a cancellation race",async()=>{const{root,context}=await setup(),due="2026-09-01T00:00:00.000Z";await root.integrations.createEndpoint(context,{name:"Fenced receiver",url:"https://receiver.invalid/hooks",events:["ticket.due"]});const ticket=await root.tickets.create(context,{operationKey:crypto.randomUUID(),subject:"Fenced",priority:"normal",source:"manual",collaboratorMembershipIds:[],dueAt:due}),row=await env.DB.prepare("SELECT id FROM integration_outbox WHERE event_type='ticket.due' AND subject_id=?").bind(ticket.id).first<{id:string}>();await env.DB.prepare("UPDATE integration_outbox SET state='dispatching',attempts=1 WHERE id=?").bind(row!.id).run();await env.DB.prepare("INSERT INTO scheduled_due_fence(outbox_id,fenced_at) VALUES(?,?)").bind(row!.id,Date.parse(due)).run();await env.DB.prepare("UPDATE ticket SET status='resolved',updated_at=updated_at+1 WHERE id=?").bind(ticket.id).run();expect(await env.DB.prepare("SELECT state FROM integration_outbox WHERE id=?").bind(row!.id).first()).toEqual({state:"dispatching"});expect(await root.integrations.dispatchOutbox(new Date("2026-09-06T00:00:00.000Z"))).toEqual([{id:row!.id,delivered:true}]);expect(await env.DB.prepare("SELECT count(*) count FROM integration_event WHERE event_type='ticket.due' AND subject_id=?").bind(ticket.id).first()).toEqual({count:1});});
- it("dispatches transactionally captured create events from the durable outbox",async()=>{const{root,context}=await setup();await root.integrations.createEndpoint(context,{name:"Create receiver",url:"https://receiver.invalid/hooks",events:["lead.created"]});const lead=await root.leads.create(context,{firstName:"Outbox",sourceId:"manual",statusId:"new",collaboratorMembershipIds:[]});expect(await env.DB.prepare("SELECT event_type,state FROM integration_outbox WHERE subject_id=?").bind(lead.id).first()).toEqual({event_type:"lead.created",state:"pending"});expect(await root.integrations.dispatchOutbox(new Date(Date.now()+1000))).toEqual([expect.objectContaining({delivered:true})]);expect(await env.DB.prepare("SELECT state FROM integration_outbox WHERE subject_id=?").bind(lead.id).first()).toEqual({state:"delivered"});expect(await env.DB.prepare("SELECT event_type,state FROM integration_event WHERE subject_id=? AND direction='outbound'").bind(lead.id).first()).toEqual({event_type:"lead.created",state:"pending"});});
- it("recovers an outbox claim that crashed on attempt twenty",async()=>{const{root,context}=await setup(),lead=await root.leads.create(context,{firstName:"Recover outbox",sourceId:"manual",statusId:"new",collaboratorMembershipIds:[]}),now=new Date(Date.now()+1000);await env.DB.prepare("UPDATE integration_outbox SET state='dispatching',attempts=20,next_attempt_at=? WHERE subject_id=?").bind(now.getTime(),lead.id).run();expect(await root.integrations.dispatchOutbox(now)).toEqual([expect.objectContaining({delivered:true})]);expect(await env.DB.prepare("SELECT state,attempts,next_attempt_at FROM integration_outbox WHERE subject_id=?").bind(lead.id).first()).toEqual({state:"delivered",attempts:20,next_attempt_at:null});});
- it("invalidates every app capability while its authority membership is inactive",async()=>{const{root,context}=await setup(),contact=await root.contacts.create(context,{firstName:"App contact",email:"app-contact@example.com"}),app=await root.integrations.createApp(context,{name:"Operational app",grants:["contacts.read","leads.read","leads.create","tickets.create","events.write"]}),leadInput={operationKey:"app-lead-1",firstName:"App lead",email:"app-lead@example.com",sourceId:"manual"};expect(app.token).toMatch(/^[0-9a-f]{32}$/);expect((await root.integrations.appContacts(app.token)).some((row:any)=>row.id===contact!.id)).toBe(true);const first=await root.integrations.appCreateLead(app.token,leadInput);expect(await root.integrations.appCreateLead(app.token,leadInput)).toEqual({...first,replayed:true});expect((await root.integrations.appLeads(app.token)).some((row:any)=>row.id===first.id)).toBe(true);expect(await root.integrations.appCreateTicket(app.token,{operationKey:"app-ticket-1",subject:"App ticket",source:"api"})).toMatchObject({replayed:false});await addBackupOwner();await env.DB.prepare("UPDATE singleton_membership SET status='revoked' WHERE user_id=?").bind(context.userId).run();await expect(root.integrations.appContacts(app.token)).rejects.toMatchObject({status:401});await expect(root.integrations.appLeads(app.token)).rejects.toMatchObject({status:401});await expect(root.integrations.appCreateLead(app.token,{...leadInput,operationKey:"inactive-lead"})).rejects.toMatchObject({status:401});await expect(root.integrations.appCreateTicket(app.token,{operationKey:"inactive-ticket",subject:"Inactive",source:"api"})).rejects.toMatchObject({status:401});await expect(root.integrations.receive(app.token,{externalId:"inactive-event",subjectId:"lead-1",type:"lead.updated",occurredAt:new Date().toISOString(),payload:{}})).rejects.toMatchObject({status:401});await env.DB.prepare("UPDATE singleton_membership SET status='active' WHERE user_id=?").bind(context.userId).run();expect((await root.integrations.appContacts(app.token)).some((row:any)=>row.id===contact!.id)).toBe(true);await root.integrations.revokeApp(context,app.id,0);await expect(root.integrations.appLeads(app.token)).rejects.toMatchObject({status:401});});
- it("keeps ticket idempotency scoped to each app and returns readable tickets",async()=>{const{root,context}=await setup(),firstApp=await root.integrations.createApp(context,{name:"First ticket app",grants:["tickets.create"]}),secondApp=await root.integrations.createApp(context,{name:"Second ticket app",grants:["tickets.create"]}),input={operationKey:"shared-client-key",subject:"App ticket",source:"api"};const first=await root.integrations.appCreateTicket(firstApp.token,input),replay=await root.integrations.appCreateTicket(firstApp.token,input),second=await root.integrations.appCreateTicket(secondApp.token,input);expect(replay).toEqual({...first,replayed:true});expect(second.id).not.toBe(first.id);await expect(root.integrations.appCreateTicket(firstApp.token,{...input,subject:"Changed"})).rejects.toMatchObject({status:409});const concurrentInput={...input,operationKey:"concurrent-client-key"},concurrent=await Promise.all([root.integrations.appCreateTicket(firstApp.token,concurrentInput),root.integrations.appCreateTicket(firstApp.token,concurrentInput)]);expect(new Set(concurrent.map(result=>result.id))).toEqual(new Set([concurrent[0]!.id]));const firstDetail=await root.tickets.byId(context,first.id),secondDetail=await root.tickets.byId(context,second.id);expect(firstDetail.events[0]?.operationKey).toContain(`integration:${firstApp.id}:ticket.create:${input.operationKey}`);expect(secondDetail.events[0]?.operationKey).toContain(`integration:${secondApp.id}:ticket.create:${input.operationKey}`);expect(ticketDetailSchema.safeParse(firstDetail).success).toBe(true);expect(ticketDetailSchema.safeParse(secondDetail).success).toBe(true);});
- it("rechecks app authority inside read, write and replay batches",async()=>{const{root,context}=await setup(),app=await root.integrations.createApp(context,{name:"Raced app",grants:["contacts.read","leads.create","tickets.create"]});await addBackupOwner();const activate=()=>env.DB.prepare("UPDATE singleton_membership SET status='active' WHERE user_id=?").bind(context.userId).run();await expect(revokeAtNativeBatch(root.db,context.userId).appContacts(app.token)).rejects.toMatchObject({status:401});await activate();await expect(revokeAtNativeBatch(root.db,context.userId).appCreateLead(app.token,{operationKey:"raced-lead",firstName:"Raced",sourceId:"manual"})).rejects.toMatchObject({status:401});expect(await env.DB.prepare("SELECT count(*) count FROM lead WHERE first_name='Raced'").first()).toEqual({count:0});await activate();const completed={operationKey:"completed-lead",firstName:"Completed",sourceId:"manual"};await root.integrations.appCreateLead(app.token,completed);await expect(revokeAtNativeBatch(root.db,context.userId).appCreateLead(app.token,completed)).rejects.toMatchObject({status:401});await activate();await expect(revokeAtNativeBatch(root.db,context.userId).appCreateTicket(app.token,{operationKey:"raced-ticket",subject:"Raced",source:"api"})).rejects.toMatchObject({status:401});expect(await env.DB.prepare("SELECT count(*) count FROM ticket WHERE subject='Raced'").first()).toEqual({count:0});});
- it("resolves static and dynamic segments and leaves AI disabled",async()=>{const{root,context}=await setup(),lead=await root.leads.create(context,{firstName:"Segmented",sourceId:"manual",statusId:"new",collaboratorMembershipIds:[]}),fixed=await root.integrations.createSegment(context,{name:"Picked",entity:"lead",kind:"static",memberIds:[lead.id]}),dynamic=await root.integrations.createSegment(context,{name:"New leads",entity:"lead",kind:"dynamic",filter:{field:"status",equals:"new"},memberIds:[]});expect(await root.integrations.segmentMembers(context,fixed.id)).toEqual([lead.id]);expect(await root.integrations.segmentMembers(context,dynamic.id)).toContain(lead.id);expect(await root.integrations.aiStatus(context)).toMatchObject({enabled:false,provider:null,monthlyBudgetMinor:0});await expect(root.integrations.useAi(context)).rejects.toMatchObject({status:409});});
+describe("integration operations", () => {
+  it("preserves app list field names and numeric timestamps", async () => {
+    const { root, context } = await setup();
+    const createdContact = await root.contacts.create(context, {
+      firstName: "Query contract",
+      email: "query-contract@example.com",
+    });
+    const app = await root.integrations.createApp(context, {
+      name: "Query contract",
+      grants: ["contacts.read", "leads.read", "leads.create"],
+    });
+    const createdLead = await root.integrations.appCreateLead(app.token, {
+      operationKey: "query-contract",
+      firstName: "Query lead",
+      sourceId: "manual",
+    });
+    const contactRow = (await root.integrations.appContacts(app.token)).find(
+      (row) => row.id === createdContact!.id,
+    );
+    const leadRow = (await root.integrations.appLeads(app.token)).find(
+      (row) => row.id === createdLead.id,
+    );
+    expect(contactRow).toEqual(
+      await env.DB.prepare(
+        "SELECT id,first_name AS firstName,last_name AS lastName,email,phone,company_id AS companyId,updated_at AS updatedAt FROM contact WHERE id=?",
+      )
+        .bind(createdContact!.id)
+        .first(),
+    );
+    expect(leadRow).toEqual(
+      await env.DB.prepare(
+        "SELECT id,first_name AS firstName,last_name AS lastName,email,phone,source_id AS sourceId,status_id AS statusId,owner_membership_id AS ownerMembershipId,updated_at AS updatedAt FROM lead WHERE id=?",
+      )
+        .bind(createdLead.id)
+        .first(),
+    );
+    expect(typeof contactRow!.updatedAt).toBe("number");
+    expect(typeof leadRow!.updatedAt).toBe("number");
+  });
+  beforeEach(async () => {
+    for (const table of [
+      "automation_run",
+      "automation_rule",
+      "integration_event",
+      "integration_outbox",
+      "webhook_endpoint",
+      "integration_app_audit",
+      "integration_app",
+      "email_template",
+      "customer_segment_member",
+      "customer_segment",
+    ]) {
+      await env.DB.prepare(`DELETE FROM ${table}`).run();
+    }
+  });
+  it("deduplicates app events, scopes ordering by subject and rejects revoked tokens", async () => {
+    const { root, context } = await setup(),
+      app = await root.integrations.createApp(context, {
+        name: "Reviews",
+        grants: ["events.write"],
+      }),
+      latest = {
+        externalId: "evt-new",
+        subjectId: "review-1",
+        type: "review.updated",
+        occurredAt: "2026-09-06T12:00:00.000Z",
+        payload: { rating: 5 },
+      },
+      old = {
+        externalId: "evt-old",
+        subjectId: "review-1",
+        type: "review.updated",
+        occurredAt: "2026-09-05T12:00:00.000Z",
+        payload: { rating: 3 },
+      };
+    expect(await root.integrations.receive(app.token, latest)).toMatchObject({
+      state: "received",
+      replayed: false,
+    });
+    expect(await root.integrations.receive(app.token, latest)).toMatchObject({
+      state: "received",
+      replayed: true,
+    });
+    expect(await root.integrations.receive(app.token, old)).toMatchObject({
+      state: "superseded",
+    });
+    expect(
+      await root.integrations.receive(app.token, {
+        ...old,
+        externalId: "evt-other",
+        subjectId: "review-2",
+      }),
+    ).toMatchObject({ state: "received" });
+    await expect(
+      root.integrations.receive(app.token, {
+        ...latest,
+        payload: { rating: 1 },
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    await root.integrations.revokeApp(context, app.id, 0);
+    await expect(
+      root.integrations.receive(app.token, {
+        ...latest,
+        externalId: "evt-after",
+      }),
+    ).rejects.toMatchObject({ status: 401 });
+  });
+  it("signs webhook delivery and retries failures without duplicating events", async () => {
+    const { root, context } = await setup();
+    await root.integrations.createEndpoint(context, {
+      name: "Local receiver",
+      url: "https://receiver.invalid/hooks",
+      events: ["lead.created"],
+    });
+    const queued = await root.integrations.queue(
+      "lead.created",
+      "lead-1",
+      "lead-event-1",
+      { id: "lead-1" },
+      new Date("2026-09-06T12:00:00Z"),
+    );
+    expect(queued).toHaveLength(1);
+    expect(
+      await root.integrations.queue("lead.created", "lead-1", "lead-event-1", {
+        id: "lead-1",
+      }),
+    ).toHaveLength(1);
+    expect(
+      (await env.DB.prepare(
+        "SELECT count(*) count FROM integration_event WHERE direction='outbound'",
+      ).first())!.count,
+    ).toBe(1);
+    const send = vi
+        .fn()
+        .mockResolvedValueOnce({ status: 503 })
+        .mockResolvedValueOnce({ status: 204 }),
+      start = new Date(Date.now() + 1000);
+    expect(await root.integrations.deliverDue({ send }, start)).toEqual([
+      { id: queued[0], delivered: false },
+    ]);
+    const retryAt = await env.DB.prepare(
+      "SELECT next_attempt_at FROM integration_event WHERE id=?",
+    )
+      .bind(queued[0])
+      .first<{ next_attempt_at: number }>();
+    expect(
+      await root.integrations.deliverDue(
+        { send },
+        new Date(retryAt!.next_attempt_at),
+      ),
+    ).toEqual([{ id: queued[0], delivered: true }]);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0]![0].headers.get("x-crm-delivery-id")).toBe(
+      queued[0],
+    );
+    expect(send.mock.calls[0]![0].headers.get("x-crm-signature")).toMatch(
+      /^[a-f0-9]{64}$/,
+    );
+  });
+  it("claims webhook deliveries before the external side effect and stops after attempt twenty", async () => {
+    const { root, context } = await setup(),
+      endpoint = await root.integrations.createEndpoint(context, {
+        name: "Concurrent receiver",
+        url: "https://receiver.invalid/hooks",
+        events: ["lead.created"],
+      }),
+      queued = await root.integrations.queue(
+        "lead.created",
+        "lead-2",
+        "lead-event-2",
+        { id: "lead-2" },
+      ),
+      send = vi.fn().mockResolvedValue({ status: 204 }),
+      now = new Date(Date.now() + 1000);
+    const results = (
+      await Promise.all([
+        root.integrations.deliverDue({ send }, now),
+        root.integrations.deliverDue({ send }, now),
+      ])
+    ).flat();
+    expect(results).toEqual([{ id: queued[0], delivered: true }]);
+    expect(send).toHaveBeenCalledTimes(1);
+    const exhausted = await root.integrations.queue(
+      "lead.created",
+      "lead-3",
+      "lead-event-3",
+      { id: "lead-3" },
+    );
+    await env.DB.prepare(
+      "UPDATE integration_event SET attempts=19,next_attempt_at=? WHERE id=?",
+    )
+      .bind(now.getTime(), exhausted[0])
+      .run();
+    expect(
+      await root.integrations.deliverDue(
+        { send: vi.fn().mockResolvedValue({ status: 503 }) },
+        now,
+      ),
+    ).toEqual([{ id: exhausted[0], delivered: false }]);
+    expect(
+      await env.DB.prepare(
+        "SELECT attempts,state,next_attempt_at FROM integration_event WHERE id=?",
+      )
+        .bind(exhausted[0])
+        .first(),
+    ).toEqual({ attempts: 20, state: "failed", next_attempt_at: null });
+    const crashed = await root.integrations.queue(
+      "lead.created",
+      "lead-crashed",
+      "lead-crashed-event",
+      { id: "lead-crashed" },
+    );
+    await env.DB.prepare(
+      "UPDATE integration_event SET state='delivering',attempts=20,next_attempt_at=? WHERE id=?",
+    )
+      .bind(now.getTime(), crashed[0])
+      .run();
+    expect(
+      await root.integrations.deliverDue(
+        { send: vi.fn().mockResolvedValue({ status: 204 }) },
+        now,
+      ),
+    ).toEqual([{ id: crashed[0], delivered: true }]);
+    await root.integrations.disableEndpoint(context, endpoint.id, 0);
+    expect(
+      (await root.integrations.dashboard(context)).endpoints.find(
+        (item) => item.id === endpoint.id,
+      )?.active,
+    ).toBe(false);
+  });
+  it("contains corrupt webhook secrets and continues unrelated deliveries", async () => {
+    const { root, context } = await setup(),
+      broken = await root.integrations.createEndpoint(context, {
+        name: "Broken receiver",
+        url: "https://broken.invalid/hooks",
+        events: ["lead.created"],
+      });
+    await root.integrations.createEndpoint(context, {
+      name: "Healthy receiver",
+      url: "https://healthy.invalid/hooks",
+      events: ["lead.created"],
+    });
+    const queued = await root.integrations.queue(
+        "lead.created",
+        "lead-corrupt",
+        "lead-corrupt-event",
+        { id: "lead-corrupt" },
+      ),
+      now = new Date(Date.now() + 1000),
+      send = vi.fn().mockResolvedValue({ status: 204 });
+    await env.DB.prepare(
+      "UPDATE webhook_endpoint SET secret_ciphertext='invalid' WHERE id=?",
+    )
+      .bind(broken.id)
+      .run();
+    const delivered = await root.integrations.deliverDue({ send }, now);
+    expect(delivered).toHaveLength(2);
+    expect(delivered.filter((result) => result.delivered)).toHaveLength(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(
+      await env.DB.prepare(
+        "SELECT state,last_error FROM integration_event WHERE endpoint_id=?",
+      )
+        .bind(broken.id)
+        .first(),
+    ).toMatchObject({
+      state: "failed",
+      last_error: "Webhook secret ciphertext cannot be decrypted",
+    });
+  });
+  it("delivers legacy webhook secrets and re-encrypts them before auth rotation", async () => {
+    const { root, context } = await setup(),
+      legacyAuth = "legacy-auth-secret-with-at-least-32-chars",
+      currentKey = "ab".repeat(32);
+    const service = new IntegrationService(root.db, legacyAuth, currentKey);
+    const created = await service.createEndpoint(context, {
+      name: "Receiver",
+      url: "https://receiver.invalid/hooks",
+      events: ["lead.created"],
+    });
+    await env.DB.prepare(
+      "UPDATE webhook_endpoint SET secret_ciphertext=? WHERE id=?",
+    )
+      .bind(await legacyCipher(legacyAuth, created.secret), created.id)
+      .run();
+    await service.queue("lead.created", "legacy-lead", "legacy-delivery", {
+      id: "legacy-lead",
+    });
+    expect(
+      await service.deliverDue(
+        { send: vi.fn().mockResolvedValue({ status: 204 }) },
+        new Date(Date.now() + 1000),
+      ),
+    ).toEqual([expect.objectContaining({ delivered: true })]);
+    const stored = await env.DB.prepare(
+      "SELECT secret_ciphertext FROM webhook_endpoint WHERE id=?",
+    )
+      .bind(created.id)
+      .first<{ secret_ciphertext: string }>();
+    expect(stored!.secret_ciphertext).toMatch(/^v1\.[0-9a-f]{16}\./);
+    await service.queue("lead.created", "rotated-lead", "rotated-delivery", {
+      id: "rotated-lead",
+    });
+    const afterAuthRotation = new IntegrationService(
+      root.db,
+      "new-auth-secret-with-at-least-32-characters",
+      currentKey,
+    );
+    expect(
+      await afterAuthRotation.deliverDue(
+        { send: vi.fn().mockResolvedValue({ status: 204 }) },
+        new Date(Date.now() + 2000),
+      ),
+    ).toEqual([expect.objectContaining({ delivered: true })]);
+  });
+  it("rewraps legacy idle and disabled endpoints in scheduled batches", async () => {
+    const { root, context } = await setup(),
+      legacyAuth = "legacy-auth-secret-with-at-least-32-chars";
+    const service = new IntegrationService(
+      root.db,
+      legacyAuth,
+      "ab".repeat(32),
+    );
+    const created = await service.createEndpoint(context, {
+      name: "Idle receiver",
+      url: "https://idle.invalid/hooks",
+      events: ["lead.created"],
+    });
+    await service.disableEndpoint(context, created.id, 0);
+    await env.DB.prepare(
+      "UPDATE webhook_endpoint SET secret_ciphertext=? WHERE id=?",
+    )
+      .bind(await legacyCipher(legacyAuth, created.secret), created.id)
+      .run();
+    expect(await service.rewrapWebhookSecrets()).toEqual({
+      processed: 1,
+      failed: 0,
+      remaining: 0,
+    });
+    expect(await service.rewrapWebhookSecrets()).toEqual({
+      processed: 0,
+      failed: 0,
+      remaining: 0,
+    });
+    const stored = await env.DB.prepare(
+      "SELECT secret_ciphertext FROM webhook_endpoint WHERE id=?",
+    )
+      .bind(created.id)
+      .first<{ secret_ciphertext: string }>();
+    expect(stored!.secret_ciphertext).toMatch(/^v1\.[0-9a-f]{16}\./);
+  });
+  it("previews templates only when all required variables exist", async () => {
+    const { root, context } = await setup(),
+      template = await root.integrations.createTemplate(context, {
+        name: "Welcome",
+        subject: "Hello {{name}}",
+        body: "Account: {{account}}",
+        requiredVariables: ["name", "account"],
+      });
+    await expect(
+      root.integrations.previewTemplate(context, template.id, { name: "Lan" }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(
+      await root.integrations.previewTemplate(context, template.id, {
+        name: "Lan",
+        account: "ACME",
+      }),
+    ).toEqual({ subject: "Hello Lan", body: "Account: ACME", missing: [] });
+  });
+  it("limits automation depth and executes matching create events with stored active authority", async () => {
+    const { root, context } = await setup(),
+      lead = await root.leads.create(context, {
+        firstName: "Assigned",
+        sourceId: "manual",
+        statusId: "new",
+        collaboratorMembershipIds: [],
+      }),
+      rule = await root.integrations.createAutomation(context, {
+        name: "Assign website leads",
+        eventType: "lead.created",
+        condition: { field: "source", equals: "website" },
+        action: {
+          type: "set-lead-owner",
+          leadIdField: "leadId",
+          membershipId: context.membershipId,
+        },
+        enabled: true,
+        maxDepth: 2,
+      });
+    expect(
+      await root.integrations.executeAutomation({
+        id: "looped",
+        type: "lead.created",
+        depth: 2,
+        payload: { source: "website", leadId: lead.id },
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        ruleId: rule.id,
+        status: "skipped",
+        reason: "loop_cap",
+      }),
+    ]);
+    expect(
+      await root.integrations.emit("lead.created", lead.id, "valid", {
+        source: "website",
+        leadId: lead.id,
+      }),
+    ).toMatchObject({
+      automations: [
+        expect.objectContaining({
+          status: "completed",
+          ownerMembershipId: context.membershipId,
+        }),
+      ],
+    });
+    expect(
+      await root.integrations.emit("lead.created", lead.id, "valid", {
+        source: "website",
+        leadId: lead.id,
+      }),
+    ).toMatchObject({
+      automations: [
+        expect.objectContaining({ status: "completed", replayed: true }),
+      ],
+    });
+  });
+  it("runs task, field, notification and webhook actions, supports toggles, and records failures", async () => {
+    const { root, context } = await setup(),
+      lead = await root.leads.create(context, {
+        firstName: "Actions",
+        sourceId: "manual",
+        statusId: "new",
+        collaboratorMembershipIds: [],
+      }),
+      base = {
+        eventType: "action.test",
+        condition: { field: "run", equals: true },
+        enabled: true,
+        maxDepth: 3,
+      };
+    const field = await root.integrations.createAutomation(context, {
+      ...base,
+      name: "Update field",
+      action: {
+        type: "update-lead-field",
+        leadIdField: "leadId",
+        field: "title",
+        value: "Qualified",
+      },
+    });
+    expect(
+      await root.integrations.executeAutomation({
+        id: "field-event",
+        type: base.eventType,
+        depth: 0,
+        payload: { run: true, leadId: lead.id },
+      }),
+    ).toEqual([
+      expect.objectContaining({ status: "completed", field: "title" }),
+    ]);
+    expect(
+      await env.DB.prepare("SELECT title FROM lead WHERE id=?")
+        .bind(lead.id)
+        .first(),
+    ).toEqual({ title: "Qualified" });
+    await root.integrations.setAutomationEnabled(context, field.id, 0, false);
+    expect(
+      await root.integrations.executeAutomation({
+        id: "disabled-event",
+        type: base.eventType,
+        depth: 0,
+        payload: { run: true, leadId: lead.id },
+      }),
+    ).toEqual([]);
+    const task = await root.integrations.createAutomation(context, {
+        ...base,
+        eventType: "task.test",
+        name: "Create task",
+        action: {
+          type: "create-task",
+          leadIdField: "leadId",
+          membershipId: context.membershipId,
+          subject: "Follow up",
+          dueOffsetMinutes: 5,
+        },
+      }),
+      taskResult = await root.integrations.executeAutomation({
+        id: "task-event",
+        type: "task.test",
+        depth: 0,
+        payload: { run: true, leadId: lead.id },
+      });
+    expect(taskResult).toEqual([
+      expect.objectContaining({
+        ruleId: task.id,
+        status: "completed",
+        taskId: expect.any(String),
+      }),
+    ]);
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM task_record WHERE activity_id=?",
+      )
+        .bind((taskResult[0] as unknown as { taskId: string }).taskId)
+        .first(),
+    ).toEqual({ count: 1 });
+    const notify = await root.integrations.createAutomation(context, {
+        ...base,
+        eventType: "notify.test",
+        name: "Notify",
+        action: {
+          type: "notify-internal",
+          subjectIdField: "leadId",
+          membershipId: context.membershipId,
+          title: "Check lead",
+        },
+      }),
+      notifyResult = await root.integrations.executeAutomation({
+        id: "notify-event",
+        type: "notify.test",
+        depth: 0,
+        payload: { run: true, leadId: lead.id },
+      });
+    expect(notifyResult).toEqual([
+      expect.objectContaining({
+        ruleId: notify.id,
+        status: "completed",
+        notificationId: expect.any(String),
+      }),
+    ]);
+    expect(
+      await env.DB.prepare("SELECT kind,title FROM notification WHERE id=?")
+        .bind(
+          (notifyResult[0] as unknown as { notificationId: string })
+            .notificationId,
+        )
+        .first(),
+    ).toEqual({ kind: "automation", title: "Check lead" });
+    expect(
+      await env.DB.prepare("SELECT count(*) count FROM task_record").first(),
+    ).toEqual({ count: 1 });
+    await root.integrations.createEndpoint(context, {
+      name: "Action hook",
+      url: "https://receiver.invalid/hooks",
+      events: ["automation.output"],
+    });
+    const webhook = await root.integrations.createAutomation(context, {
+      ...base,
+      eventType: "webhook.test",
+      name: "Emit hook",
+      action: {
+        type: "emit-webhook",
+        subjectIdField: "leadId",
+        eventType: "automation.output",
+      },
+    });
+    expect(
+      await root.integrations.executeAutomation({
+        id: "webhook-event",
+        type: "webhook.test",
+        depth: 0,
+        payload: { run: true, leadId: lead.id },
+      }),
+    ).toEqual([
+      expect.objectContaining({ ruleId: webhook.id, status: "completed" }),
+    ]);
+    const template = await root.integrations.createTemplate(context, {
+        name: "Unavailable email",
+        subject: "Hello",
+        body: "Body",
+        requiredVariables: [],
+      }),
+      email = await root.integrations.createAutomation(context, {
+        ...base,
+        eventType: "email.test",
+        name: "Email",
+        action: {
+          type: "send-email",
+          templateId: template.id,
+          recipientField: "email",
+        },
+      });
+    expect(
+      await root.integrations.executeAutomation({
+        id: "email-event",
+        type: "email.test",
+        depth: 0,
+        payload: { run: true, email: "a@example.com" },
+      }),
+    ).toEqual([
+      expect.objectContaining({ ruleId: email.id, status: "failed" }),
+    ]);
+    expect(
+      await root.integrations.executeAutomation({
+        id: "email-event",
+        type: "email.test",
+        depth: 0,
+        payload: { run: true, email: "a@example.com" },
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        ruleId: email.id,
+        status: "failed",
+        replayed: false,
+      }),
+    ]);
+    expect(
+      await env.DB.prepare(
+        "SELECT status,attempts FROM automation_run WHERE rule_id=? AND event_id='email-event'",
+      )
+        .bind(email.id)
+        .first(),
+    ).toEqual({ status: "failed", attempts: 2 });
+  });
+  it("emits stable due events for the scheduled runner", async () => {
+    const { root, context } = await setup();
+    await root.integrations.createEndpoint(context, {
+      name: "Due receiver",
+      url: "https://receiver.invalid/hooks",
+      events: ["ticket.due"],
+    });
+    const ticket = await root.tickets.create(context, {
+      operationKey: crypto.randomUUID(),
+      subject: "Overdue",
+      priority: "normal",
+      source: "manual",
+      collaboratorMembershipIds: [],
+      dueAt: "2026-09-01T00:00:00.000Z",
+    });
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM integration_outbox WHERE external_id LIKE 'ticket.due:%'",
+      ).first(),
+    ).toEqual({ count: 1 });
+    await root.integrations.dispatchOutbox(
+      new Date("2026-09-06T00:00:01.000Z"),
+    );
+    expect(
+      await env.DB.prepare(
+        "SELECT event_type,subject_id,count(*) count FROM integration_event WHERE direction='outbound' GROUP BY event_type,subject_id",
+      ).first(),
+    ).toEqual({ event_type: "ticket.due", subject_id: ticket.id, count: 1 });
+  });
+  it("dispatches scheduled due work in bounded pages without historical scans", async () => {
+    const { root, context } = await setup(),
+      now = new Date("2026-09-06T00:00:00.000Z");
+    for (let index = 0; index < 25; index++)
+      await root.tickets.create(context, {
+        operationKey: crypto.randomUUID(),
+        subject: `Overdue ${index}`,
+        priority: "normal",
+        source: "manual",
+        collaboratorMembershipIds: [],
+        dueAt: "2026-09-01T00:00:00.000Z",
+      });
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM integration_outbox WHERE external_id LIKE 'ticket.due:%'",
+      ).first(),
+    ).toEqual({ count: 25 });
+    expect(await root.integrations.dispatchOutbox(now)).toHaveLength(20);
+    expect(await root.integrations.dispatchOutbox(now)).toHaveLength(5);
+    expect(await root.integrations.dispatchOutbox(now)).toHaveLength(0);
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM integration_outbox WHERE external_id LIKE 'ticket.due:%' AND state='delivered'",
+      ).first(),
+    ).toEqual({ count: 25 });
+  });
+  it("replaces rescheduled due work and drops cancelled or stale claimed work", async () => {
+    const { root, context } = await setup(),
+      first = "2026-09-01T00:00:00.000Z",
+      second = "2026-09-02T00:00:00.000Z",
+      ticket = await root.tickets.create(context, {
+        operationKey: crypto.randomUUID(),
+        subject: "Rescheduled",
+        priority: "normal",
+        source: "manual",
+        collaboratorMembershipIds: [],
+        dueAt: first,
+      });
+    await env.DB.prepare(
+      "UPDATE ticket SET due_at=?,updated_at=updated_at+1 WHERE id=?",
+    )
+      .bind(Date.parse(second), ticket.id)
+      .run();
+    expect(
+      await env.DB.prepare(
+        "SELECT external_id,state FROM integration_outbox WHERE event_type='ticket.due' AND subject_id=?",
+      )
+        .bind(ticket.id)
+        .all(),
+    ).toMatchObject({
+      results: [
+        {
+          external_id: `ticket.due:${ticket.id}:${Date.parse(second)}`,
+          state: "pending",
+        },
+      ],
+    });
+    await env.DB.prepare(
+      "UPDATE integration_outbox SET state='dispatching',attempts=1 WHERE event_type='ticket.due' AND subject_id=?",
+    )
+      .bind(ticket.id)
+      .run();
+    await env.DB.prepare(
+      "UPDATE ticket SET status='resolved',updated_at=updated_at+1 WHERE id=?",
+    )
+      .bind(ticket.id)
+      .run();
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM integration_outbox WHERE event_type='ticket.due' AND subject_id=?",
+      )
+        .bind(ticket.id)
+        .first(),
+    ).toEqual({ count: 0 });
+    const staleId = crypto.randomUUID();
+    await env.DB.prepare(
+      "INSERT INTO integration_outbox(id,event_type,subject_id,external_id,payload_json,state,attempts,next_attempt_at,created_at,updated_at) VALUES(?,?,?,?,?,'dispatching',1,?,?,?)",
+    )
+      .bind(
+        staleId,
+        "ticket.due",
+        ticket.id,
+        `ticket.due:${ticket.id}:${Date.parse(second)}`,
+        JSON.stringify({ ticketId: ticket.id }),
+        Date.parse(second),
+        Date.parse(second),
+        Date.parse(second),
+      )
+      .run();
+    expect(
+      await root.integrations.dispatchOutbox(
+        new Date("2026-09-06T00:00:00.000Z"),
+      ),
+    ).toEqual([{ id: staleId, delivered: false }]);
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM integration_outbox WHERE id=?",
+      )
+        .bind(staleId)
+        .first(),
+    ).toEqual({ count: 0 });
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM integration_event WHERE event_type='ticket.due' AND subject_id=?",
+      )
+        .bind(ticket.id)
+        .first(),
+    ).toEqual({ count: 0 });
+  });
+  it("keeps a due event after its atomic dispatch fence wins a cancellation race", async () => {
+    const { root, context } = await setup(),
+      due = "2026-09-01T00:00:00.000Z";
+    await root.integrations.createEndpoint(context, {
+      name: "Fenced receiver",
+      url: "https://receiver.invalid/hooks",
+      events: ["ticket.due"],
+    });
+    const ticket = await root.tickets.create(context, {
+        operationKey: crypto.randomUUID(),
+        subject: "Fenced",
+        priority: "normal",
+        source: "manual",
+        collaboratorMembershipIds: [],
+        dueAt: due,
+      }),
+      row = await env.DB.prepare(
+        "SELECT id FROM integration_outbox WHERE event_type='ticket.due' AND subject_id=?",
+      )
+        .bind(ticket.id)
+        .first<{ id: string }>();
+    await env.DB.prepare(
+      "UPDATE integration_outbox SET state='dispatching',attempts=1 WHERE id=?",
+    )
+      .bind(row!.id)
+      .run();
+    await env.DB.prepare(
+      "INSERT INTO scheduled_due_fence(outbox_id,fenced_at) VALUES(?,?)",
+    )
+      .bind(row!.id, Date.parse(due))
+      .run();
+    await env.DB.prepare(
+      "UPDATE ticket SET status='resolved',updated_at=updated_at+1 WHERE id=?",
+    )
+      .bind(ticket.id)
+      .run();
+    expect(
+      await env.DB.prepare("SELECT state FROM integration_outbox WHERE id=?")
+        .bind(row!.id)
+        .first(),
+    ).toEqual({ state: "dispatching" });
+    expect(
+      await root.integrations.dispatchOutbox(
+        new Date("2026-09-06T00:00:00.000Z"),
+      ),
+    ).toEqual([{ id: row!.id, delivered: true }]);
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM integration_event WHERE event_type='ticket.due' AND subject_id=?",
+      )
+        .bind(ticket.id)
+        .first(),
+    ).toEqual({ count: 1 });
+  });
+  it("dispatches transactionally captured create events from the durable outbox", async () => {
+    const { root, context } = await setup();
+    await root.integrations.createEndpoint(context, {
+      name: "Create receiver",
+      url: "https://receiver.invalid/hooks",
+      events: ["lead.created"],
+    });
+    const lead = await root.leads.create(context, {
+      firstName: "Outbox",
+      sourceId: "manual",
+      statusId: "new",
+      collaboratorMembershipIds: [],
+    });
+    expect(
+      await env.DB.prepare(
+        "SELECT event_type,state FROM integration_outbox WHERE subject_id=?",
+      )
+        .bind(lead.id)
+        .first(),
+    ).toEqual({ event_type: "lead.created", state: "pending" });
+    expect(
+      await root.integrations.dispatchOutbox(new Date(Date.now() + 1000)),
+    ).toEqual([expect.objectContaining({ delivered: true })]);
+    expect(
+      await env.DB.prepare(
+        "SELECT state FROM integration_outbox WHERE subject_id=?",
+      )
+        .bind(lead.id)
+        .first(),
+    ).toEqual({ state: "delivered" });
+    expect(
+      await env.DB.prepare(
+        "SELECT event_type,state FROM integration_event WHERE subject_id=? AND direction='outbound'",
+      )
+        .bind(lead.id)
+        .first(),
+    ).toEqual({ event_type: "lead.created", state: "pending" });
+  });
+  it("recovers an outbox claim that crashed on attempt twenty", async () => {
+    const { root, context } = await setup(),
+      lead = await root.leads.create(context, {
+        firstName: "Recover outbox",
+        sourceId: "manual",
+        statusId: "new",
+        collaboratorMembershipIds: [],
+      }),
+      now = new Date(Date.now() + 1000);
+    await env.DB.prepare(
+      "UPDATE integration_outbox SET state='dispatching',attempts=20,next_attempt_at=? WHERE subject_id=?",
+    )
+      .bind(now.getTime(), lead.id)
+      .run();
+    expect(await root.integrations.dispatchOutbox(now)).toEqual([
+      expect.objectContaining({ delivered: true }),
+    ]);
+    expect(
+      await env.DB.prepare(
+        "SELECT state,attempts,next_attempt_at FROM integration_outbox WHERE subject_id=?",
+      )
+        .bind(lead.id)
+        .first(),
+    ).toEqual({ state: "delivered", attempts: 20, next_attempt_at: null });
+  });
+  it("invalidates every app capability while its authority membership is inactive", async () => {
+    const { root, context } = await setup(),
+      contact = await root.contacts.create(context, {
+        firstName: "App contact",
+        email: "app-contact@example.com",
+      }),
+      app = await root.integrations.createApp(context, {
+        name: "Operational app",
+        grants: [
+          "contacts.read",
+          "leads.read",
+          "leads.create",
+          "tickets.create",
+          "events.write",
+        ],
+      }),
+      leadInput = {
+        operationKey: "app-lead-1",
+        firstName: "App lead",
+        email: "app-lead@example.com",
+        sourceId: "manual",
+      };
+    expect(app.token).toMatch(/^[0-9a-f]{32}$/);
+    expect(
+      (await root.integrations.appContacts(app.token)).some(
+        (row: any) => row.id === contact!.id,
+      ),
+    ).toBe(true);
+    const first = await root.integrations.appCreateLead(app.token, leadInput);
+    expect(await root.integrations.appCreateLead(app.token, leadInput)).toEqual(
+      { ...first, replayed: true },
+    );
+    expect(
+      (await root.integrations.appLeads(app.token)).some(
+        (row: any) => row.id === first.id,
+      ),
+    ).toBe(true);
+    expect(
+      await root.integrations.appCreateTicket(app.token, {
+        operationKey: "app-ticket-1",
+        subject: "App ticket",
+        source: "api",
+      }),
+    ).toMatchObject({ replayed: false });
+    await addBackupOwner();
+    await env.DB.prepare(
+      "UPDATE singleton_membership SET status='revoked' WHERE user_id=?",
+    )
+      .bind(context.userId)
+      .run();
+    await expect(
+      root.integrations.appContacts(app.token),
+    ).rejects.toMatchObject({ status: 401 });
+    await expect(root.integrations.appLeads(app.token)).rejects.toMatchObject({
+      status: 401,
+    });
+    await expect(
+      root.integrations.appCreateLead(app.token, {
+        ...leadInput,
+        operationKey: "inactive-lead",
+      }),
+    ).rejects.toMatchObject({ status: 401 });
+    await expect(
+      root.integrations.appCreateTicket(app.token, {
+        operationKey: "inactive-ticket",
+        subject: "Inactive",
+        source: "api",
+      }),
+    ).rejects.toMatchObject({ status: 401 });
+    await expect(
+      root.integrations.receive(app.token, {
+        externalId: "inactive-event",
+        subjectId: "lead-1",
+        type: "lead.updated",
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      }),
+    ).rejects.toMatchObject({ status: 401 });
+    await env.DB.prepare(
+      "UPDATE singleton_membership SET status='active' WHERE user_id=?",
+    )
+      .bind(context.userId)
+      .run();
+    expect(
+      (await root.integrations.appContacts(app.token)).some(
+        (row: any) => row.id === contact!.id,
+      ),
+    ).toBe(true);
+    await root.integrations.revokeApp(context, app.id, 0);
+    await expect(root.integrations.appLeads(app.token)).rejects.toMatchObject({
+      status: 401,
+    });
+  });
+  it("keeps ticket idempotency scoped to each app and returns readable tickets", async () => {
+    const { root, context } = await setup(),
+      firstApp = await root.integrations.createApp(context, {
+        name: "First ticket app",
+        grants: ["tickets.create"],
+      }),
+      secondApp = await root.integrations.createApp(context, {
+        name: "Second ticket app",
+        grants: ["tickets.create"],
+      }),
+      input = {
+        operationKey: "shared-client-key",
+        subject: "App ticket",
+        source: "api",
+      };
+    const first = await root.integrations.appCreateTicket(
+        firstApp.token,
+        input,
+      ),
+      replay = await root.integrations.appCreateTicket(firstApp.token, input),
+      second = await root.integrations.appCreateTicket(secondApp.token, input);
+    expect(replay).toEqual({ ...first, replayed: true });
+    expect(second.id).not.toBe(first.id);
+    await expect(
+      root.integrations.appCreateTicket(firstApp.token, {
+        ...input,
+        subject: "Changed",
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    const concurrentInput = { ...input, operationKey: "concurrent-client-key" },
+      concurrent = await Promise.all([
+        root.integrations.appCreateTicket(firstApp.token, concurrentInput),
+        root.integrations.appCreateTicket(firstApp.token, concurrentInput),
+      ]);
+    expect(new Set(concurrent.map((result) => result.id))).toEqual(
+      new Set([concurrent[0]!.id]),
+    );
+    const firstDetail = await root.tickets.byId(context, first.id),
+      secondDetail = await root.tickets.byId(context, second.id);
+    expect(firstDetail.events[0]?.operationKey).toContain(
+      `integration:${firstApp.id}:ticket.create:${input.operationKey}`,
+    );
+    expect(secondDetail.events[0]?.operationKey).toContain(
+      `integration:${secondApp.id}:ticket.create:${input.operationKey}`,
+    );
+    expect(ticketDetailSchema.safeParse(firstDetail).success).toBe(true);
+    expect(ticketDetailSchema.safeParse(secondDetail).success).toBe(true);
+  });
+  it("rechecks app authority inside read, write and replay batches", async () => {
+    const { root, context } = await setup(),
+      app = await root.integrations.createApp(context, {
+        name: "Raced app",
+        grants: ["contacts.read", "leads.create", "tickets.create"],
+      });
+    await addBackupOwner();
+    const activate = () =>
+      env.DB.prepare(
+        "UPDATE singleton_membership SET status='active' WHERE user_id=?",
+      )
+        .bind(context.userId)
+        .run();
+    await expect(
+      revokeAtNativeBatch(root.db, context.userId).appContacts(app.token),
+    ).rejects.toMatchObject({ status: 401 });
+    await activate();
+    await expect(
+      revokeAtNativeBatch(root.db, context.userId).appCreateLead(app.token, {
+        operationKey: "raced-lead",
+        firstName: "Raced",
+        sourceId: "manual",
+      }),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM lead WHERE first_name='Raced'",
+      ).first(),
+    ).toEqual({ count: 0 });
+    await activate();
+    const completed = {
+      operationKey: "completed-lead",
+      firstName: "Completed",
+      sourceId: "manual",
+    };
+    await root.integrations.appCreateLead(app.token, completed);
+    await expect(
+      revokeAtNativeBatch(root.db, context.userId).appCreateLead(
+        app.token,
+        completed,
+      ),
+    ).rejects.toMatchObject({ status: 401 });
+    await activate();
+    await expect(
+      revokeAtNativeBatch(root.db, context.userId).appCreateTicket(app.token, {
+        operationKey: "raced-ticket",
+        subject: "Raced",
+        source: "api",
+      }),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(
+      await env.DB.prepare(
+        "SELECT count(*) count FROM ticket WHERE subject='Raced'",
+      ).first(),
+    ).toEqual({ count: 0 });
+  });
+  it("resolves static and dynamic segments and leaves AI disabled", async () => {
+    const { root, context } = await setup(),
+      lead = await root.leads.create(context, {
+        firstName: "Segmented",
+        sourceId: "manual",
+        statusId: "new",
+        collaboratorMembershipIds: [],
+      }),
+      fixed = await root.integrations.createSegment(context, {
+        name: "Picked",
+        entity: "lead",
+        kind: "static",
+        memberIds: [lead.id],
+      }),
+      dynamic = await root.integrations.createSegment(context, {
+        name: "New leads",
+        entity: "lead",
+        kind: "dynamic",
+        filter: { field: "status", equals: "new" },
+        memberIds: [],
+      });
+    expect(await root.integrations.segmentMembers(context, fixed.id)).toEqual([
+      lead.id,
+    ]);
+    expect(
+      await root.integrations.segmentMembers(context, dynamic.id),
+    ).toContain(lead.id);
+    expect(await root.integrations.aiStatus(context)).toMatchObject({
+      enabled: false,
+      provider: null,
+      monthlyBudgetMinor: 0,
+    });
+    await expect(root.integrations.useAi(context)).rejects.toMatchObject({
+      status: 409,
+    });
+  });
 });

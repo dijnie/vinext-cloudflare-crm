@@ -17,4 +17,3 @@
 ## Risk and rollback
 
 Feature screens vary in density. Prefer shared surface classes and primitives over component-specific visual rewrites.
-

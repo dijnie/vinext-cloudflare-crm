@@ -35,10 +35,7 @@ async function parseMemberId(params: RouteContext["params"]): Promise<string> {
   return result.data;
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: RouteContext,
-) {
+export async function PATCH(request: Request, { params }: RouteContext) {
   const root = createCompositionRoot(env as RuntimeEnv);
   return createMemberPatchHandler(root, params)(request);
 }
@@ -63,10 +60,7 @@ export function createMemberPatchHandler(
   });
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: RouteContext,
-) {
+export async function DELETE(request: Request, { params }: RouteContext) {
   const root = createCompositionRoot(env as RuntimeEnv);
   return createMemberDeleteHandler(root, params)(request);
 }

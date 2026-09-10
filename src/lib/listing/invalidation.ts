@@ -11,8 +11,15 @@ export const mutationSurfaces = {
   activity: ["records", "lists", "timeline", "dashboard"],
   ownership: ["records", "lists", "facets", "settings", "dashboard"],
   fields: ["records", "lists", "facets", "settings"],
-  views: ["lists", "settings"], currency: ["records", "lists", "settings", "dashboard"],
+  views: ["lists", "settings"],
+  currency: ["records", "lists", "settings", "dashboard"],
 } as const;
-export function invalidateCrm(kind: EntityType | keyof typeof mutationSurfaces) {
-  window.dispatchEvent(new CustomEvent("crm:invalidate", { detail: { kind, surfaces: mutationSurfaces[kind] } }));
+export function invalidateCrm(
+  kind: EntityType | keyof typeof mutationSurfaces,
+) {
+  window.dispatchEvent(
+    new CustomEvent("crm:invalidate", {
+      detail: { kind, surfaces: mutationSurfaces[kind] },
+    }),
+  );
 }

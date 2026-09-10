@@ -16,7 +16,25 @@ import { dealUpdateInputSchema } from "@/lib/services/deals/deal-contract";
 import { orderUpdateInputSchema } from "@/lib/services/orders/order-contract";
 import { crmRequest, requestError } from "../record-types";
 
-export function InlineRecordField({ entity, recordId, field, value, label, labels, expectedRevision, readOnly }: { entity: EntityType; readOnly?: boolean; expectedRevision?: number; recordId: string; field: string; value: string; label: string; labels: CrmDictionary }) {
+export function InlineRecordField({
+  entity,
+  recordId,
+  field,
+  value,
+  label,
+  labels,
+  expectedRevision,
+  readOnly,
+}: {
+  entity: EntityType;
+  readOnly?: boolean;
+  expectedRevision?: number;
+  recordId: string;
+  field: string;
+  value: string;
+  label: string;
+  labels: CrmDictionary;
+}) {
   const { isEnabled } = useModules();
   const moduleEnabled = isEnabled(entity) && !readOnly;
 
@@ -31,15 +49,118 @@ export function InlineRecordField({ entity, recordId, field, value, label, label
   async function save() {
     if (committing.current || !moduleEnabled) return;
     const next = draft.trim();
-    if (next === value) { setEditing(false); return; }
-    const schema = { company: companyUpdateInputSchema, contact: contactUpdateInputSchema, deal: dealUpdateInputSchema, lead: leadUpdateInputSchema, product: productUpdateInputSchema, order: orderUpdateInputSchema }[entity];
-    const parsed = schema.safeParse({ action: "update", data: { [field]: next || null, ...(["lead", "product", "order"].includes(entity) ? { expectedRevision: editRevision.current } : {}) } });
-    if (!parsed.success) { setError(labels.invalid); return; }
-    committing.current = true; setBusy(true); setError("");
-    try { await crmRequest(`/api/crm/${entityPaths[entity]}/${recordId}`, { method: "PATCH", body: JSON.stringify(parsed.data) }); setEditing(false); invalidateCrm(entity); control.current?.focus(); }
-    catch (reason) { setError(requestError(reason, labels)); }
-    finally { committing.current = false; setBusy(false); }
+    if (next === value) {
+      setEditing(false);
+      return;
+    }
+    const schema = {
+      company: companyUpdateInputSchema,
+      contact: contactUpdateInputSchema,
+      deal: dealUpdateInputSchema,
+      lead: leadUpdateInputSchema,
+      product: productUpdateInputSchema,
+      order: orderUpdateInputSchema,
+    }[entity];
+    const parsed = schema.safeParse({
+      action: "update",
+      data: {
+        [field]: next || null,
+        ...(["lead", "product", "order"].includes(entity)
+          ? { expectedRevision: editRevision.current }
+          : {}),
+      },
+    });
+    if (!parsed.success) {
+      setError(labels.invalid);
+      return;
+    }
+    committing.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await crmRequest(`/api/crm/${entityPaths[entity]}/${recordId}`, {
+        method: "PATCH",
+        body: JSON.stringify(parsed.data),
+      });
+      setEditing(false);
+      invalidateCrm(entity);
+      control.current?.focus();
+    } catch (reason) {
+      setError(requestError(reason, labels));
+    } finally {
+      committing.current = false;
+      setBusy(false);
+    }
   }
-  const props = { "data-inline-record-editor": true, autoFocus: true, "aria-label": label, value: draft, disabled: busy || !moduleEnabled, "aria-invalid": Boolean(error), onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(event.target.value), onBlur: () => { void save(); }, onKeyDown: (event: React.KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setDraft(value); setEditing(false); setError(""); } else if (event.key === "Enter" && (!multiline || event.ctrlKey || event.metaKey)) { event.preventDefault(); void save(); } } };
-  return <div className="min-w-0">{editing ? multiline ? <Textarea {...props} rows={3} /> : <Input {...props} type={field === "email" ? "email" : field === "phone" ? "tel" : "text"} /> : <Button ref={control} type="button" variant="ghost" size="sm" className={`w-full justify-start border border-transparent px-2 font-normal hover:border-input hover:bg-muted/40 ${multiline ? "h-auto min-h-8 whitespace-pre-wrap py-1 text-left" : "h-8"}`} disabled={!moduleEnabled} aria-label={`${labels.edit}: ${label}`} onClick={() => { editRevision.current = expectedRevision; setDraft(value); setEditing(true); }}><span className={`min-w-0 ${multiline ? "break-words" : "truncate"} ${value ? "" : "text-muted-foreground"}`}>{value || "—"}</span></Button>}{error && <p role="alert" className="px-2 text-xs text-destructive">{error}</p>}</div>;
+  const props = {
+    "data-inline-record-editor": true,
+    autoFocus: true,
+    "aria-label": label,
+    value: draft,
+    disabled: busy || !moduleEnabled,
+    "aria-invalid": Boolean(error),
+    onChange: (
+      event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    ) => setDraft(event.target.value),
+    onBlur: () => {
+      void save();
+    },
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setDraft(value);
+        setEditing(false);
+        setError("");
+      } else if (
+        event.key === "Enter" &&
+        (!multiline || event.ctrlKey || event.metaKey)
+      ) {
+        event.preventDefault();
+        void save();
+      }
+    },
+  };
+  return (
+    <div className="min-w-0">
+      {editing ? (
+        multiline ? (
+          <Textarea {...props} rows={3} />
+        ) : (
+          <Input
+            {...props}
+            type={
+              field === "email" ? "email" : field === "phone" ? "tel" : "text"
+            }
+          />
+        )
+      ) : (
+        <Button
+          ref={control}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={`w-full justify-start border border-transparent px-2 font-normal hover:border-input hover:bg-muted/40 ${multiline ? "h-auto min-h-8 whitespace-pre-wrap py-1 text-left" : "h-8"}`}
+          disabled={!moduleEnabled}
+          aria-label={`${labels.edit}: ${label}`}
+          onClick={() => {
+            editRevision.current = expectedRevision;
+            setDraft(value);
+            setEditing(true);
+          }}
+        >
+          <span
+            className={`min-w-0 ${multiline ? "break-words" : "truncate"} ${value ? "" : "text-muted-foreground"}`}
+          >
+            {value || "—"}
+          </span>
+        </Button>
+      )}
+      {error && (
+        <p role="alert" className="px-2 text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }

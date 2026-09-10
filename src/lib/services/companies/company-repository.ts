@@ -1,12 +1,23 @@
-import type { PreparedRecordFields, PreparedRecordCreation } from "../shared/record-fields-contract";
+import type {
+  PreparedRecordFields,
+  PreparedRecordCreation,
+} from "../shared/record-fields-contract";
 import { dealStage, operationConditionGuard } from "@/lib/db/schema";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { fieldConditionQuery } from "../custom-fields/field-condition-query";
 import { customFieldSort } from "../custom-fields/field-sort";
 import type { RequestContext } from "@/lib/http/request-context";
-import { actionGuard, authorizedWrite, permissionError } from "../permissions/permission-policy";
+import {
+  actionGuard,
+  authorizedWrite,
+  permissionError,
+} from "../permissions/permission-policy";
 import { inJsonArray } from "@/lib/db/sql-filters";
-import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/lib/services/custom-fields/field-list-query";
+import {
+  fieldFilterConditions,
+  fieldListData,
+  validateFieldFilters,
+} from "@/lib/services/custom-fields/field-list-query";
 import {
   and,
   asc,
@@ -22,7 +33,13 @@ import {
 
 import type { AppDatabase } from "@/lib/db/database";
 import { listFacets } from "@/lib/services/shared/facet-repository";
-import { company, contact, deal, singletonMembership, user } from "@/lib/db/schema";
+import {
+  company,
+  contact,
+  deal,
+  singletonMembership,
+  user,
+} from "@/lib/db/schema";
 import type {
   CompanyListInput,
   CompanyUpdateData,
@@ -33,8 +50,17 @@ export class CompanyRepository {
 
   async list(input: CompanyListInput) {
     await validateFieldFilters(this.db, "company", input.fields);
-    const fieldSort = await customFieldSort(this.db, "company", input.sort, input.dir);
-    const conditions = await fieldConditionQuery(this.db, "company", input.criteria);
+    const fieldSort = await customFieldSort(
+      this.db,
+      "company",
+      input.sort,
+      input.dir,
+    );
+    const conditions = await fieldConditionQuery(
+      this.db,
+      "company",
+      input.criteria,
+    );
     const where = and(this.where(input), ...conditions)!;
     const order = this.order(input.sort, input.dir);
     const rowsQuery = this.db
@@ -65,15 +91,35 @@ export class CompanyRepository {
       .select({ total: sql<number>`count(*)` })
       .from(company)
       .where(where);
-    const facetWhere = and(this.where({ ...input, owner: [], industry: [], fields: {} }), ...conditions)!;
+    const facetWhere = and(
+      this.where({ ...input, owner: [], industry: [], fields: {} }),
+      ...conditions,
+    )!;
     assertQueryLimits(rowsQuery, countQuery);
     const [rows, [{ total }], facets] = await Promise.all([
       rowsQuery,
       countQuery,
       listFacets(this.db, "company", facetWhere),
     ]);
-    const fields = await fieldListData(this.db, "company", rows.map(row => row.id), facetWhere);
-    return { rows: rows.map(({ internalFieldSortValue: _sortValue, ...row }) => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldFileLabels: fields.fieldFileLabels, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
+    const fields = await fieldListData(
+      this.db,
+      "company",
+      rows.map((row) => row.id),
+      facetWhere,
+    );
+    return {
+      rows: rows.map(({ internalFieldSortValue: _sortValue, ...row }) => ({
+        ...row,
+        fields: fields.fieldsByRecord[row.id] ?? {},
+      })),
+      total,
+      facets,
+      customFields: fields.customFields,
+      fieldFacets: fields.fieldFacets,
+      fieldFileLabels: fields.fieldFileLabels,
+      fieldCustomerLabels: fields.fieldCustomerLabels,
+      fieldUserLabels: fields.fieldUserLabels,
+    };
   }
 
   async byId(id: string) {
@@ -133,29 +179,104 @@ export class CompanyRepository {
     return { ...record, contacts, deals };
   }
 
-  async create(values: typeof company.$inferInsert, context: RequestContext, fields?: PreparedRecordFields, creation?: PreparedRecordCreation) {
-    const op = actionGuard(this.db, context, ["company.create", ...(values.ownerMembershipId ? ["company.assign" as const] : [])]);
+  async create(
+    values: typeof company.$inferInsert,
+    context: RequestContext,
+    fields?: PreparedRecordFields,
+    creation?: PreparedRecordCreation,
+  ) {
+    const op = actionGuard(this.db, context, [
+      "company.create",
+      ...(values.ownerMembershipId ? ["company.assign" as const] : []),
+    ]);
     const before = creation?.before ?? [];
     try {
-      const results = await this.db.batch([op.begin, ...before, this.db.insert(company).values(values).returning(), ...(fields?.statements ?? []), ...(creation?.after ?? []), op.end]);
-      return (results[1 + before.length] as (typeof company.$inferSelect)[])[0]!;
-    } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
+      const results = await this.db.batch([
+        op.begin,
+        ...before,
+        this.db.insert(company).values(values).returning(),
+        ...(fields?.statements ?? []),
+        ...(creation?.after ?? []),
+        op.end,
+      ]);
+      return (
+        results[1 + before.length] as (typeof company.$inferSelect)[]
+      )[0]!;
+    } catch (error) {
+      if (fields) fields.translateError(error);
+      permissionError(error);
+    }
   }
-  async update(id: string, values: Partial<typeof company.$inferInsert>, context: RequestContext, fields?: PreparedRecordFields) {
-    const op = actionGuard(this.db, context, ["company.update", ...(values.ownerMembershipId !== undefined ? ["company.assign" as const] : [])]);
+  async update(
+    id: string,
+    values: Partial<typeof company.$inferInsert>,
+    context: RequestContext,
+    fields?: PreparedRecordFields,
+  ) {
+    const op = actionGuard(this.db, context, [
+      "company.update",
+      ...(values.ownerMembershipId !== undefined
+        ? ["company.assign" as const]
+        : []),
+    ]);
     const guardId = crypto.randomUUID();
     try {
-      const results = await this.db.batch([op.begin, this.db.update(company).set(values).where(eq(company.id, id)).returning(),
-        ...(fields ? [this.db.insert(operationConditionGuard).values({ id: guardId, authorized: sql<number>`case when changes()=1 then 1 else 0 end` }), ...fields.statements, this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, guardId))] : []), op.end]);
+      const results = await this.db.batch([
+        op.begin,
+        this.db
+          .update(company)
+          .set(values)
+          .where(eq(company.id, id))
+          .returning(),
+        ...(fields
+          ? [
+              this.db
+                .insert(operationConditionGuard)
+                .values({
+                  id: guardId,
+                  authorized: sql<number>`case when changes()=1 then 1 else 0 end`,
+                }),
+              ...fields.statements,
+              this.db
+                .delete(operationConditionGuard)
+                .where(eq(operationConditionGuard.id, guardId)),
+            ]
+          : []),
+        op.end,
+      ]);
       return (results[1] as (typeof company.$inferSelect)[])[0]!;
-    } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
+    } catch (error) {
+      if (fields) fields.translateError(error);
+      permissionError(error);
+    }
   }
   async archive(id: string, archivedAt: Date | null, context: RequestContext) {
-    const rows = await authorizedWrite(this.db, context, [archivedAt ? "company.archive" : "company.restore"], this.db.update(company).set({ archivedAt, updatedAt: new Date() }).where(eq(company.id, id)).returning());
+    const rows = await authorizedWrite(
+      this.db,
+      context,
+      [archivedAt ? "company.archive" : "company.restore"],
+      this.db
+        .update(company)
+        .set({ archivedAt, updatedAt: new Date() })
+        .where(eq(company.id, id))
+        .returning(),
+    );
     return rows[0];
   }
-  async bulkArchive(ids: string[], archivedAt: Date | null, context: RequestContext) {
-    const result = await authorizedWrite(this.db, context, [archivedAt ? "company.archive" : "company.restore"], this.db.update(company).set({ archivedAt, updatedAt: new Date() }).where(inJsonArray(company.id, ids)));
+  async bulkArchive(
+    ids: string[],
+    archivedAt: Date | null,
+    context: RequestContext,
+  ) {
+    const result = await authorizedWrite(
+      this.db,
+      context,
+      [archivedAt ? "company.archive" : "company.restore"],
+      this.db
+        .update(company)
+        .set({ archivedAt, updatedAt: new Date() })
+        .where(inJsonArray(company.id, ids)),
+    );
     return result.meta.changes;
   }
   activeMember(id: string) {

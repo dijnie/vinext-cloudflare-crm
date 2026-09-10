@@ -26,10 +26,7 @@ import {
   user,
   verification,
 } from "@/lib/db/schema";
-import {
-  createCompositionRoot,
-  type RuntimeEnv,
-} from "@/lib/composition-root";
+import { createCompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
 
 class RecordingEmailAdapter implements AuthEmailAdapter {
   readonly verificationMessages: AuthEmailMessage[] = [];
@@ -47,7 +44,10 @@ class RecordingEmailAdapter implements AuthEmailAdapter {
 const runtimeBindings = env as RuntimeEnv;
 let harnessIndex = 0;
 
-function createHarness(overrides: Partial<RuntimeEnv> = {}, queries?: string[]) {
+function createHarness(
+  overrides: Partial<RuntimeEnv> = {},
+  queries?: string[],
+) {
   const email = new RecordingEmailAdapter();
   const bindings = { ...runtimeBindings, ...overrides } as RuntimeEnv;
   const root = createCompositionRoot(bindings, email);
@@ -56,10 +56,14 @@ function createHarness(overrides: Partial<RuntimeEnv> = {}, queries?: string[]) 
       schema,
       logger: { logQuery: (query) => queries.push(query) },
     });
-    root.auth = createAuth(root.db, {
-      secret: bindings.BETTER_AUTH_SECRET,
-      baseUrl: bindings.AUTH_BASE_URL,
-    }, email);
+    root.auth = createAuth(
+      root.db,
+      {
+        secret: bindings.BETTER_AUTH_SECRET,
+        baseUrl: bindings.AUTH_BASE_URL,
+      },
+      email,
+    );
   }
   harnessIndex += 1;
   const currentHarness = harnessIndex;
@@ -165,7 +169,12 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     expect(await root.db.select().from(singletonMembership)).toHaveLength(0);
   });
 
-  it.each(["https://auth.test", "http://localhost:8787", "http://127.0.0.1:8787", "http://[::1]:8787"])("signs up, verifies, signs in and signs out on %s", async (baseUrl) => {
+  it.each([
+    "https://auth.test",
+    "http://localhost:8787",
+    "http://127.0.0.1:8787",
+    "http://[::1]:8787",
+  ])("signs up, verifies, signs in and signs out on %s", async (baseUrl) => {
     const { email, request, root } = createHarness({ AUTH_BASE_URL: baseUrl });
     const signUp = await request("/sign-up/email", {
       method: "POST",
@@ -197,14 +206,17 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     const membership = await root.db.query.singletonMembership.findFirst();
     expect(membership).toMatchObject({ role: "owner", status: "active" });
 
-    const signIn = await request(`${baseUrl.replace("https:", "http:")}/api/auth/sign-in/email`, {
-      method: "POST",
-      headers: { origin: baseUrl.replace("https:", "http:") },
-      body: jsonBody({
-        email: " OWNER@EXAMPLE.COM ",
-        password: "correct horse battery staple",
-      }),
-    });
+    const signIn = await request(
+      `${baseUrl.replace("https:", "http:")}/api/auth/sign-in/email`,
+      {
+        method: "POST",
+        headers: { origin: baseUrl.replace("https:", "http:") },
+        body: jsonBody({
+          email: " OWNER@EXAMPLE.COM ",
+          password: "correct horse battery staple",
+        }),
+      },
+    );
     expect(signIn.status).toBe(200);
     const setCookie = signIn.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("HttpOnly");
@@ -236,8 +248,17 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     expect(await afterSignOut.json()).toBeNull();
   });
 
-  it.each(["http://auth.test", "http://localhost.evil.test", "http://192.168.1.5", "http://localhost:8787/path", "http://localhost:8787?x=1", "http://user:pass@localhost:8787"])("rejects unsafe auth base URL %s", baseUrl => {
-    expect(() => createHarness({ AUTH_BASE_URL: baseUrl })).toThrow("Auth base URL must be a canonical HTTPS origin or HTTP loopback origin");
+  it.each([
+    "http://auth.test",
+    "http://localhost.evil.test",
+    "http://192.168.1.5",
+    "http://localhost:8787/path",
+    "http://localhost:8787?x=1",
+    "http://user:pass@localhost:8787",
+  ])("rejects unsafe auth base URL %s", (baseUrl) => {
+    expect(() => createHarness({ AUTH_BASE_URL: baseUrl })).toThrow(
+      "Auth base URL must be a canonical HTTPS origin or HTTP loopback origin",
+    );
   });
 
   it("rejects an untrusted mutation origin", async () => {
@@ -270,7 +291,9 @@ describe.sequential("Better Auth compatibility under workerd", () => {
       );
     }
 
-    expect(responses.slice(0, 10).every((response) => response.status === 200)).toBe(true);
+    expect(
+      responses.slice(0, 10).every((response) => response.status === 200),
+    ).toBe(true);
     expect(responses[10].status).toBe(429);
     expect(await harness.root.db.select().from(rateLimit)).not.toHaveLength(0);
   });
@@ -333,10 +356,13 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     // Age the real persisted session instead of sleeping for the renewal window.
     const previousUpdate = new Date(Date.now() - 301_000);
     const previousExpiry = new Date(previousUpdate.getTime() + 3_600_000);
-    await harness.root.db.update(session).set({
-      updatedAt: previousUpdate,
-      expiresAt: previousExpiry,
-    }).where(eq(session.id, currentSession.id));
+    await harness.root.db
+      .update(session)
+      .set({
+        updatedAt: previousUpdate,
+        expiresAt: previousExpiry,
+      })
+      .where(eq(session.id, currentSession.id));
 
     const response = await harness.request("/get-session", {
       headers: { cookie },
@@ -381,8 +407,9 @@ describe.sequential("Better Auth compatibility under workerd", () => {
 
     // A previously valid cookie cannot bypass immediate server-side revocation.
     await harness.root.db.delete(session);
-    await expect(requireRequestContext(headers, harness.root))
-      .rejects.toMatchObject({ status: 401 });
+    await expect(
+      requireRequestContext(headers, harness.root),
+    ).rejects.toMatchObject({ status: 401 });
   });
 
   it("observes role, verification and membership changes on the next request", async () => {
@@ -397,23 +424,39 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     const headers = new Headers({ cookie: requestCookie(signIn) });
     const context = await requireRequestContext(headers, harness.root);
     expect(context.role).toBe("member");
-    await harness.root.db.update(singletonMembership).set({ role: "owner" })
+    await harness.root.db
+      .update(singletonMembership)
+      .set({ role: "owner" })
       .where(eq(singletonMembership.userId, context.userId));
-    expect((await requireRequestContext(headers, harness.root)).role).toBe("owner");
-    await harness.root.db.update(singletonMembership).set({ role: "member" })
+    expect((await requireRequestContext(headers, harness.root)).role).toBe(
+      "owner",
+    );
+    await harness.root.db
+      .update(singletonMembership)
+      .set({ role: "member" })
       .where(eq(singletonMembership.userId, context.userId));
-    expect((await requireRequestContext(headers, harness.root)).role).toBe("member");
+    expect((await requireRequestContext(headers, harness.root)).role).toBe(
+      "member",
+    );
 
-    await harness.root.db.update(user).set({ emailVerified: false })
+    await harness.root.db
+      .update(user)
+      .set({ emailVerified: false })
       .where(eq(user.id, context.userId));
-    await expect(requireRequestContext(headers, harness.root))
-      .rejects.toMatchObject({ status: 401 });
-    await harness.root.db.update(user).set({ emailVerified: true })
+    await expect(
+      requireRequestContext(headers, harness.root),
+    ).rejects.toMatchObject({ status: 401 });
+    await harness.root.db
+      .update(user)
+      .set({ emailVerified: true })
       .where(eq(user.id, context.userId));
-    await harness.root.db.update(singletonMembership).set({ status: "revoked" })
+    await harness.root.db
+      .update(singletonMembership)
+      .set({ status: "revoked" })
       .where(eq(singletonMembership.userId, context.userId));
-    await expect(requireRequestContext(headers, harness.root))
-      .rejects.toMatchObject({ status: 403 });
+    await expect(
+      requireRequestContext(headers, harness.root),
+    ).rejects.toMatchObject({ status: 403 });
   });
 
   it("rejects expired sessions instead of renewing them", async () => {
@@ -425,9 +468,12 @@ describe.sequential("Better Auth compatibility under workerd", () => {
       body: jsonBody({ email: "owner@example.com", password }),
     });
     const headers = new Headers({ cookie: requestCookie(signIn) });
-    await harness.root.db.update(session).set({ expiresAt: new Date(Date.now() - 1_000) });
-    await expect(requireRequestContext(headers, harness.root))
-      .rejects.toMatchObject({ status: 401 });
+    await harness.root.db
+      .update(session)
+      .set({ expiresAt: new Date(Date.now() - 1_000) });
+    await expect(
+      requireRequestContext(headers, harness.root),
+    ).rejects.toMatchObject({ status: 401 });
     expect(await harness.root.db.select().from(session)).toHaveLength(0);
   });
 
@@ -513,8 +559,9 @@ describe.sequential("Better Auth compatibility under workerd", () => {
   });
 
   it("claims exactly one owner through concurrent verified auth flows", async () => {
-    const emails = Array.from({ length: 8 }, (_, index) =>
-      `race-${index}@example.com`,
+    const emails = Array.from(
+      { length: 8 },
+      (_, index) => `race-${index}@example.com`,
     );
     const harness = createHarness();
     const password = "correct horse battery staple";
@@ -542,9 +589,13 @@ describe.sequential("Better Auth compatibility under workerd", () => {
         }),
       ),
     );
-    const memberships = await harness.root.db.select().from(singletonMembership);
+    const memberships = await harness.root.db
+      .select()
+      .from(singletonMembership);
     expect(memberships).toHaveLength(8);
-    expect(memberships.filter((entry) => entry.role === "owner")).toHaveLength(1);
+    expect(memberships.filter((entry) => entry.role === "owner")).toHaveLength(
+      1,
+    );
   });
 
   it("claims one owner, enrolls later members, and never revives revocation", async () => {
@@ -642,12 +693,38 @@ describe.sequential("Better Auth compatibility under workerd", () => {
     const { root } = createHarness();
     const now = new Date();
     await root.db.insert(user).values([
-      { id: "owner-a", name: "Owner A", email: "a@example.com", emailVerified: true, createdAt: now, updatedAt: now },
-      { id: "owner-b", name: "Owner B", email: "b@example.com", emailVerified: true, createdAt: now, updatedAt: now },
+      {
+        id: "owner-a",
+        name: "Owner A",
+        email: "a@example.com",
+        emailVerified: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "owner-b",
+        name: "Owner B",
+        email: "b@example.com",
+        emailVerified: true,
+        createdAt: now,
+        updatedAt: now,
+      },
     ]);
     await root.db.insert(singletonMembership).values([
-      { userId: "owner-a", role: "owner", status: "active", createdAt: now, updatedAt: now },
-      { userId: "owner-b", role: "owner", status: "active", createdAt: now, updatedAt: now },
+      {
+        userId: "owner-a",
+        role: "owner",
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        userId: "owner-b",
+        role: "owner",
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      },
     ]);
 
     const removals = await Promise.all([

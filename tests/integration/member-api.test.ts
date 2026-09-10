@@ -8,13 +8,13 @@ import {
 } from "../../src/app/api/crm/members/[memberId]/route";
 import { createMembersGetHandler } from "../../src/app/api/crm/members/route";
 import { handleAuthRequest } from "@/lib/auth/auth";
-import type { AuthEmailAdapter, AuthEmailMessage } from "@/lib/email/email-adapter";
+import type {
+  AuthEmailAdapter,
+  AuthEmailMessage,
+} from "@/lib/email/email-adapter";
 import { SINGLETON_WORKSPACE_ID } from "@/lib/services/members/singleton-workspace";
 import { company, deal, singletonMembership } from "@/lib/db/schema";
-import {
-  createCompositionRoot,
-  type RuntimeEnv,
-} from "@/lib/composition-root";
+import { createCompositionRoot, type RuntimeEnv } from "@/lib/composition-root";
 
 class RecordingEmailAdapter implements AuthEmailAdapter {
   verificationMessages: AuthEmailMessage[] = [];
@@ -310,15 +310,13 @@ describe.sequential("member API", () => {
       }),
     );
     expect(promoteCanonicalOwner.status).toBe(200);
-    await root.db
-      .insert(company)
-      .values({
-        id: "canonical-owner-company",
-        name: "Canonical owner company",
-        ownerMembershipId: "sentinel-owner",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+    await root.db.insert(company).values({
+      id: "canonical-owner-company",
+      name: "Canonical owner company",
+      ownerMembershipId: "sentinel-owner",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
     const remove = await createMemberDeleteHandler(
       root,

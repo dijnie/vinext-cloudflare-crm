@@ -4,7 +4,11 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { isAppLocale } from "@/lib/i18n/config";
 import { getCrmDictionary } from "@/lib/i18n/crm-dictionary";
-import { entityPaths, parseListState, type EntityType } from "@/lib/listing/list-state";
+import {
+  entityPaths,
+  parseListState,
+  type EntityType,
+} from "@/lib/listing/list-state";
 import type { CompanyListInput } from "@/lib/services/companies/company-contract";
 import type { ContactListInput } from "@/lib/services/contacts/contact-contract";
 import type { DealListInput } from "@/lib/services/deals/deal-contract";
@@ -14,11 +18,27 @@ import { getPageContext } from "@/lib/http/page-context";
 import { isHttpError } from "@/lib/http/http-errors";
 import { EntityList } from "./entity-list";
 
-export type EntityPageProps = { params: Promise<{ locale: string; slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
-export async function EntityListPage({ entity, params, searchParams }: EntityPageProps & { entity: EntityType }) {
-  const { locale, slug } = await params; if (!isAppLocale(locale)) notFound();
+export type EntityPageProps = {
+  params: Promise<{ locale: string; slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+export async function EntityListPage({
+  entity,
+  params,
+  searchParams,
+}: EntityPageProps & { entity: EntityType }) {
+  const { locale, slug } = await params;
+  if (!isAppLocale(locale)) notFound();
   const { root, context } = await getPageContext();
-  const query = new URLSearchParams(); for (const [key, value] of Object.entries(await searchParams)) { for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item); }
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    for (const item of Array.isArray(value)
+      ? value
+      : value === undefined
+        ? []
+        : [value])
+      query.append(key, item);
+  }
   if (query.size === 0) {
     const preferred = await root.views.preferred(context, entity);
     if (preferred) {
@@ -27,23 +47,88 @@ export async function EntityListPage({ entity, params, searchParams }: EntityPag
       redirect(`/${locale}/${slug}/${entityPaths[entity]}?${next}`);
     }
   }
-  let state; try { state = parseListState(entity, query); } catch { const labels = getCrmDictionary(locale); return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}/${entityPaths[entity]}?page=1`}>{labels.reset}</Link></div>; }
+  let state;
+  try {
+    state = parseListState(entity, query);
+  } catch {
+    const labels = getCrmDictionary(locale);
+    return (
+      <div className="space-y-4">
+        <h1>{labels.invalidQuery}</h1>
+        <Link
+          className="text-primary underline"
+          href={`/${locale}/${slug}/${entityPaths[entity]}?page=1`}
+        >
+          {labels.reset}
+        </Link>
+      </div>
+    );
+  }
   try {
     const [initialData, initialLayout] = await Promise.all([
-      entity === "company" ? root.companies.list(context, state.list as CompanyListInput) : entity === "contact" ? root.contacts.list(context, state.list as ContactListInput) : entity === "lead" ? root.leads.list(context, state.list as LeadListInput) : entity === "product" ? root.products.list(context, state.list as ProductListInput) : entity === "order" ? root.orders.list(context, state.list as OrderListInput) : root.deals.list(context, state.list as DealListInput),
+      entity === "company"
+        ? root.companies.list(context, state.list as CompanyListInput)
+        : entity === "contact"
+          ? root.contacts.list(context, state.list as ContactListInput)
+          : entity === "lead"
+            ? root.leads.list(context, state.list as LeadListInput)
+            : entity === "product"
+              ? root.products.list(context, state.list as ProductListInput)
+              : entity === "order"
+                ? root.orders.list(context, state.list as OrderListInput)
+                : root.deals.list(context, state.list as DealListInput),
       root.layouts.get(context, { entity }),
     ]);
-    return <EntityList entity={entity} initialData={initialData} initialQueryKey={`${entity}:${JSON.stringify(state.list)}`} initialLayout={initialLayout} locale={locale} />;
+    return (
+      <EntityList
+        entity={entity}
+        initialData={initialData}
+        initialQueryKey={`${entity}:${JSON.stringify(state.list)}`}
+        initialLayout={initialLayout}
+        locale={locale}
+      />
+    );
   } catch (error) {
     if (!isHttpError(error) || error.status !== 400) throw error;
     const labels = getCrmDictionary(locale);
-    return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}/${entityPaths[entity]}?page=1`}>{labels.reset}</Link></div>;
+    return (
+      <div className="space-y-4">
+        <h1>{labels.invalidQuery}</h1>
+        <Link
+          className="text-primary underline"
+          href={`/${locale}/${slug}/${entityPaths[entity]}?page=1`}
+        >
+          {labels.reset}
+        </Link>
+      </div>
+    );
   }
 }
-export async function DirectRecordPage({ entity, locale, slug, id, searchParams }: { entity: EntityType; locale: string; slug: string; id: string; searchParams: EntityPageProps["searchParams"] }) {
+export async function DirectRecordPage({
+  entity,
+  locale,
+  slug,
+  id,
+  searchParams,
+}: {
+  entity: EntityType;
+  locale: string;
+  slug: string;
+  id: string;
+  searchParams: EntityPageProps["searchParams"];
+}) {
   if (!isAppLocale(locale) || !stableIdSchema.safeParse(id).success) notFound();
   await getPageContext();
-  const query = new URLSearchParams(); for (const [key, value] of Object.entries(await searchParams)) for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item);
-  query.set("recordType", entity); query.set("recordId", id); if (!query.has("tab")) query.set("tab", "details");
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams))
+    for (const item of Array.isArray(value)
+      ? value
+      : value === undefined
+        ? []
+        : [value])
+      query.append(key, item);
+  query.set("recordType", entity);
+  query.set("recordId", id);
+  if (!query.has("tab")) query.set("tab", "details");
   redirect(`/${locale}/${slug}/${entityPaths[entity]}?${query}`);
 }

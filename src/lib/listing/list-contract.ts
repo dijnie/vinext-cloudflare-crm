@@ -5,14 +5,34 @@ import { customFieldSortSchema } from "@/lib/services/custom-fields/field-sort-c
 import { fieldCriteriaQuerySchema } from "@/lib/services/custom-fields/field-filter-contracts";
 
 export const DEFAULT_PAGE_SIZE = 25;
-export const facetOutputSchema = z.record(z.string(), z.array(z.object({ value: z.string(), label: z.string(), count: z.number().int().nonnegative() })));
+export const facetOutputSchema = z.record(
+  z.string(),
+  z.array(
+    z.object({
+      value: z.string(),
+      label: z.string(),
+      count: z.number().int().nonnegative(),
+    }),
+  ),
+);
 export const MAX_PAGE_SIZE = 100;
 export const MAX_BULK_IDS = 100;
-export const customFieldFiltersSchema = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,59}$/), z.array(z.string().min(1).max(255)).max(100)).refine(value => Object.keys(value).length <= 20);
-const customFieldQuerySchema = z.preprocess(value => {
-  if (typeof value !== "string") return value;
-  try { return JSON.parse(value); } catch { return value; }
-}, customFieldFiltersSchema).default({});
+export const customFieldFiltersSchema = z
+  .record(
+    z.string().regex(/^[a-z][a-z0-9_]{0,59}$/),
+    z.array(z.string().min(1).max(255)).max(100),
+  )
+  .refine((value) => Object.keys(value).length <= 20);
+const customFieldQuerySchema = z
+  .preprocess((value) => {
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }, customFieldFiltersSchema)
+  .default({});
 
 export const stableIdSchema = z.uuid();
 export const membershipIdSchema = z.string().trim().min(1).max(255);
@@ -80,7 +100,9 @@ export function parseSearchParams<T>(
     input[key] = arrayKeys.includes(key)
       ? url.searchParams
           .getAll(key)
-          .flatMap((value) => ["industry", "title"].includes(key) ? [value] : value.split(","))
+          .flatMap((value) =>
+            ["industry", "title"].includes(key) ? [value] : value.split(","),
+          )
           .filter(Boolean)
       : (url.searchParams.get(key) ?? "");
   }

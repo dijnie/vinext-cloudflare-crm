@@ -11,7 +11,10 @@ import type {
   DealUpdateData,
 } from "@/lib/services/deals/deal-contract";
 import { toIso } from "@/lib/listing/list-contract";
-import { blankToNull, relationError } from "@/lib/services/shared/service-utils";
+import {
+  blankToNull,
+  relationError,
+} from "@/lib/services/shared/service-utils";
 import { HttpError } from "@/lib/http/http-errors";
 import type { RequestContext } from "@/lib/http/request-context";
 import { deal } from "@/lib/db/schema";
@@ -34,7 +37,9 @@ export class DealService {
       facets: result.facets,
       customFields: result.customFields,
       fieldFacets: result.fieldFacets,
-      fieldFileLabels: result.fieldFileLabels, fieldCustomerLabels: result.fieldCustomerLabels, fieldUserLabels: result.fieldUserLabels,
+      fieldFileLabels: result.fieldFileLabels,
+      fieldCustomerLabels: result.fieldCustomerLabels,
+      fieldUserLabels: result.fieldUserLabels,
       rows: result.rows.map((row) => this.serialize(row)),
     };
   }
@@ -79,12 +84,25 @@ export class DealService {
     };
   }
 
-  async create(context: RequestContext, input: DealCreateInput, creation?: PreparedRecordCreation):Promise<{id:string;name:string;companyId:string}> {
-    const prepared=await this.prepareCreate(context,input,creation);
-    try{await this.db.batch(prepared.statements);return prepared.result;}catch(error){return prepared.translateError(error);}
+  async create(
+    context: RequestContext,
+    input: DealCreateInput,
+    creation?: PreparedRecordCreation,
+  ): Promise<{ id: string; name: string; companyId: string }> {
+    const prepared = await this.prepareCreate(context, input, creation);
+    try {
+      await this.db.batch(prepared.statements);
+      return prepared.result;
+    } catch (error) {
+      return prepared.translateError(error);
+    }
   }
 
-  async prepareCreate(context: RequestContext, input: DealCreateInput, creation?: PreparedRecordCreation) {
+  async prepareCreate(
+    context: RequestContext,
+    input: DealCreateInput,
+    creation?: PreparedRecordCreation,
+  ) {
     await this.guard(context, ["deal.create", "deal.assign"]);
     const [company, owner, stage] = await Promise.all([
       this.repository.company(input.companyId),
@@ -102,32 +120,92 @@ export class DealService {
     if (!stage || stage.archivedAt)
       throw new HttpError(400, "validation_failed", "Deal stage is invalid");
     const id = creation?.recordId ?? crypto.randomUUID();
-    const fields = await new FieldService(this.db).prepareValues(context, { entity: "deal", recordId: id, values: input.customFields ?? {}, calendarRevision: input.calendarRevision }, "create");
+    const fields = await new FieldService(this.db).prepareValues(
+      context,
+      {
+        entity: "deal",
+        recordId: id,
+        values: input.customFields ?? {},
+        calendarRevision: input.calendarRevision,
+      },
+      "create",
+    );
     const now = new Date();
-    const values={
-        id,
-        name: input.name,
-        companyId: input.companyId,
-        ownerMembershipId: input.ownerMembershipId,
-        stageId: input.stageId,
-        stageChangedAt: now,
-        amountMinor: input.amountMinor ?? null,
-        currency: input.currency,
-        expectedCloseAt: input.expectedCloseAt
-          ? new Date(input.expectedCloseAt)
-          : null,
-        closedAt: stage.closedState === "open" ? null : now,
-        createdAt: now,
-        updatedAt: now,
-      };
-    const fx=await prepareDealConversion(this.db,{id,amountMinor:values.amountMinor,currency:values.currency,moneyRevision:0});
-    const auth=actionGuard(this.db,context,["deal.create","deal.assign"]);
-    const statements:Parameters<AppDatabase["batch"]>[0]=[auth.begin,...creation?.before??[],fx.guard,this.db.insert(deal).values(values),fx.conversion,fx.finish,...fields.statements,...creation?.after??[],auth.end];
-    return {statements,result:{id,name:values.name,companyId:values.companyId},translateError(error:unknown):never{try{fields.translateError(error);}catch(fieldError){try{dealStageWriteError(fieldError);}catch(stageError){try{currencyError(stageError);}catch(classified){relationError(classified,"Deal relationships are invalid");}}}try{permissionError(error);}catch(classified){try{dealStageWriteError(classified);}catch(stageError){try{currencyError(stageError);}catch(finalError){relationError(finalError,"Deal relationships are invalid");}}}}};
+    const values = {
+      id,
+      name: input.name,
+      companyId: input.companyId,
+      ownerMembershipId: input.ownerMembershipId,
+      stageId: input.stageId,
+      stageChangedAt: now,
+      amountMinor: input.amountMinor ?? null,
+      currency: input.currency,
+      expectedCloseAt: input.expectedCloseAt
+        ? new Date(input.expectedCloseAt)
+        : null,
+      closedAt: stage.closedState === "open" ? null : now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const fx = await prepareDealConversion(this.db, {
+      id,
+      amountMinor: values.amountMinor,
+      currency: values.currency,
+      moneyRevision: 0,
+    });
+    const auth = actionGuard(this.db, context, ["deal.create", "deal.assign"]);
+    const statements: Parameters<AppDatabase["batch"]>[0] = [
+      auth.begin,
+      ...(creation?.before ?? []),
+      fx.guard,
+      this.db.insert(deal).values(values),
+      fx.conversion,
+      fx.finish,
+      ...fields.statements,
+      ...(creation?.after ?? []),
+      auth.end,
+    ];
+    return {
+      statements,
+      result: { id, name: values.name, companyId: values.companyId },
+      translateError(error: unknown): never {
+        try {
+          fields.translateError(error);
+        } catch (fieldError) {
+          try {
+            dealStageWriteError(fieldError);
+          } catch (stageError) {
+            try {
+              currencyError(stageError);
+            } catch (classified) {
+              relationError(classified, "Deal relationships are invalid");
+            }
+          }
+        }
+        try {
+          permissionError(error);
+        } catch (classified) {
+          try {
+            dealStageWriteError(classified);
+          } catch (stageError) {
+            try {
+              currencyError(stageError);
+            } catch (finalError) {
+              relationError(finalError, "Deal relationships are invalid");
+            }
+          }
+        }
+      },
+    };
   }
 
   async update(context: RequestContext, id: string, input: DealUpdateData) {
-    await this.guard(context, ["deal.update", ...(input.ownerMembershipId !== undefined ? ["deal.assign" as const] : [])]);
+    await this.guard(context, [
+      "deal.update",
+      ...(input.ownerMembershipId !== undefined
+        ? ["deal.assign" as const]
+        : []),
+    ]);
     const current = await this.repository.byId(id);
     if (!current) throw new HttpError(404, "not_found", "Deal was not found");
     const companyId = input.companyId ?? current.companyId;
@@ -164,7 +242,10 @@ export class DealService {
       values.ownerMembershipId = input.ownerMembershipId;
     if (input.amountMinor !== undefined) values.amountMinor = input.amountMinor;
     if (input.currency !== undefined) values.currency = input.currency;
-    const moneyChanged = (input.amountMinor !== undefined && input.amountMinor !== current.amountMinor) || (input.currency !== undefined && input.currency !== current.currency);
+    const moneyChanged =
+      (input.amountMinor !== undefined &&
+        input.amountMinor !== current.amountMinor) ||
+      (input.currency !== undefined && input.currency !== current.currency);
     if (moneyChanged) values.moneyRevision = current.moneyRevision + 1;
     if (input.expectedCloseAt !== undefined)
       values.expectedCloseAt = input.expectedCloseAt
@@ -180,28 +261,77 @@ export class DealService {
           : null;
     } else if (input.closedReason !== undefined)
       values.closedReason = input.closedReason;
-    const fields = input.customFields === undefined ? undefined : await new FieldService(this.db).prepareValues(context, { entity: "deal", recordId: id, values: input.customFields, calendarRevision: input.calendarRevision });
+    const fields =
+      input.customFields === undefined
+        ? undefined
+        : await new FieldService(this.db).prepareValues(context, {
+            entity: "deal",
+            recordId: id,
+            values: input.customFields,
+            calendarRevision: input.calendarRevision,
+          });
     try {
-      const row = await this.repository.updateWithHistory(id, values, current.stageId, context.userId, context, moneyChanged ? { revision:current.moneyRevision,amountMinor:current.amountMinor,currency:current.currency } : undefined, fields);
-      if (!row) throw new HttpError(409, "conflict", "Deal stage changed before this update");
+      const row = await this.repository.updateWithHistory(
+        id,
+        values,
+        current.stageId,
+        context.userId,
+        context,
+        moneyChanged
+          ? {
+              revision: current.moneyRevision,
+              amountMinor: current.amountMinor,
+              currency: current.currency,
+            }
+          : undefined,
+        fields,
+      );
+      if (!row)
+        throw new HttpError(
+          409,
+          "conflict",
+          "Deal stage changed before this update",
+        );
       return { id: row.id, name: row.name };
     } catch (error) {
-      try { dealStageWriteError(error); } catch (stageError) { try { currencyError(stageError); } catch (classified) { relationError(classified, "Deal relationships are invalid"); } }
+      try {
+        dealStageWriteError(error);
+      } catch (stageError) {
+        try {
+          currencyError(stageError);
+        } catch (classified) {
+          relationError(classified, "Deal relationships are invalid");
+        }
+      }
     }
   }
 
   async archive(context: RequestContext, id: string, restore = false) {
     await this.guard(context, [restore ? "deal.restore" : "deal.archive"]);
-    const row = await this.repository.archive(id, restore ? null : new Date(), context);
+    const row = await this.repository.archive(
+      id,
+      restore ? null : new Date(),
+      context,
+    );
     if (!row) throw new HttpError(404, "not_found", "Deal was not found");
     return { id: row.id, name: row.name, archivedAt: toIso(row.archivedAt) };
   }
   async bulkArchive(context: RequestContext, ids: string[], restore = false) {
     await this.guard(context, [restore ? "deal.restore" : "deal.archive"]);
     try {
-      const succeeded = await this.repository.bulkArchive(ids, restore ? null : new Date(), context);
-      return { requested: ids.length, succeeded, failed: ids.length - succeeded };
-    } catch (error) { relationError(error, "Restored records conflict with active records"); }
+      const succeeded = await this.repository.bulkArchive(
+        ids,
+        restore ? null : new Date(),
+        context,
+      );
+      return {
+        requested: ids.length,
+        succeeded,
+        failed: ids.length - succeeded,
+      };
+    } catch (error) {
+      relationError(error, "Restored records conflict with active records");
+    }
   }
 
   async attachContact(

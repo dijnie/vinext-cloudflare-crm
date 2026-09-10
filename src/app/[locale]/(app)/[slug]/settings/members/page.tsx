@@ -5,12 +5,31 @@ import { isAppLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { getPageContext } from "@/lib/http/page-context";
 
-export default async function MembersPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function MembersPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
   const { locale } = await params;
   if (!isAppLocale(locale)) notFound();
   const { root, context } = await getPageContext();
   if (context.role !== "owner") notFound();
-  const members = (await root.members.list(context)).map((member) => ({ ...member, createdAt: member.createdAt.toISOString() }));
+  const members = (await root.members.list(context)).map((member) => ({
+    ...member,
+    createdAt: member.createdAt.toISOString(),
+  }));
   const dictionary = getDictionary(locale);
-  return <div className="crm-page"><div><h1 className="crm-page-title">{dictionary.members.title}</h1><p className="crm-page-subtitle">{dictionary.members.description}</p></div><MembersTable currentMembershipId={context.membershipId} dictionary={dictionary} members={members} /></div>;
+  return (
+    <div className="crm-page">
+      <div>
+        <h1 className="crm-page-title">{dictionary.members.title}</h1>
+        <p className="crm-page-subtitle">{dictionary.members.description}</p>
+      </div>
+      <MembersTable
+        currentMembershipId={context.membershipId}
+        dictionary={dictionary}
+        members={members}
+      />
+    </div>
+  );
 }

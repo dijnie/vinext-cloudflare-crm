@@ -1,27 +1,89 @@
 import { describe, expect, it } from "vitest";
-import { captureSavedViewState, savedViewDefaultInputSchema, savedViewCreateSchema, validateSavedViewState } from "@/lib/services/saved-views/saved-view-contracts";
+import {
+  captureSavedViewState,
+  savedViewDefaultInputSchema,
+  savedViewCreateSchema,
+  validateSavedViewState,
+} from "@/lib/services/saved-views/saved-view-contracts";
 import { parseListState } from "@/lib/listing/list-state";
 
 describe("saved view URL contracts", () => {
   it("round-trips filters and custom columns while removing ephemeral navigation", () => {
-    const url = new URLSearchParams({ q: "A & B", industry: "Media, Publishing", fields: JSON.stringify({ category: ["option-a", "option-b"] }), columns: "name,field:category", archived: "true", sort: "name", dir: "asc", page: "5", recordType: "company", recordId: crypto.randomUUID(), tab: "fields", view: crypto.randomUUID() });
+    const url = new URLSearchParams({
+      q: "A & B",
+      industry: "Media, Publishing",
+      fields: JSON.stringify({ category: ["option-a", "option-b"] }),
+      columns: "name,field:category",
+      archived: "true",
+      sort: "name",
+      dir: "asc",
+      page: "5",
+      recordType: "company",
+      recordId: crypto.randomUUID(),
+      tab: "fields",
+      view: crypto.randomUUID(),
+    });
     const state = captureSavedViewState("company", url);
     const restored = new URLSearchParams(state.query);
-    for (const key of ["page", "recordType", "recordId", "tab", "view"]) expect(restored.has(key)).toBe(false);
+    for (const key of ["page", "recordType", "recordId", "tab", "view"])
+      expect(restored.has(key)).toBe(false);
     expect(restored.get("q")).toBe("A & B");
-    expect(parseListState("company", restored)).toMatchObject({ columns: ["name", "field:category"], list: { page: 1, archived: true, fields: { category: ["option-a", "option-b"] } } });
+    expect(parseListState("company", restored)).toMatchObject({
+      columns: ["name", "field:category"],
+      list: {
+        page: 1,
+        archived: true,
+        fields: { category: ["option-a", "option-b"] },
+      },
+    });
     expect(validateSavedViewState("company", state)).toEqual(state);
   });
   it("rejects unknown versions, forbidden navigation, wrong-entity filters and malicious fields", () => {
-    for (const query of ["page=2", "recordId=x", "tab=fields", "view=x", "tenant=x", "sort=password", "stage=closed-won", "columns=email", "columns=field:bad%27key", `fields=${encodeURIComponent('{"bad-key":["x"]}')}`]) expect(() => validateSavedViewState("company", { version: 1, query })).toThrow();
-    for (const state of [{ version: 2, query: "" }, { query: "" }, { version: 1, query: "", unsafe: true }, null]) expect(() => validateSavedViewState("company", state)).toThrow();
-    expect(savedViewCreateSchema.safeParse({ entity: "company", name: "x", state: { version: 1, query: "" }, ownerMembershipId: "other" }).success).toBe(false);
+    for (const query of [
+      "page=2",
+      "recordId=x",
+      "tab=fields",
+      "view=x",
+      "tenant=x",
+      "sort=password",
+      "stage=closed-won",
+      "columns=email",
+      "columns=field:bad%27key",
+      `fields=${encodeURIComponent('{"bad-key":["x"]}')}`,
+    ])
+      expect(() =>
+        validateSavedViewState("company", { version: 1, query }),
+      ).toThrow();
+    for (const state of [
+      { version: 2, query: "" },
+      { query: "" },
+      { version: 1, query: "", unsafe: true },
+      null,
+    ])
+      expect(() => validateSavedViewState("company", state)).toThrow();
+    expect(
+      savedViewCreateSchema.safeParse({
+        entity: "company",
+        name: "x",
+        state: { version: 1, query: "" },
+        ownerMembershipId: "other",
+      }).success,
+    ).toBe(false);
   });
   it("accepts personal defaults and rejects injected owners, invalid IDs and unknown entities", () => {
     const viewId = crypto.randomUUID();
-    expect(savedViewDefaultInputSchema.parse({ entity: "company", viewId })).toEqual({ entity: "company", viewId });
-    expect(savedViewDefaultInputSchema.parse({ entity: "contact", viewId: null })).toEqual({ entity: "contact", viewId: null });
-    for (const input of [{ entity: "unknown", viewId }, { entity: "company", viewId: "bad" }, { entity: "company" }, { entity: "company", viewId, userId: "other" }]) expect(savedViewDefaultInputSchema.safeParse(input).success).toBe(false);
+    expect(
+      savedViewDefaultInputSchema.parse({ entity: "company", viewId }),
+    ).toEqual({ entity: "company", viewId });
+    expect(
+      savedViewDefaultInputSchema.parse({ entity: "contact", viewId: null }),
+    ).toEqual({ entity: "contact", viewId: null });
+    for (const input of [
+      { entity: "unknown", viewId },
+      { entity: "company", viewId: "bad" },
+      { entity: "company" },
+      { entity: "company", viewId, userId: "other" },
+    ])
+      expect(savedViewDefaultInputSchema.safeParse(input).success).toBe(false);
   });
-
 });

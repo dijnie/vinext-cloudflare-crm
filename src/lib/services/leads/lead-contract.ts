@@ -1,6 +1,9 @@
 import { recordFieldsShape } from "../shared/record-fields-contract";
 import { z } from "zod";
-import { fieldDefinitionSchema, fieldValuesSchema } from "@/lib/services/custom-fields/field-contracts";
+import {
+  fieldDefinitionSchema,
+  fieldValuesSchema,
+} from "@/lib/services/custom-fields/field-contracts";
 
 import {
   bulkArchiveInputSchema,
@@ -47,7 +50,11 @@ export const leadCreateInputSchema = z
     sourceId: leadChoiceIdSchema.optional(),
     statusId: leadChoiceIdSchema.optional(),
     rejectionReason: z.string().trim().max(2000).nullable().optional(),
-    collaboratorMembershipIds: z.array(membershipIdSchema).max(100).transform(ids => [...new Set(ids)]).optional(),
+    collaboratorMembershipIds: z
+      .array(membershipIdSchema)
+      .max(100)
+      .transform((ids) => [...new Set(ids)])
+      .optional(),
     companyId: stableIdSchema.nullable().optional(),
     ownerMembershipId: membershipIdSchema.nullable().optional(),
   })
@@ -64,7 +71,11 @@ export const leadUpdateInputSchema = z
         sourceId: leadChoiceIdSchema.optional(),
         statusId: leadChoiceIdSchema.optional(),
         rejectionReason: z.string().trim().max(2000).nullable().optional(),
-        collaboratorMembershipIds: z.array(membershipIdSchema).max(100).transform(ids => [...new Set(ids)]).optional(),
+        collaboratorMembershipIds: z
+          .array(membershipIdSchema)
+          .max(100)
+          .transform((ids) => [...new Set(ids)])
+          .optional(),
         firstName: z.string().trim().min(1).max(120).optional(),
         lastName: nullableText.optional(),
         email: z.union([z.email(), z.literal(""), z.null()]).optional(),
@@ -150,6 +161,4 @@ export const leadDetailOutputSchema = leadListRowOutputSchema;
 export { bulkResultSchema as leadBulkOutputSchema };
 export type LeadListInput = z.infer<typeof leadListInputSchema>;
 export type LeadCreateInput = z.infer<typeof leadCreateInputSchema>;
-export type LeadUpdateData = z.infer<
-  typeof leadUpdateInputSchema
->["data"];
+export type LeadUpdateData = z.infer<typeof leadUpdateInputSchema>["data"];

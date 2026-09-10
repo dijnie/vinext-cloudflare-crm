@@ -14,16 +14,25 @@ const legacyRoutes = [
   "/api/customers/1/workflow",
 ];
 
-test("malformed signup is rejected before creating an account", async ({ request: api, baseURL }) => {
+test("malformed signup is rejected before creating an account", async ({
+  request: api,
+  baseURL,
+}) => {
   const response = await api.post("/api/auth/sign-up/email", {
     headers: { origin: baseURL! },
-    data: { name: "Malformed", email: "not-an-email", password: "not-a-real-user-password" },
+    data: {
+      name: "Malformed",
+      email: "not-an-email",
+      password: "not-a-real-user-password",
+    },
   });
   expect(response.status()).toBe(400);
 });
 
 for (const authenticated of [false, true]) {
-  test(`${authenticated ? "authenticated" : "unauthenticated"}: removed sample and workflow routes return secured 404s`, async ({ baseURL }) => {
+  test(`${authenticated ? "authenticated" : "unauthenticated"}: removed sample and workflow routes return secured 404s`, async ({
+    baseURL,
+  }) => {
     const api = await request.newContext({
       baseURL,
       ignoreHTTPSErrors: true,
@@ -32,7 +41,10 @@ for (const authenticated of [false, true]) {
     try {
       if (authenticated) {
         const signedIn = await api.post("/api/auth/sign-in/email", {
-          data: { email: process.env["E2E_OWNER_EMAIL"], password: process.env["E2E_OWNER_PASSWORD"] },
+          data: {
+            email: process.env["E2E_OWNER_EMAIL"],
+            password: process.env["E2E_OWNER_PASSWORD"],
+          },
         });
         expect(signedIn.ok()).toBe(true);
         expect((await api.get("/api/crm/members")).status()).toBe(200);
@@ -50,8 +62,12 @@ for (const authenticated of [false, true]) {
             "x-content-type-options": "nosniff",
             "x-frame-options": "DENY",
           });
-          expect(response.headers()["content-security-policy"]).toContain("default-src 'self'");
-          expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+          expect(response.headers()["content-security-policy"]).toContain(
+            "default-src 'self'",
+          );
+          expect(response.headers()["content-security-policy"]).toContain(
+            "frame-ancestors 'none'",
+          );
           expect(response.headers()["www-authenticate"]).toBeUndefined();
           expect(await response.text()).toBe("");
         }

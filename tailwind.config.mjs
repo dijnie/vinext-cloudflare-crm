@@ -1,22 +1,40 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
-  content: [
-    "./src/**/*.{js,jsx,md,mdx,ts,tsx}",
-  ],
+  content: ["./src/**/*.{js,jsx,md,mdx,ts,tsx}"],
   theme: {
     extend: {
-      fontFamily: { sans: ['"Geist Variable"', '"Geist"', 'sans-serif'], mono: ['"Geist Mono"', 'monospace'] },
-      boxShadow: { '2xs': 'var(--shadow-2xs)', xs: 'var(--shadow-xs)', sm: 'var(--shadow-sm)', DEFAULT: 'var(--shadow)', md: 'var(--shadow-md)', lg: 'var(--shadow-lg)', xl: 'var(--shadow-xl)' },
+      fontFamily: {
+        sans: ['"Geist Variable"', '"Geist"', "sans-serif"],
+        mono: ['"Geist Mono"', "monospace"],
+      },
+      boxShadow: {
+        "2xs": "var(--shadow-2xs)",
+        xs: "var(--shadow-xs)",
+        sm: "var(--shadow-sm)",
+        DEFAULT: "var(--shadow)",
+        md: "var(--shadow-md)",
+        lg: "var(--shadow-lg)",
+        xl: "var(--shadow-xl)",
+      },
       borderRadius: {
         lg: "8px",
         md: "5px",
         sm: "4px",
       },
       colors: {
-        overlay: 'var(--overlay)', tag: { DEFAULT: 'rgb(var(--tag-rgb) / <alpha-value>)', foreground: 'rgb(var(--tag-foreground-rgb) / <alpha-value>)' },
-        sidebar: { DEFAULT: 'rgb(var(--sidebar-rgb) / <alpha-value>)', foreground: 'rgb(var(--sidebar-foreground-rgb) / <alpha-value>)' },
-        success: 'var(--success)', warning: 'var(--warning)', info: 'var(--info)',
+        overlay: "var(--overlay)",
+        tag: {
+          DEFAULT: "rgb(var(--tag-rgb) / <alpha-value>)",
+          foreground: "rgb(var(--tag-foreground-rgb) / <alpha-value>)",
+        },
+        sidebar: {
+          DEFAULT: "rgb(var(--sidebar-rgb) / <alpha-value>)",
+          foreground: "rgb(var(--sidebar-foreground-rgb) / <alpha-value>)",
+        },
+        success: "var(--success)",
+        warning: "var(--warning)",
+        info: "var(--info)",
 
         background: "rgb(var(--background-rgb) / <alpha-value>)",
         foreground: "rgb(var(--foreground-rgb) / <alpha-value>)",

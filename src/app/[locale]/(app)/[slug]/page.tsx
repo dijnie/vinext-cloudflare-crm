@@ -8,7 +8,10 @@ import { getPageContext } from "@/lib/http/page-context";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({ params, searchParams }: {
+export default async function DashboardPage({
+  params,
+  searchParams,
+}: {
   params: Promise<{ locale: string; slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
@@ -20,7 +23,19 @@ export default async function DashboardPage({ params, searchParams }: {
   const input = dashboardInputSchema.safeParse({ scope: query.scope });
   if (!input.success) {
     const labels = getCrmDictionary(locale);
-    return <div className="space-y-4"><h1>{labels.invalidQuery}</h1><Link className="text-primary underline" href={`/${locale}/${slug}`}>{labels.reset}</Link></div>;
+    return (
+      <div className="space-y-4">
+        <h1>{labels.invalidQuery}</h1>
+        <Link className="text-primary underline" href={`/${locale}/${slug}`}>
+          {labels.reset}
+        </Link>
+      </div>
+    );
   }
-  return <DashboardSummary initialData={await root.dashboard.summary(context, input.data)} locale={locale} />;
+  return (
+    <DashboardSummary
+      initialData={await root.dashboard.summary(context, input.data)}
+      locale={locale}
+    />
+  );
 }

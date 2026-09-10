@@ -1,6 +1,9 @@
 import { recordFieldsShape } from "../shared/record-fields-contract";
 import { z } from "zod";
-import { fieldDefinitionSchema, fieldValuesSchema } from "@/lib/services/custom-fields/field-contracts";
+import {
+  fieldDefinitionSchema,
+  fieldValuesSchema,
+} from "@/lib/services/custom-fields/field-contracts";
 
 import {
   bulkArchiveInputSchema,
@@ -41,7 +44,9 @@ export const contactCreateInputSchema = z
     phone: z.string().trim().max(80).optional(),
     title: z.string().trim().max(160).optional(),
     birthDate: z.union([z.iso.date(), z.literal("")]).optional(),
-    gender: z.enum(["female", "male", "nonbinary", "other", "undisclosed"]).optional(),
+    gender: z
+      .enum(["female", "male", "nonbinary", "other", "undisclosed"])
+      .optional(),
     companyId: stableIdSchema.nullable().optional(),
     ownerMembershipId: membershipIdSchema.nullable().optional(),
   })
@@ -59,7 +64,10 @@ export const contactUpdateInputSchema = z
         phone: nullableText.optional(),
         title: nullableText.optional(),
         birthDate: z.iso.date().nullable().optional(),
-        gender: z.enum(["female", "male", "nonbinary", "other", "undisclosed"]).nullable().optional(),
+        gender: z
+          .enum(["female", "male", "nonbinary", "other", "undisclosed"])
+          .nullable()
+          .optional(),
         companyId: stableIdSchema.nullable().optional(),
         ownerMembershipId: membershipIdSchema.nullable().optional(),
       })
@@ -103,7 +111,9 @@ const contactListRowOutputSchema = z.object({
   phone: z.string().nullable(),
   title: z.string().nullable(),
   birthDate: z.iso.date().nullable(),
-  gender: z.enum(["female", "male", "nonbinary", "other", "undisclosed"]).nullable(),
+  gender: z
+    .enum(["female", "male", "nonbinary", "other", "undisclosed"])
+    .nullable(),
   companyId: stableIdSchema.nullable(),
   company: companyReferenceSchema.nullable(),
   ownerMembershipId: membershipIdSchema.nullable(),
@@ -124,7 +134,16 @@ export const contactListOutputSchema = z.object({
   rows: z.array(contactListRowOutputSchema),
 });
 export const contactDetailOutputSchema = contactListRowOutputSchema.extend({
-  convertedFrom: z.array(z.object({ id: stableIdSchema, firstName: z.string(), lastName: z.string().nullable(), convertedAt: isoDateTimeSchema })).max(100),
+  convertedFrom: z
+    .array(
+      z.object({
+        id: stableIdSchema,
+        firstName: z.string(),
+        lastName: z.string().nullable(),
+        convertedAt: isoDateTimeSchema,
+      }),
+    )
+    .max(100),
   deals: z.array(
     z.object({
       id: stableIdSchema,

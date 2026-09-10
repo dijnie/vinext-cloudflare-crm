@@ -43,7 +43,10 @@ import { WebformService } from "@/lib/services/webforms/webform-service";
 import { IntegrationService } from "@/lib/services/integrations/integration-service";
 import { WorkspaceService } from "@/lib/services/settings/workspace-service";
 
-import { defaultSecurityLogger, type SecurityLogger } from "./http/security-logging";
+import {
+  defaultSecurityLogger,
+  type SecurityLogger,
+} from "./http/security-logging";
 
 export interface RuntimeEnv extends Cloudflare.Env {
   BETTER_AUTH_SECRET: string;
@@ -81,7 +84,8 @@ export function createCompositionRoot(
   const fields = new FieldService(db);
   const dashboard = new DashboardService(db);
   const currency = new CurrencyService(db);
-  if (!runtimeBindings.WEBHOOK_ENCRYPTION_KEY) throw new Error("WEBHOOK_ENCRYPTION_KEY is required");
+  if (!runtimeBindings.WEBHOOK_ENCRYPTION_KEY)
+    throw new Error("WEBHOOK_ENCRYPTION_KEY is required");
   return {
     workspace: new WorkspaceService(db, runtimeBindings.CRM_FILES),
     integrations: new IntegrationService(
@@ -93,7 +97,10 @@ export function createCompositionRoot(
     reportExports: new ReportExportService(db),
     reports: new ReportService(db),
     reviews: new ReviewService(db),
-    contractDocuments: new ContractDocumentService(db, runtimeBindings.CRM_FILES),
+    contractDocuments: new ContractDocumentService(
+      db,
+      runtimeBindings.CRM_FILES,
+    ),
     contracts: new ContractService(db),
     notifications: new NotificationService(db),
     tickets: new TicketService(db),

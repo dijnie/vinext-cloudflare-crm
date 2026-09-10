@@ -20,7 +20,9 @@ export async function requireRequestContext(
   requestHeaders: Headers,
   root: CompositionRoot,
 ): Promise<RequestContext> {
-  const authSession = await root.auth.api.getSession({ headers: requestHeaders });
+  const authSession = await root.auth.api.getSession({
+    headers: requestHeaders,
+  });
   if (!authSession?.user.emailVerified) {
     throw new HttpError(401, "authentication_required", "Sign in is required");
   }
@@ -32,13 +34,21 @@ export async function requireRequestContext(
     ),
   });
   if (!membership) {
-    throw new HttpError(403, "membership_required", "Active membership is required");
+    throw new HttpError(
+      403,
+      "membership_required",
+      "Active membership is required",
+    );
   }
 
   return {
     [guardContext]: true,
     userId: authSession.user.id,
-    user: { name: authSession.user.name, email: authSession.user.email, image: authSession.user.image },
+    user: {
+      name: authSession.user.name,
+      email: authSession.user.email,
+      image: authSession.user.image,
+    },
     membershipId: membership.userId,
     role: membership.role,
     requestId: requestHeaders.get("cf-ray") ?? crypto.randomUUID(),

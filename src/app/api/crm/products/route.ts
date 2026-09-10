@@ -33,12 +33,16 @@ export function createProductsGetHandler(root: CompositionRoot) {
 
 export function createProductsPostHandler(root: CompositionRoot) {
   return createRouteHandler(root, {
-    input: productCreateInputSchema.extend({ draftId: z.string().uuid().optional() }),
+    input: productCreateInputSchema.extend({
+      draftId: z.string().uuid().optional(),
+    }),
     output: productWriteOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
       const { draftId, ...data } = input;
-      const creation = draftId ? await root.drafts.prepareConsumption(context, "product", draftId) : undefined;
+      const creation = draftId
+        ? await root.drafts.prepareConsumption(context, "product", draftId)
+        : undefined;
       return root.products.create(context, data, creation);
     },
   });
@@ -50,7 +54,11 @@ export function createProductsPatchHandler(root: CompositionRoot) {
     output: productBulkOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.products.bulkArchive(context, input.ids, input.action === "bulk-restore");
+      return root.products.bulkArchive(
+        context,
+        input.ids,
+        input.action === "bulk-restore",
+      );
     },
   });
 }

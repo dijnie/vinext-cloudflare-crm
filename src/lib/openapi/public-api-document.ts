@@ -442,9 +442,7 @@ export const publicApiDocument = {
       },
       WebformSubmission: {
         type: "object",
-        examples: [
-          { firstName: "An", email: "an@example.com", consent: true },
-        ],
+        examples: [{ firstName: "An", email: "an@example.com", consent: true }],
         maxProperties: 50,
         propertyNames: { type: "string", minLength: 1, maxLength: 80 },
         additionalProperties: {

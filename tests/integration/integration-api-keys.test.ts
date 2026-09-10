@@ -56,10 +56,12 @@ it("issues one-time 32-hex keys, rotates and records lifecycle audit without raw
   ]);
   expect(JSON.stringify(listed)).not.toContain(created.token);
   await root.integrations.appContacts(created.token);
-  await expect(root.integrations.appLeads(created.token)).rejects.toMatchObject({
-    status: 401,
-    code: "authentication_required",
-  });
+  await expect(root.integrations.appLeads(created.token)).rejects.toMatchObject(
+    {
+      status: 401,
+      code: "authentication_required",
+    },
+  );
   const used = (await root.integrations.apps(context))[0]!;
   expect(used.lastUsedAt).toBeInstanceOf(Date);
   const rotated = await root.integrations.rotateApp(

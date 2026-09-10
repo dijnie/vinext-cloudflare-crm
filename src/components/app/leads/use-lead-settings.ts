@@ -9,9 +9,28 @@ export function useLeadSettings(enabled = true) {
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
-    const load = () => { void crmRequest<LeadSettings>("/api/crm/lead-settings", { signal: controller.signal }).then(value => { if (!controller.signal.aborted) { setData(value); setError(false); } }).catch(() => { if (!controller.signal.aborted) setError(true); }); };
-    load(); window.addEventListener("crm:invalidate", load); window.addEventListener("focus", load);
-    return () => { controller.abort(); window.removeEventListener("crm:invalidate", load); window.removeEventListener("focus", load); };
+    const load = () => {
+      void crmRequest<LeadSettings>("/api/crm/lead-settings", {
+        signal: controller.signal,
+      })
+        .then((value) => {
+          if (!controller.signal.aborted) {
+            setData(value);
+            setError(false);
+          }
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setError(true);
+        });
+    };
+    load();
+    window.addEventListener("crm:invalidate", load);
+    window.addEventListener("focus", load);
+    return () => {
+      controller.abort();
+      window.removeEventListener("crm:invalidate", load);
+      window.removeEventListener("focus", load);
+    };
   }, [enabled, revision]);
-  return { data, error, reload: () => setRevision(value => value + 1) };
+  return { data, error, reload: () => setRevision((value) => value + 1) };
 }

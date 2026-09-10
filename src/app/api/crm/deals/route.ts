@@ -33,12 +33,16 @@ export function createDealsGetHandler(root: CompositionRoot) {
 
 export function createDealsPostHandler(root: CompositionRoot) {
   return createRouteHandler(root, {
-    input: dealCreateInputSchema.extend({ draftId: z.string().uuid().optional() }),
+    input: dealCreateInputSchema.extend({
+      draftId: z.string().uuid().optional(),
+    }),
     output: dealCreateOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
       const { draftId, ...data } = input;
-      const creation = draftId ? await root.drafts.prepareConsumption(context, "deal", draftId) : undefined;
+      const creation = draftId
+        ? await root.drafts.prepareConsumption(context, "deal", draftId)
+        : undefined;
       return root.deals.create(context, data, creation);
     },
   });
@@ -50,7 +54,11 @@ export function createDealsPatchHandler(root: CompositionRoot) {
     output: dealBulkOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.deals.bulkArchive(context, input.ids, input.action === "bulk-restore");
+      return root.deals.bulkArchive(
+        context,
+        input.ids,
+        input.action === "bulk-restore",
+      );
     },
   });
 }

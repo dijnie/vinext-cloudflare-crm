@@ -33,12 +33,16 @@ export function createContactsGetHandler(root: CompositionRoot) {
 
 export function createContactsPostHandler(root: CompositionRoot) {
   return createRouteHandler(root, {
-    input: contactCreateInputSchema.extend({ draftId: z.string().uuid().optional() }),
+    input: contactCreateInputSchema.extend({
+      draftId: z.string().uuid().optional(),
+    }),
     output: contactWriteOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
       const { draftId, ...data } = input;
-      const creation = draftId ? await root.drafts.prepareConsumption(context, "contact", draftId) : undefined;
+      const creation = draftId
+        ? await root.drafts.prepareConsumption(context, "contact", draftId)
+        : undefined;
       return root.contacts.create(context, data, creation);
     },
   });
@@ -50,7 +54,11 @@ export function createContactsPatchHandler(root: CompositionRoot) {
     output: contactBulkOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.contacts.bulkArchive(context, input.ids, input.action === "bulk-restore");
+      return root.contacts.bulkArchive(
+        context,
+        input.ids,
+        input.action === "bulk-restore",
+      );
     },
   });
 }

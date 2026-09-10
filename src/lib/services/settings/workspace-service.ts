@@ -1,62 +1,684 @@
-import {and,count,eq,gte,inArray,isNull,lt,lte,max,ne,sql} from "drizzle-orm";
-import {executeD1Batch,type AppDatabase} from "@/lib/db/database";
-import {actionOperationGuard,operationConditionGuard,configurationCopyAudit,contact,contractDocument,crmFile,crmSetting,lead,leadSource,workspaceDeletionObject,workspaceDeletionRequest,workspaceProfile} from "@/lib/db/schema";
-import type {RequestContext} from "@/lib/http/request-context";
-import {HttpError} from "@/lib/http/http-errors";
-import {actionGuard,permissionError,requirePermission} from "../permissions/permission-policy";
-import {normalizeLeadPhone} from "../leads/lead-normalization";
-import type {z} from "zod";
-import type {configurationCopySchema} from "./workspace-contract";
-import {storageWriteError} from "../files/storage-write-policy";
+import {
+  and,
+  count,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  max,
+  ne,
+  sql,
+} from "drizzle-orm";
+import { executeD1Batch, type AppDatabase } from "@/lib/db/database";
+import {
+  actionOperationGuard,
+  operationConditionGuard,
+  configurationCopyAudit,
+  contact,
+  contractDocument,
+  crmFile,
+  crmSetting,
+  lead,
+  leadSource,
+  workspaceDeletionObject,
+  workspaceDeletionRequest,
+  workspaceProfile,
+} from "@/lib/db/schema";
+import type { RequestContext } from "@/lib/http/request-context";
+import { HttpError } from "@/lib/http/http-errors";
+import {
+  actionGuard,
+  permissionError,
+  requirePermission,
+} from "../permissions/permission-policy";
+import { normalizeLeadPhone } from "../leads/lead-normalization";
+import type { z } from "zod";
+import type { configurationCopySchema } from "./workspace-contract";
+import { storageWriteError } from "../files/storage-write-policy";
 
-type CopyInput=z.infer<typeof configurationCopySchema>;
-const imageTypes=new Set(["image/png","image/jpeg","image/webp","image/gif"]);
-function sqliteIdentifier(name:string){if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))throw new Error(`Unsafe SQLite identifier: ${name}`);return sql.raw(`"${name}"`);}
-export class WorkspaceService{
- constructor(private readonly db:AppDatabase,private readonly bucket:R2Bucket){}
- async get(context:RequestContext){await requirePermission(this.db,context);const[profile,deletion,general,sources]=await Promise.all([this.db.select().from(workspaceProfile).get(),this.db.select().from(workspaceDeletionRequest).get(),this.db.select({timeZone:crmSetting.timeZone,countryCode:crmSetting.countryCode,calendarRevision:crmSetting.calendarRevision}).from(crmSetting).get(),this.db.select().from(leadSource).orderBy(leadSource.position)]);return{profile:{...profile,hasLogo:Boolean(profile?.logoObjectKey)},deletion,general,sources,deletionImpact:context.role==="owner"?(await this.deletionPreview(context)).counts:null};}
- async rename(context:RequestContext,name:string,expectedRevision:number){await requirePermission(this.db,context,["workspace.manage"],true);const guard=actionGuard(this.db,context,["workspace.manage"],true);try{const[,rows]=await this.db.batch([guard.begin,this.db.update(workspaceProfile).set({name,revision:expectedRevision+1,updatedAt:new Date()}).where(and(eq(workspaceProfile.id,"workspace"),eq(workspaceProfile.revision,expectedRevision))).returning(),guard.end]);if(!rows.length)throw new HttpError(409,"conflict","Workspace changed before saving");}catch(error){permissionError(error);}return{id:"workspace",name,revision:expectedRevision+1};}
- async uploadLogo(context:RequestContext,request:Request,expectedRevision:number){await requirePermission(this.db,context,["workspace.manage"],true);const type=(request.headers.get("content-type")??"").split(";",1)[0]!.toLowerCase();if(!imageTypes.has(type))throw new HttpError(400,"validation_failed","Logo must be PNG, JPEG, WebP, or GIF");const declared=Number(request.headers.get("content-length")??0);if(declared>2_097_152)throw new HttpError(413,"payload_too_large","Logo exceeds 2 MiB");const bytes=await request.arrayBuffer();if(!bytes.byteLength||bytes.byteLength>2_097_152)throw new HttpError(413,"payload_too_large","Logo exceeds 2 MiB");const name=(request.headers.get("x-file-name")??"workspace-logo").trim().slice(0,255),key=`workspace/${crypto.randomUUID()}`,current=await this.db.select().from(workspaceProfile).get();if(!current||current.revision!==expectedRevision)throw new HttpError(409,"conflict","Workspace changed before upload");await this.bucket.put(key,bytes,{httpMetadata:{contentType:type}});try{const guard=actionGuard(this.db,context,["workspace.manage"],true);const[,rows]=await this.db.batch([guard.begin,this.db.update(workspaceProfile).set({logoObjectKey:key,logoFileName:name,logoContentType:type,logoSize:bytes.byteLength,revision:expectedRevision+1,updatedAt:new Date()}).where(and(eq(workspaceProfile.id,"workspace"),eq(workspaceProfile.revision,expectedRevision))).returning(),guard.end]);if(!rows.length)throw new HttpError(409,"conflict","Workspace changed before upload");}catch(error){await this.bucket.delete(key);if(error instanceof HttpError)throw error;storageWriteError(error);}if(current.logoObjectKey){try{await this.bucket.delete(current.logoObjectKey);}catch{/* The new logo remains authoritative; stale object can be cleaned operationally. */}}return{name,size:bytes.byteLength,revision:expectedRevision+1};}
- async logo(context:RequestContext){await requirePermission(this.db,context);const profile=await this.db.select().from(workspaceProfile).get();if(!profile?.logoObjectKey)throw new HttpError(404,"not_found","Workspace logo is unavailable");const object=await this.bucket.get(profile.logoObjectKey);if(!object)throw new HttpError(404,"not_found","Workspace logo bytes are unavailable");await requirePermission(this.db,context);return new Response(object.body,{headers:{"content-type":profile.logoContentType!,"content-length":String(object.size),"content-disposition":"inline","cache-control":"private, no-store","x-content-type-options":"nosniff"}});}
- async copyConfiguration(context:RequestContext,input:CopyInput){await requirePermission(this.db,context,["workspace.manage"],true);const current=await this.get(context),sourceMap=new Map(current.sources.map(source=>[source.id,source.label??source.labelKey])),changes={workspaceName:{from:current.profile.name,to:input.workspaceName},timeZone:{from:current.general?.timeZone,to:input.timeZone},countryCode:{from:current.general?.countryCode,to:input.countryCode},sources:input.sources.filter(source=>sourceMap.get(source.id)!==source.label)};const auditId=crypto.randomUUID(),now=new Date();if(!input.apply){const previewGuard=actionGuard(this.db,context,["workspace.manage"],true);try{await this.db.batch([previewGuard.begin,this.db.insert(configurationCopyAudit).values({id:auditId,actorId:context.userId,keysJson:JSON.stringify(["workspaceName","timeZone","countryCode","sources"]),previewJson:JSON.stringify(changes),applied:false,createdAt:now}),previewGuard.end]);}catch(error){permissionError(error);}return{auditId,applied:false,changes,excluded:["customers","permissions","secrets"]};}const guard=actionGuard(this.db,context,["workspace.manage"],true,sql`exists(select 1 from workspace_profile where id='workspace' and revision=${input.workspaceRevision}) and exists(select 1 from crm_setting where id='settings' and calendar_revision=${input.calendarRevision})`),maxPosition=await this.db.select({position:max(leadSource.position)}).from(leadSource).get(),statements=[guard.begin,this.db.update(workspaceProfile).set({name:input.workspaceName,revision:sql`${workspaceProfile.revision}+1`,updatedAt:now}).where(eq(workspaceProfile.id,"workspace")),this.db.update(crmSetting).set({timeZone:input.timeZone,countryCode:input.countryCode,calendarRevision:sql`${crmSetting.calendarRevision}+1`,updatedAt:now}).where(eq(crmSetting.id,"settings")),...input.sources.map((source,index)=>this.db.insert(leadSource).values({id:source.id,label:source.label,labelKey:`leadSource.${source.id}`,position:(maxPosition?.position??0)+index+1,archivedAt:null}).onConflictDoUpdate({target:leadSource.id,set:{label:source.label,archivedAt:null}})),this.db.insert(configurationCopyAudit).values({id:auditId,actorId:context.userId,keysJson:JSON.stringify(["workspaceName","timeZone","countryCode","sources"]),previewJson:JSON.stringify(changes),applied:true,createdAt:now}),guard.end];try{await this.db.batch(statements as unknown as Parameters<AppDatabase["batch"]>[0]);}catch(error){permissionError(error);}return{auditId,applied:true,changes,excluded:["customers","permissions","secrets"]};}
- async deletionPreview(context:RequestContext){await requirePermission(this.db,context,["workspace.delete"],true);const counts=await this.db.get(sql`SELECT (SELECT count(*) FROM company) companies,(SELECT count(*) FROM contact) contacts,(SELECT count(*) FROM lead) leads,(SELECT count(*) FROM deal) deals,(SELECT count(*) FROM sales_order) orders,(SELECT count(*) FROM crm_file)+(SELECT count(*) FROM contract_document)+(SELECT CASE WHEN logo_object_key IS NULL THEN 0 ELSE 1 END FROM workspace_profile) private_files`);const profile=await this.db.select().from(workspaceProfile).get();return{workspaceName:profile!.name,counts,retentionDays:30,historyRetainedUntilExecution:true};}
- async scheduleDeletion(context:RequestContext,confirmation:string,now=new Date()){const preview=await this.deletionPreview(context);if(confirmation!==preview.workspaceName)throw new HttpError(400,"validation_failed","Confirmation must exactly match the workspace name");const executeAfter=new Date(now.getTime()+30*86_400_000);const guard=actionGuard(this.db,context,["workspace.delete"],true);try{await this.db.batch([guard.begin,this.db.insert(workspaceDeletionRequest).values({id:"workspace",requestedBy:context.userId,requestedAt:now,executeAfter,quiesceUntil:null,status:"scheduled",cancelledAt:null}).onConflictDoUpdate({target:workspaceDeletionRequest.id,set:{requestedBy:context.userId,requestedAt:now,executeAfter,quiesceUntil:null,status:"scheduled",cancelledAt:null}}),guard.end]);}catch(error){permissionError(error);}return{status:"scheduled" as const,executeAfter:executeAfter.toISOString()};}
- async cancelDeletion(context:RequestContext){await requirePermission(this.db,context,["workspace.delete"],true);const guard=actionGuard(this.db,context,["workspace.delete"],true);try{const[,rows]=await this.db.batch([guard.begin,this.db.update(workspaceDeletionRequest).set({status:"cancelled",cancelledAt:new Date()}).where(and(eq(workspaceDeletionRequest.id,"workspace"),eq(workspaceDeletionRequest.status,"scheduled"))).returning(),guard.end]);if(!rows.length)throw new HttpError(409,"conflict","No scheduled deletion exists");}catch(error){permissionError(error);}return{status:"cancelled" as const};}
- async executeDeletion(context:RequestContext,confirmation:string,now=new Date()){
-  const preview=await this.deletionPreview(context),request=await this.db.select().from(workspaceDeletionRequest).where(and(eq(workspaceDeletionRequest.id,"workspace"),eq(workspaceDeletionRequest.status,"scheduled"))).get();
-  if(confirmation!==preview.workspaceName)throw new HttpError(400,"validation_failed","Confirmation must exactly match the workspace name");
-  if(!request||request.executeAfter>now)throw new HttpError(409,"conflict","Deletion is not due yet");
-  const guardId=crypto.randomUUID(),nowMs=now.getTime();
-  try{await executeD1Batch(this.db,[
-   sql`INSERT INTO action_operation_guard(id,authorized) SELECT ${guardId},CASE WHEN EXISTS(SELECT 1 FROM singleton_membership WHERE user_id=${context.userId} AND status='active' AND role='owner') AND EXISTS(SELECT 1 FROM workspace_deletion_request WHERE id='workspace' AND status='scheduled' AND execute_after<=${nowMs}) AND EXISTS(SELECT 1 FROM workspace_profile WHERE id='workspace' AND name=${confirmation}) THEN 1 ELSE 0 END`,
-   sql`INSERT OR IGNORE INTO workspace_deletion_object(object_key,state,attempts,updated_at) SELECT object_key,'pending',0,${nowMs} FROM crm_file UNION SELECT object_key,'pending',0,${nowMs} FROM contract_document UNION SELECT logo_object_key,'pending',0,${nowMs} FROM workspace_profile WHERE logo_object_key IS NOT NULL`,
-   this.db.update(workspaceDeletionRequest).set({status:"executing",quiesceUntil:new Date(nowMs+900_000)}).where(and(eq(workspaceDeletionRequest.id,"workspace"),eq(workspaceDeletionRequest.status,"scheduled"),lte(workspaceDeletionRequest.executeAfter,now))),
-   this.db.delete(actionOperationGuard).where(eq(actionOperationGuard.id,guardId)),
-  ]);}catch(error){permissionError(error);}
-  return this.cleanupDeletionObjects(now);
- }
- async retryDeletion(context:RequestContext){
-  await requirePermission(this.db,context,["workspace.delete"],true);const guard=actionGuard(this.db,context,["workspace.delete"],true,sql`exists(select 1 from workspace_deletion_request where id='workspace' and status='executing')`);
-  try{await executeD1Batch(this.db,[guard.begin,this.db.update(workspaceDeletionObject).set({attempts:0,lastError:null,updatedAt:new Date()}).where(and(eq(workspaceDeletionObject.state,"failed"),gte(workspaceDeletionObject.attempts,20))),guard.end]);}catch(error){permissionError(error);}
-  return this.cleanupDeletionObjects();
- }
- async cleanupDeletionObjects(now=new Date()){
-  const request=await this.db.select().from(workspaceDeletionRequest).where(and(eq(workspaceDeletionRequest.id,"workspace"),eq(workspaceDeletionRequest.status,"executing"))).get();
-  if(!request)return{status:"idle" as const,deletedFiles:0};
-  if(request.quiesceUntil&&request.quiesceUntil>now)return{status:"executing" as const,deletedFiles:0};
-  await executeD1Batch(this.db,[this.db.update(crmFile).set({status:"failed"}).where(eq(crmFile.status,"pending")),this.db.update(contractDocument).set({status:"failed"}).where(eq(contractDocument.status,"pending"))]);
-  const objects=await this.db.select({objectKey:workspaceDeletionObject.objectKey,state:workspaceDeletionObject.state,attempts:workspaceDeletionObject.attempts}).from(workspaceDeletionObject).where(and(inArray(workspaceDeletionObject.state,["pending","failed"]),lt(workspaceDeletionObject.attempts,20))).orderBy(workspaceDeletionObject.objectKey).limit(100);let deletedFiles=0;
-  for(const object of objects){const attempts=object.attempts+1;try{await this.bucket.delete(object.objectKey);await this.db.update(workspaceDeletionObject).set({state:"deleted",attempts,lastError:null,updatedAt:new Date()}).where(and(eq(workspaceDeletionObject.objectKey,object.objectKey),eq(workspaceDeletionObject.state,object.state),eq(workspaceDeletionObject.attempts,object.attempts)));deletedFiles++;}catch(error){await this.db.update(workspaceDeletionObject).set({state:"failed",attempts,lastError:error instanceof Error?error.message.slice(0,500):"R2 deletion failed",updatedAt:new Date()}).where(and(eq(workspaceDeletionObject.objectKey,object.objectKey),eq(workspaceDeletionObject.state,object.state),eq(workspaceDeletionObject.attempts,object.attempts)));}}
-  const remaining=await this.db.select({count:count()}).from(workspaceDeletionObject).where(ne(workspaceDeletionObject.state,"deleted")).get();
-  if(remaining?.count)return{status:"executing" as const,deletedFiles};
-  await this.finalizeDeletion();return{status:"deleted" as const,deletedFiles};
- }
- private async finalizeDeletion(){
-  const names=(await this.db.all<{name:string}>(sql`SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND substr(name,1,1) != '_' AND name NOT IN ('d1_migrations','action_operation_guard','operation_condition_guard','workspace_deletion_guard','workspace_deletion_request','workspace_deletion_object')`)).map(row=>row.name),dependencies=new Map<string,string[]>();
-  for(const name of names){const foreign=await this.db.all<{table:string}>(sql`PRAGMA foreign_key_list(${sqliteIdentifier(name)})`).catch(error=>{throw new Error(`Could not inspect ${name}`,{cause:error});});dependencies.set(name,foreign.map(row=>row.table).filter(parent=>parent!==name&&names.includes(parent)));}
-  const ordered:string[]=[],visiting=new Set<string>(),visited=new Set<string>();const visit=(name:string)=>{if(visited.has(name)||visiting.has(name))return;visiting.add(name);for(const parent of dependencies.get(name)??[])visit(parent);visiting.delete(name);visited.add(name);ordered.push(name);};for(const name of names)visit(name);
-  const guardId=crypto.randomUUID(),statements=[sql`INSERT INTO operation_condition_guard(id,authorized) SELECT ${guardId},CASE WHEN EXISTS(SELECT 1 FROM workspace_deletion_request WHERE id='workspace' AND status='executing') AND NOT EXISTS(SELECT 1 FROM workspace_deletion_object WHERE state!='deleted') THEN 1 ELSE 0 END`,sql`INSERT INTO workspace_deletion_guard(id) VALUES('workspace')`,...ordered.reverse().map(name=>sql`DELETE FROM ${sqliteIdentifier(name)}`),sql`DELETE FROM workspace_deletion_guard WHERE id='workspace'`,this.db.update(workspaceDeletionRequest).set({status:"deleted"}).where(and(eq(workspaceDeletionRequest.id,"workspace"),eq(workspaceDeletionRequest.status,"executing"))),this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id,guardId))];
-  await executeD1Batch(this.db,statements);
- }
- async customerMatch(context:RequestContext,phone:string){await requirePermission(this.db,context);const normalized=normalizeLeadPhone(phone);if(!normalized)throw new HttpError(400,"validation_failed","Phone number is required");const[leads,contacts]=await Promise.all([this.db.select({id:lead.id,firstName:lead.firstName,lastName:lead.lastName}).from(lead).where(and(eq(lead.normalizedPhone,normalized),isNull(lead.archivedAt))).limit(20),this.db.select({id:contact.id,firstName:contact.firstName,lastName:contact.lastName}).from(contact).where(and(eq(contact.normalizedPhone,normalized),isNull(contact.archivedAt))).limit(20)]);return{normalizedPhone:normalized,leads,contacts};}
+type CopyInput = z.infer<typeof configurationCopySchema>;
+const imageTypes = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
+function sqliteIdentifier(name: string) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+    throw new Error(`Unsafe SQLite identifier: ${name}`);
+  return sql.raw(`"${name}"`);
+}
+export class WorkspaceService {
+  constructor(
+    private readonly db: AppDatabase,
+    private readonly bucket: R2Bucket,
+  ) {}
+  async get(context: RequestContext) {
+    await requirePermission(this.db, context);
+    const [profile, deletion, general, sources] = await Promise.all([
+      this.db.select().from(workspaceProfile).get(),
+      this.db.select().from(workspaceDeletionRequest).get(),
+      this.db
+        .select({
+          timeZone: crmSetting.timeZone,
+          countryCode: crmSetting.countryCode,
+          calendarRevision: crmSetting.calendarRevision,
+        })
+        .from(crmSetting)
+        .get(),
+      this.db.select().from(leadSource).orderBy(leadSource.position),
+    ]);
+    return {
+      profile: { ...profile, hasLogo: Boolean(profile?.logoObjectKey) },
+      deletion,
+      general,
+      sources,
+      deletionImpact:
+        context.role === "owner"
+          ? (await this.deletionPreview(context)).counts
+          : null,
+    };
+  }
+  async rename(
+    context: RequestContext,
+    name: string,
+    expectedRevision: number,
+  ) {
+    await requirePermission(this.db, context, ["workspace.manage"], true);
+    const guard = actionGuard(this.db, context, ["workspace.manage"], true);
+    try {
+      const [, rows] = await this.db.batch([
+        guard.begin,
+        this.db
+          .update(workspaceProfile)
+          .set({ name, revision: expectedRevision + 1, updatedAt: new Date() })
+          .where(
+            and(
+              eq(workspaceProfile.id, "workspace"),
+              eq(workspaceProfile.revision, expectedRevision),
+            ),
+          )
+          .returning(),
+        guard.end,
+      ]);
+      if (!rows.length)
+        throw new HttpError(409, "conflict", "Workspace changed before saving");
+    } catch (error) {
+      permissionError(error);
+    }
+    return { id: "workspace", name, revision: expectedRevision + 1 };
+  }
+  async uploadLogo(
+    context: RequestContext,
+    request: Request,
+    expectedRevision: number,
+  ) {
+    await requirePermission(this.db, context, ["workspace.manage"], true);
+    const type = (request.headers.get("content-type") ?? "")
+      .split(";", 1)[0]!
+      .toLowerCase();
+    if (!imageTypes.has(type))
+      throw new HttpError(
+        400,
+        "validation_failed",
+        "Logo must be PNG, JPEG, WebP, or GIF",
+      );
+    const declared = Number(request.headers.get("content-length") ?? 0);
+    if (declared > 2_097_152)
+      throw new HttpError(413, "payload_too_large", "Logo exceeds 2 MiB");
+    const bytes = await request.arrayBuffer();
+    if (!bytes.byteLength || bytes.byteLength > 2_097_152)
+      throw new HttpError(413, "payload_too_large", "Logo exceeds 2 MiB");
+    const name = (request.headers.get("x-file-name") ?? "workspace-logo")
+        .trim()
+        .slice(0, 255),
+      key = `workspace/${crypto.randomUUID()}`,
+      current = await this.db.select().from(workspaceProfile).get();
+    if (!current || current.revision !== expectedRevision)
+      throw new HttpError(409, "conflict", "Workspace changed before upload");
+    await this.bucket.put(key, bytes, { httpMetadata: { contentType: type } });
+    try {
+      const guard = actionGuard(this.db, context, ["workspace.manage"], true);
+      const [, rows] = await this.db.batch([
+        guard.begin,
+        this.db
+          .update(workspaceProfile)
+          .set({
+            logoObjectKey: key,
+            logoFileName: name,
+            logoContentType: type,
+            logoSize: bytes.byteLength,
+            revision: expectedRevision + 1,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(workspaceProfile.id, "workspace"),
+              eq(workspaceProfile.revision, expectedRevision),
+            ),
+          )
+          .returning(),
+        guard.end,
+      ]);
+      if (!rows.length)
+        throw new HttpError(409, "conflict", "Workspace changed before upload");
+    } catch (error) {
+      await this.bucket.delete(key);
+      if (error instanceof HttpError) throw error;
+      storageWriteError(error);
+    }
+    if (current.logoObjectKey) {
+      try {
+        await this.bucket.delete(current.logoObjectKey);
+      } catch {
+        /* The new logo remains authoritative; stale object can be cleaned operationally. */
+      }
+    }
+    return { name, size: bytes.byteLength, revision: expectedRevision + 1 };
+  }
+  async logo(context: RequestContext) {
+    await requirePermission(this.db, context);
+    const profile = await this.db.select().from(workspaceProfile).get();
+    if (!profile?.logoObjectKey)
+      throw new HttpError(404, "not_found", "Workspace logo is unavailable");
+    const object = await this.bucket.get(profile.logoObjectKey);
+    if (!object)
+      throw new HttpError(
+        404,
+        "not_found",
+        "Workspace logo bytes are unavailable",
+      );
+    await requirePermission(this.db, context);
+    return new Response(object.body, {
+      headers: {
+        "content-type": profile.logoContentType!,
+        "content-length": String(object.size),
+        "content-disposition": "inline",
+        "cache-control": "private, no-store",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  }
+  async copyConfiguration(context: RequestContext, input: CopyInput) {
+    await requirePermission(this.db, context, ["workspace.manage"], true);
+    const current = await this.get(context),
+      sourceMap = new Map(
+        current.sources.map((source) => [
+          source.id,
+          source.label ?? source.labelKey,
+        ]),
+      ),
+      changes = {
+        workspaceName: { from: current.profile.name, to: input.workspaceName },
+        timeZone: { from: current.general?.timeZone, to: input.timeZone },
+        countryCode: {
+          from: current.general?.countryCode,
+          to: input.countryCode,
+        },
+        sources: input.sources.filter(
+          (source) => sourceMap.get(source.id) !== source.label,
+        ),
+      };
+    const auditId = crypto.randomUUID(),
+      now = new Date();
+    if (!input.apply) {
+      const previewGuard = actionGuard(
+        this.db,
+        context,
+        ["workspace.manage"],
+        true,
+      );
+      try {
+        await this.db.batch([
+          previewGuard.begin,
+          this.db
+            .insert(configurationCopyAudit)
+            .values({
+              id: auditId,
+              actorId: context.userId,
+              keysJson: JSON.stringify([
+                "workspaceName",
+                "timeZone",
+                "countryCode",
+                "sources",
+              ]),
+              previewJson: JSON.stringify(changes),
+              applied: false,
+              createdAt: now,
+            }),
+          previewGuard.end,
+        ]);
+      } catch (error) {
+        permissionError(error);
+      }
+      return {
+        auditId,
+        applied: false,
+        changes,
+        excluded: ["customers", "permissions", "secrets"],
+      };
+    }
+    const guard = actionGuard(
+        this.db,
+        context,
+        ["workspace.manage"],
+        true,
+        sql`exists(select 1 from workspace_profile where id='workspace' and revision=${input.workspaceRevision}) and exists(select 1 from crm_setting where id='settings' and calendar_revision=${input.calendarRevision})`,
+      ),
+      maxPosition = await this.db
+        .select({ position: max(leadSource.position) })
+        .from(leadSource)
+        .get(),
+      statements = [
+        guard.begin,
+        this.db
+          .update(workspaceProfile)
+          .set({
+            name: input.workspaceName,
+            revision: sql`${workspaceProfile.revision}+1`,
+            updatedAt: now,
+          })
+          .where(eq(workspaceProfile.id, "workspace")),
+        this.db
+          .update(crmSetting)
+          .set({
+            timeZone: input.timeZone,
+            countryCode: input.countryCode,
+            calendarRevision: sql`${crmSetting.calendarRevision}+1`,
+            updatedAt: now,
+          })
+          .where(eq(crmSetting.id, "settings")),
+        ...input.sources.map((source, index) =>
+          this.db
+            .insert(leadSource)
+            .values({
+              id: source.id,
+              label: source.label,
+              labelKey: `leadSource.${source.id}`,
+              position: (maxPosition?.position ?? 0) + index + 1,
+              archivedAt: null,
+            })
+            .onConflictDoUpdate({
+              target: leadSource.id,
+              set: { label: source.label, archivedAt: null },
+            }),
+        ),
+        this.db
+          .insert(configurationCopyAudit)
+          .values({
+            id: auditId,
+            actorId: context.userId,
+            keysJson: JSON.stringify([
+              "workspaceName",
+              "timeZone",
+              "countryCode",
+              "sources",
+            ]),
+            previewJson: JSON.stringify(changes),
+            applied: true,
+            createdAt: now,
+          }),
+        guard.end,
+      ];
+    try {
+      await this.db.batch(
+        statements as unknown as Parameters<AppDatabase["batch"]>[0],
+      );
+    } catch (error) {
+      permissionError(error);
+    }
+    return {
+      auditId,
+      applied: true,
+      changes,
+      excluded: ["customers", "permissions", "secrets"],
+    };
+  }
+  async deletionPreview(context: RequestContext) {
+    await requirePermission(this.db, context, ["workspace.delete"], true);
+    const counts = await this.db.get(
+      sql`SELECT (SELECT count(*) FROM company) companies,(SELECT count(*) FROM contact) contacts,(SELECT count(*) FROM lead) leads,(SELECT count(*) FROM deal) deals,(SELECT count(*) FROM sales_order) orders,(SELECT count(*) FROM crm_file)+(SELECT count(*) FROM contract_document)+(SELECT CASE WHEN logo_object_key IS NULL THEN 0 ELSE 1 END FROM workspace_profile) private_files`,
+    );
+    const profile = await this.db.select().from(workspaceProfile).get();
+    return {
+      workspaceName: profile!.name,
+      counts,
+      retentionDays: 30,
+      historyRetainedUntilExecution: true,
+    };
+  }
+  async scheduleDeletion(
+    context: RequestContext,
+    confirmation: string,
+    now = new Date(),
+  ) {
+    const preview = await this.deletionPreview(context);
+    if (confirmation !== preview.workspaceName)
+      throw new HttpError(
+        400,
+        "validation_failed",
+        "Confirmation must exactly match the workspace name",
+      );
+    const executeAfter = new Date(now.getTime() + 30 * 86_400_000);
+    const guard = actionGuard(this.db, context, ["workspace.delete"], true);
+    try {
+      await this.db.batch([
+        guard.begin,
+        this.db
+          .insert(workspaceDeletionRequest)
+          .values({
+            id: "workspace",
+            requestedBy: context.userId,
+            requestedAt: now,
+            executeAfter,
+            quiesceUntil: null,
+            status: "scheduled",
+            cancelledAt: null,
+          })
+          .onConflictDoUpdate({
+            target: workspaceDeletionRequest.id,
+            set: {
+              requestedBy: context.userId,
+              requestedAt: now,
+              executeAfter,
+              quiesceUntil: null,
+              status: "scheduled",
+              cancelledAt: null,
+            },
+          }),
+        guard.end,
+      ]);
+    } catch (error) {
+      permissionError(error);
+    }
+    return {
+      status: "scheduled" as const,
+      executeAfter: executeAfter.toISOString(),
+    };
+  }
+  async cancelDeletion(context: RequestContext) {
+    await requirePermission(this.db, context, ["workspace.delete"], true);
+    const guard = actionGuard(this.db, context, ["workspace.delete"], true);
+    try {
+      const [, rows] = await this.db.batch([
+        guard.begin,
+        this.db
+          .update(workspaceDeletionRequest)
+          .set({ status: "cancelled", cancelledAt: new Date() })
+          .where(
+            and(
+              eq(workspaceDeletionRequest.id, "workspace"),
+              eq(workspaceDeletionRequest.status, "scheduled"),
+            ),
+          )
+          .returning(),
+        guard.end,
+      ]);
+      if (!rows.length)
+        throw new HttpError(409, "conflict", "No scheduled deletion exists");
+    } catch (error) {
+      permissionError(error);
+    }
+    return { status: "cancelled" as const };
+  }
+  async executeDeletion(
+    context: RequestContext,
+    confirmation: string,
+    now = new Date(),
+  ) {
+    const preview = await this.deletionPreview(context),
+      request = await this.db
+        .select()
+        .from(workspaceDeletionRequest)
+        .where(
+          and(
+            eq(workspaceDeletionRequest.id, "workspace"),
+            eq(workspaceDeletionRequest.status, "scheduled"),
+          ),
+        )
+        .get();
+    if (confirmation !== preview.workspaceName)
+      throw new HttpError(
+        400,
+        "validation_failed",
+        "Confirmation must exactly match the workspace name",
+      );
+    if (!request || request.executeAfter > now)
+      throw new HttpError(409, "conflict", "Deletion is not due yet");
+    const guardId = crypto.randomUUID(),
+      nowMs = now.getTime();
+    try {
+      await executeD1Batch(this.db, [
+        sql`INSERT INTO action_operation_guard(id,authorized) SELECT ${guardId},CASE WHEN EXISTS(SELECT 1 FROM singleton_membership WHERE user_id=${context.userId} AND status='active' AND role='owner') AND EXISTS(SELECT 1 FROM workspace_deletion_request WHERE id='workspace' AND status='scheduled' AND execute_after<=${nowMs}) AND EXISTS(SELECT 1 FROM workspace_profile WHERE id='workspace' AND name=${confirmation}) THEN 1 ELSE 0 END`,
+        sql`INSERT OR IGNORE INTO workspace_deletion_object(object_key,state,attempts,updated_at) SELECT object_key,'pending',0,${nowMs} FROM crm_file UNION SELECT object_key,'pending',0,${nowMs} FROM contract_document UNION SELECT logo_object_key,'pending',0,${nowMs} FROM workspace_profile WHERE logo_object_key IS NOT NULL`,
+        this.db
+          .update(workspaceDeletionRequest)
+          .set({ status: "executing", quiesceUntil: new Date(nowMs + 900_000) })
+          .where(
+            and(
+              eq(workspaceDeletionRequest.id, "workspace"),
+              eq(workspaceDeletionRequest.status, "scheduled"),
+              lte(workspaceDeletionRequest.executeAfter, now),
+            ),
+          ),
+        this.db
+          .delete(actionOperationGuard)
+          .where(eq(actionOperationGuard.id, guardId)),
+      ]);
+    } catch (error) {
+      permissionError(error);
+    }
+    return this.cleanupDeletionObjects(now);
+  }
+  async retryDeletion(context: RequestContext) {
+    await requirePermission(this.db, context, ["workspace.delete"], true);
+    const guard = actionGuard(
+      this.db,
+      context,
+      ["workspace.delete"],
+      true,
+      sql`exists(select 1 from workspace_deletion_request where id='workspace' and status='executing')`,
+    );
+    try {
+      await executeD1Batch(this.db, [
+        guard.begin,
+        this.db
+          .update(workspaceDeletionObject)
+          .set({ attempts: 0, lastError: null, updatedAt: new Date() })
+          .where(
+            and(
+              eq(workspaceDeletionObject.state, "failed"),
+              gte(workspaceDeletionObject.attempts, 20),
+            ),
+          ),
+        guard.end,
+      ]);
+    } catch (error) {
+      permissionError(error);
+    }
+    return this.cleanupDeletionObjects();
+  }
+  async cleanupDeletionObjects(now = new Date()) {
+    const request = await this.db
+      .select()
+      .from(workspaceDeletionRequest)
+      .where(
+        and(
+          eq(workspaceDeletionRequest.id, "workspace"),
+          eq(workspaceDeletionRequest.status, "executing"),
+        ),
+      )
+      .get();
+    if (!request) return { status: "idle" as const, deletedFiles: 0 };
+    if (request.quiesceUntil && request.quiesceUntil > now)
+      return { status: "executing" as const, deletedFiles: 0 };
+    await executeD1Batch(this.db, [
+      this.db
+        .update(crmFile)
+        .set({ status: "failed" })
+        .where(eq(crmFile.status, "pending")),
+      this.db
+        .update(contractDocument)
+        .set({ status: "failed" })
+        .where(eq(contractDocument.status, "pending")),
+    ]);
+    const objects = await this.db
+      .select({
+        objectKey: workspaceDeletionObject.objectKey,
+        state: workspaceDeletionObject.state,
+        attempts: workspaceDeletionObject.attempts,
+      })
+      .from(workspaceDeletionObject)
+      .where(
+        and(
+          inArray(workspaceDeletionObject.state, ["pending", "failed"]),
+          lt(workspaceDeletionObject.attempts, 20),
+        ),
+      )
+      .orderBy(workspaceDeletionObject.objectKey)
+      .limit(100);
+    let deletedFiles = 0;
+    for (const object of objects) {
+      const attempts = object.attempts + 1;
+      try {
+        await this.bucket.delete(object.objectKey);
+        await this.db
+          .update(workspaceDeletionObject)
+          .set({
+            state: "deleted",
+            attempts,
+            lastError: null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(workspaceDeletionObject.objectKey, object.objectKey),
+              eq(workspaceDeletionObject.state, object.state),
+              eq(workspaceDeletionObject.attempts, object.attempts),
+            ),
+          );
+        deletedFiles++;
+      } catch (error) {
+        await this.db
+          .update(workspaceDeletionObject)
+          .set({
+            state: "failed",
+            attempts,
+            lastError:
+              error instanceof Error
+                ? error.message.slice(0, 500)
+                : "R2 deletion failed",
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(workspaceDeletionObject.objectKey, object.objectKey),
+              eq(workspaceDeletionObject.state, object.state),
+              eq(workspaceDeletionObject.attempts, object.attempts),
+            ),
+          );
+      }
+    }
+    const remaining = await this.db
+      .select({ count: count() })
+      .from(workspaceDeletionObject)
+      .where(ne(workspaceDeletionObject.state, "deleted"))
+      .get();
+    if (remaining?.count) return { status: "executing" as const, deletedFiles };
+    await this.finalizeDeletion();
+    return { status: "deleted" as const, deletedFiles };
+  }
+  private async finalizeDeletion() {
+    const names = (
+        await this.db.all<{ name: string }>(
+          sql`SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND substr(name,1,1) != '_' AND name NOT IN ('d1_migrations','action_operation_guard','operation_condition_guard','workspace_deletion_guard','workspace_deletion_request','workspace_deletion_object')`,
+        )
+      ).map((row) => row.name),
+      dependencies = new Map<string, string[]>();
+    for (const name of names) {
+      const foreign = await this.db
+        .all<{ table: string }>(
+          sql`PRAGMA foreign_key_list(${sqliteIdentifier(name)})`,
+        )
+        .catch((error) => {
+          throw new Error(`Could not inspect ${name}`, { cause: error });
+        });
+      dependencies.set(
+        name,
+        foreign
+          .map((row) => row.table)
+          .filter((parent) => parent !== name && names.includes(parent)),
+      );
+    }
+    const ordered: string[] = [],
+      visiting = new Set<string>(),
+      visited = new Set<string>();
+    const visit = (name: string) => {
+      if (visited.has(name) || visiting.has(name)) return;
+      visiting.add(name);
+      for (const parent of dependencies.get(name) ?? []) visit(parent);
+      visiting.delete(name);
+      visited.add(name);
+      ordered.push(name);
+    };
+    for (const name of names) visit(name);
+    const guardId = crypto.randomUUID(),
+      statements = [
+        sql`INSERT INTO operation_condition_guard(id,authorized) SELECT ${guardId},CASE WHEN EXISTS(SELECT 1 FROM workspace_deletion_request WHERE id='workspace' AND status='executing') AND NOT EXISTS(SELECT 1 FROM workspace_deletion_object WHERE state!='deleted') THEN 1 ELSE 0 END`,
+        sql`INSERT INTO workspace_deletion_guard(id) VALUES('workspace')`,
+        ...ordered
+          .reverse()
+          .map((name) => sql`DELETE FROM ${sqliteIdentifier(name)}`),
+        sql`DELETE FROM workspace_deletion_guard WHERE id='workspace'`,
+        this.db
+          .update(workspaceDeletionRequest)
+          .set({ status: "deleted" })
+          .where(
+            and(
+              eq(workspaceDeletionRequest.id, "workspace"),
+              eq(workspaceDeletionRequest.status, "executing"),
+            ),
+          ),
+        this.db
+          .delete(operationConditionGuard)
+          .where(eq(operationConditionGuard.id, guardId)),
+      ];
+    await executeD1Batch(this.db, statements);
+  }
+  async customerMatch(context: RequestContext, phone: string) {
+    await requirePermission(this.db, context);
+    const normalized = normalizeLeadPhone(phone);
+    if (!normalized)
+      throw new HttpError(400, "validation_failed", "Phone number is required");
+    const [leads, contacts] = await Promise.all([
+      this.db
+        .select({
+          id: lead.id,
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+        })
+        .from(lead)
+        .where(
+          and(eq(lead.normalizedPhone, normalized), isNull(lead.archivedAt)),
+        )
+        .limit(20),
+      this.db
+        .select({
+          id: contact.id,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+        })
+        .from(contact)
+        .where(
+          and(
+            eq(contact.normalizedPhone, normalized),
+            isNull(contact.archivedAt),
+          ),
+        )
+        .limit(20),
+    ]);
+    return { normalizedPhone: normalized, leads, contacts };
+  }
 }

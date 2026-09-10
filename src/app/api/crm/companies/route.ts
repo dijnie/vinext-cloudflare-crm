@@ -32,12 +32,16 @@ export function createCompaniesGetHandler(root: CompositionRoot) {
 
 export function createCompaniesPostHandler(root: CompositionRoot) {
   return createRouteHandler(root, {
-    input: companyCreateInputSchema.extend({ draftId: z.string().uuid().optional() }),
+    input: companyCreateInputSchema.extend({
+      draftId: z.string().uuid().optional(),
+    }),
     output: companyWriteOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
       const { draftId, ...data } = input;
-      const creation = draftId ? await root.drafts.prepareConsumption(context, "company", draftId) : undefined;
+      const creation = draftId
+        ? await root.drafts.prepareConsumption(context, "company", draftId)
+        : undefined;
       return root.companies.create(context, data, creation);
     },
   });
@@ -49,7 +53,11 @@ export function createCompaniesPatchHandler(root: CompositionRoot) {
     output: companyBulkOutputSchema,
     unsafe: true,
     async handle({ context, input }) {
-      return root.companies.bulkArchive(context, input.ids, input.action === "bulk-restore");
+      return root.companies.bulkArchive(
+        context,
+        input.ids,
+        input.action === "bulk-restore",
+      );
     },
   });
 }

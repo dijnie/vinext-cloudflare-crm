@@ -10,11 +10,13 @@ const adapterPath = "src/lib/db/database.ts";
 
 async function typescriptFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
-  const nested = await Promise.all(entries.map(entry => {
-    const path = `${directory}/${entry.name}`;
-    if (entry.isDirectory()) return typescriptFiles(path);
-    return entry.isFile() && /\.tsx?$/.test(entry.name) ? [path] : [];
-  }));
+  const nested = await Promise.all(
+    entries.map((entry) => {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) return typescriptFiles(path);
+      return entry.isFile() && /\.tsx?$/.test(entry.name) ? [path] : [];
+    }),
+  );
   return nested.flat();
 }
 
@@ -26,5 +28,9 @@ test("runtime D1 access stays behind the Drizzle database adapter", async () => 
     const source = await readFile(path, "utf8");
     if (source.includes(".$client")) violations.push(projectPath);
   }
-  assert.deepEqual(violations, [], `Direct D1 access found outside ${adapterPath}`);
+  assert.deepEqual(
+    violations,
+    [],
+    `Direct D1 access found outside ${adapterPath}`,
+  );
 });

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalWorkspacePath, localeFromPath, localizedPath, savedLocale } from "@/lib/i18n/config";
+import {
+  canonicalWorkspacePath,
+  localeFromPath,
+  localizedPath,
+  savedLocale,
+} from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/get-dictionary";
 
 describe("localized routes", () => {
@@ -17,12 +22,18 @@ describe("localized routes", () => {
   });
 
   it("switches only the locale and preserves query state", () => {
-    expect(localizedPath("/vi/crm/companies", "en", "?record=42&view=mine")).toBe("/en/crm/companies?record=42&view=mine");
+    expect(
+      localizedPath("/vi/crm/companies", "en", "?record=42&view=mine"),
+    ).toBe("/en/crm/companies?record=42&view=mine");
   });
 
   it("preserves query state in canonical workspace redirects", () => {
-    expect(canonicalWorkspacePath("vi", "crm", "?record=42")).toBe("/vi/crm/companies?record=42");
-    expect(canonicalWorkspacePath("en", "crm", "?tab=active", "/settings/members")).toBe("/en/crm/settings/members?tab=active");
+    expect(canonicalWorkspacePath("vi", "crm", "?record=42")).toBe(
+      "/vi/crm/companies?record=42",
+    );
+    expect(
+      canonicalWorkspacePath("en", "crm", "?tab=active", "/settings/members"),
+    ).toBe("/en/crm/settings/members?tab=active");
   });
 });
 
@@ -30,6 +41,8 @@ describe("dictionaries", () => {
   it("provides matching locale contracts", () => {
     expect(getDictionary("vi").locale).toBe("vi");
     expect(getDictionary("en").locale).toBe("en");
-    expect(Object.keys(getDictionary("vi"))).toEqual(Object.keys(getDictionary("en")));
+    expect(Object.keys(getDictionary("vi"))).toEqual(
+      Object.keys(getDictionary("en")),
+    );
   });
 });

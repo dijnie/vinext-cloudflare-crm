@@ -1,6 +1,10 @@
 export function NavigationSkeleton({ label }: { label: string }) {
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6" data-navigation-pending role="status">
+    <div
+      className="mx-auto w-full max-w-7xl space-y-6"
+      data-navigation-pending
+      role="status"
+    >
       <span className="sr-only">{label}</span>
       <div aria-hidden="true" className="space-y-6 motion-safe:animate-pulse">
         <div className="space-y-3">

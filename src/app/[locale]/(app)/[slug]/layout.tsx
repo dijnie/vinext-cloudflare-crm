@@ -12,25 +12,59 @@ import { getDictionary } from "@/lib/i18n/get-dictionary";
 import { isHttpError } from "@/lib/http/http-errors";
 import { getPageContext } from "@/lib/http/page-context";
 
-export default async function ProtectedLayout({ children, params }: { children: ReactNode; params: Promise<{ locale: string; slug: string }> }) {
+export default async function ProtectedLayout({
+  children,
+  params,
+}: {
+  children: ReactNode;
+  params: Promise<{ locale: string; slug: string }>;
+}) {
   const { locale, slug } = await params;
   if (!isAppLocale(locale)) notFound();
   let pageContext;
   try {
     pageContext = await getPageContext();
   } catch (error) {
-    if (isHttpError(error) && error.status === 401) redirect(`/${locale}/sign-in`);
+    if (isHttpError(error) && error.status === 401)
+      redirect(`/${locale}/sign-in`);
     if (isHttpError(error) && error.status === 403) notFound();
     throw error;
   }
   const { root, context: viewer, requestHeaders } = pageContext;
-  const workspace = await root.db.query.singletonWorkspace.findFirst({ where: eq(singletonWorkspace.id, SINGLETON_WORKSPACE_ID) });
+  const workspace = await root.db.query.singletonWorkspace.findFirst({
+    where: eq(singletonWorkspace.id, SINGLETON_WORKSPACE_ID),
+  });
   if (!workspace) throw new Error("Singleton workspace is not initialized");
   if (slug !== workspace.slug) {
-    const path = requestHeaders.get("x-request-path") ?? `/${locale}/${slug}/companies`;
+    const path =
+      requestHeaders.get("x-request-path") ?? `/${locale}/${slug}/companies`;
     const suffix = `/${path.split("/").slice(3).join("/") || "companies"}`;
-    redirect(canonicalWorkspacePath(locale, workspace.slug, requestHeaders.get("x-request-search") ?? "", suffix));
+    redirect(
+      canonicalWorkspacePath(
+        locale,
+        workspace.slug,
+        requestHeaders.get("x-request-search") ?? "",
+        suffix,
+      ),
+    );
   }
-  const [modules, stages] = await Promise.all([root.modules.get(viewer), root.dealStages.get(viewer)]);
-  return <ModuleProvider initialSettings={modules} locale={locale}><DealStageProvider initialCatalog={stages} locale={locale}><AppShell dictionary={getDictionary(locale)} locale={locale} role={viewer.role} user={viewer.user} slug={workspace.slug}>{children}</AppShell></DealStageProvider></ModuleProvider>;
+  const [modules, stages] = await Promise.all([
+    root.modules.get(viewer),
+    root.dealStages.get(viewer),
+  ]);
+  return (
+    <ModuleProvider initialSettings={modules} locale={locale}>
+      <DealStageProvider initialCatalog={stages} locale={locale}>
+        <AppShell
+          dictionary={getDictionary(locale)}
+          locale={locale}
+          role={viewer.role}
+          user={viewer.user}
+          slug={workspace.slug}
+        >
+          {children}
+        </AppShell>
+      </DealStageProvider>
+    </ModuleProvider>
+  );
 }

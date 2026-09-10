@@ -13,13 +13,19 @@ function subscribe(listener: () => void) {
     listening = true;
     window.addEventListener("crm:invalidate", () => {
       revision += 1;
-      subscribers.forEach(notify => notify());
+      subscribers.forEach((notify) => notify());
     });
   }
   subscribers.add(listener);
-  return () => { subscribers.delete(listener); };
+  return () => {
+    subscribers.delete(listener);
+  };
 }
 
 export function useCrmInvalidation() {
-  return useSyncExternalStore(subscribe, () => revision, () => 0);
+  return useSyncExternalStore(
+    subscribe,
+    () => revision,
+    () => 0,
+  );
 }

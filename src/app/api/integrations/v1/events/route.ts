@@ -1,1 +1,1 @@
-export {POST} from "../../events/route";
+export { POST } from "../../events/route";

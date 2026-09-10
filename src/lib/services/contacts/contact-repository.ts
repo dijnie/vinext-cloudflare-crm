@@ -1,12 +1,28 @@
-import type { PreparedRecordFields, PreparedRecordCreation } from "../shared/record-fields-contract";
-import { lead, leadConversion, dealStage, operationConditionGuard } from "@/lib/db/schema";
+import type {
+  PreparedRecordFields,
+  PreparedRecordCreation,
+} from "../shared/record-fields-contract";
+import {
+  lead,
+  leadConversion,
+  dealStage,
+  operationConditionGuard,
+} from "@/lib/db/schema";
 import { assertQueryLimits } from "@/lib/db/query-limits";
 import { fieldConditionQuery } from "../custom-fields/field-condition-query";
 import { customFieldSort } from "../custom-fields/field-sort";
 import type { RequestContext } from "@/lib/http/request-context";
-import { actionGuard, authorizedWrite, permissionError } from "../permissions/permission-policy";
+import {
+  actionGuard,
+  authorizedWrite,
+  permissionError,
+} from "../permissions/permission-policy";
 import { inJsonArray } from "@/lib/db/sql-filters";
-import { fieldFilterConditions, fieldListData, validateFieldFilters } from "@/lib/services/custom-fields/field-list-query";
+import {
+  fieldFilterConditions,
+  fieldListData,
+  validateFieldFilters,
+} from "@/lib/services/custom-fields/field-list-query";
 import {
   and,
   asc,
@@ -37,8 +53,17 @@ export class ContactRepository {
 
   async list(input: ContactListInput) {
     await validateFieldFilters(this.db, "contact", input.fields);
-    const fieldSort = await customFieldSort(this.db, "contact", input.sort, input.dir);
-    const conditions = await fieldConditionQuery(this.db, "contact", input.criteria);
+    const fieldSort = await customFieldSort(
+      this.db,
+      "contact",
+      input.sort,
+      input.dir,
+    );
+    const conditions = await fieldConditionQuery(
+      this.db,
+      "contact",
+      input.criteria,
+    );
     const where = and(this.where(input), ...conditions)!;
     const rowsQuery = this.db
       .select({
@@ -66,22 +91,45 @@ export class ContactRepository {
       .leftJoin(company, eq(company.id, contact.companyId))
       .leftJoin(user, eq(user.id, contact.ownerMembershipId))
       .where(where)
-      .orderBy(...(fieldSort?.order ?? [this.order(input.sort, input.dir)]), asc(contact.id))
+      .orderBy(
+        ...(fieldSort?.order ?? [this.order(input.sort, input.dir)]),
+        asc(contact.id),
+      )
       .limit(input.pageSize)
       .offset((input.page - 1) * input.pageSize);
     const countQuery = this.db
       .select({ total: sql<number>`count(*)` })
       .from(contact)
       .where(where);
-    const facetWhere = and(this.where({ ...input, owner: [], company: [], title: [], fields: {} }), ...conditions)!;
+    const facetWhere = and(
+      this.where({ ...input, owner: [], company: [], title: [], fields: {} }),
+      ...conditions,
+    )!;
     assertQueryLimits(rowsQuery, countQuery);
     const [rows, [{ total }], facets] = await Promise.all([
       rowsQuery,
       countQuery,
       listFacets(this.db, "contact", facetWhere),
     ]);
-    const fields = await fieldListData(this.db, "contact", rows.map(row => row.id), facetWhere);
-    return { rows: rows.map(({ internalFieldSortValue: _sortValue, ...row }) => ({ ...row, fields: fields.fieldsByRecord[row.id] ?? {} })), total, facets, customFields: fields.customFields, fieldFacets: fields.fieldFacets, fieldFileLabels: fields.fieldFileLabels, fieldCustomerLabels: fields.fieldCustomerLabels, fieldUserLabels: fields.fieldUserLabels };
+    const fields = await fieldListData(
+      this.db,
+      "contact",
+      rows.map((row) => row.id),
+      facetWhere,
+    );
+    return {
+      rows: rows.map(({ internalFieldSortValue: _sortValue, ...row }) => ({
+        ...row,
+        fields: fields.fieldsByRecord[row.id] ?? {},
+      })),
+      total,
+      facets,
+      customFields: fields.customFields,
+      fieldFacets: fields.fieldFacets,
+      fieldFileLabels: fields.fieldFileLabels,
+      fieldCustomerLabels: fields.fieldCustomerLabels,
+      fieldUserLabels: fields.fieldUserLabels,
+    };
   }
 
   async byId(id: string) {
@@ -130,44 +178,135 @@ export class ContactRepository {
       .innerJoin(dealStage, eq(dealStage.id, deal.stageId))
       .where(eq(dealContact.contactId, id))
       .orderBy(asc(deal.name), asc(deal.id));
-    const convertedFrom = await this.db.select({ id: lead.id, firstName: lead.firstName, lastName: lead.lastName, convertedAt: leadConversion.completedAt })
-      .from(leadConversion).innerJoin(lead, eq(lead.id, leadConversion.leadId))
-      .where(eq(leadConversion.contactId, id)).orderBy(desc(leadConversion.completedAt), asc(leadConversion.leadId)).limit(100);
+    const convertedFrom = await this.db
+      .select({
+        id: lead.id,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        convertedAt: leadConversion.completedAt,
+      })
+      .from(leadConversion)
+      .innerJoin(lead, eq(lead.id, leadConversion.leadId))
+      .where(eq(leadConversion.contactId, id))
+      .orderBy(desc(leadConversion.completedAt), asc(leadConversion.leadId))
+      .limit(100);
     return { ...record, deals, convertedFrom };
   }
 
-  prepareCreate(values: typeof contact.$inferInsert, context: RequestContext, fields?: PreparedRecordFields, creation?: PreparedRecordCreation) {
-    const op = actionGuard(this.db, context, ["contact.create", ...(values.ownerMembershipId ? ["contact.assign" as const] : [])]);
+  prepareCreate(
+    values: typeof contact.$inferInsert,
+    context: RequestContext,
+    fields?: PreparedRecordFields,
+    creation?: PreparedRecordCreation,
+  ) {
+    const op = actionGuard(this.db, context, [
+      "contact.create",
+      ...(values.ownerMembershipId ? ["contact.assign" as const] : []),
+    ]);
     const before = creation?.before ?? [];
-    const statements: Parameters<AppDatabase["batch"]>[0] = [op.begin, ...before, this.db.insert(contact).values(values).returning(), ...(fields?.statements ?? []), ...(creation?.after ?? []), op.end];
+    const statements: Parameters<AppDatabase["batch"]>[0] = [
+      op.begin,
+      ...before,
+      this.db.insert(contact).values(values).returning(),
+      ...(fields?.statements ?? []),
+      ...(creation?.after ?? []),
+      op.end,
+    ];
     return {
       statements,
       resultIndex: 1 + before.length,
-      translateError(error: unknown): never { if (fields) fields.translateError(error); permissionError(error); },
+      translateError(error: unknown): never {
+        if (fields) fields.translateError(error);
+        permissionError(error);
+      },
     };
   }
-  async create(values: typeof contact.$inferInsert, context: RequestContext, fields?: PreparedRecordFields, creation?: PreparedRecordCreation) {
+  async create(
+    values: typeof contact.$inferInsert,
+    context: RequestContext,
+    fields?: PreparedRecordFields,
+    creation?: PreparedRecordCreation,
+  ) {
     const prepared = this.prepareCreate(values, context, fields, creation);
     try {
       const results = await this.db.batch(prepared.statements);
-      return (results[prepared.resultIndex] as (typeof contact.$inferSelect)[])[0]!;
-    } catch (error) { return prepared.translateError(error); }
+      return (
+        results[prepared.resultIndex] as (typeof contact.$inferSelect)[]
+      )[0]!;
+    } catch (error) {
+      return prepared.translateError(error);
+    }
   }
-  async update(id: string, values: Partial<typeof contact.$inferInsert>, context: RequestContext, fields?: PreparedRecordFields) {
-    const op = actionGuard(this.db, context, ["contact.update", ...(values.ownerMembershipId !== undefined ? ["contact.assign" as const] : [])]);
+  async update(
+    id: string,
+    values: Partial<typeof contact.$inferInsert>,
+    context: RequestContext,
+    fields?: PreparedRecordFields,
+  ) {
+    const op = actionGuard(this.db, context, [
+      "contact.update",
+      ...(values.ownerMembershipId !== undefined
+        ? ["contact.assign" as const]
+        : []),
+    ]);
     const guardId = crypto.randomUUID();
     try {
-      const results = await this.db.batch([op.begin, this.db.update(contact).set(values).where(eq(contact.id, id)).returning(),
-        ...(fields ? [this.db.insert(operationConditionGuard).values({ id: guardId, authorized: sql<number>`case when changes()=1 then 1 else 0 end` }), ...fields.statements, this.db.delete(operationConditionGuard).where(eq(operationConditionGuard.id, guardId))] : []), op.end]);
+      const results = await this.db.batch([
+        op.begin,
+        this.db
+          .update(contact)
+          .set(values)
+          .where(eq(contact.id, id))
+          .returning(),
+        ...(fields
+          ? [
+              this.db
+                .insert(operationConditionGuard)
+                .values({
+                  id: guardId,
+                  authorized: sql<number>`case when changes()=1 then 1 else 0 end`,
+                }),
+              ...fields.statements,
+              this.db
+                .delete(operationConditionGuard)
+                .where(eq(operationConditionGuard.id, guardId)),
+            ]
+          : []),
+        op.end,
+      ]);
       return (results[1] as (typeof contact.$inferSelect)[])[0]!;
-    } catch (error) { if (fields) fields.translateError(error); permissionError(error); }
+    } catch (error) {
+      if (fields) fields.translateError(error);
+      permissionError(error);
+    }
   }
   async archive(id: string, archivedAt: Date | null, context: RequestContext) {
-    const rows = await authorizedWrite(this.db, context, [archivedAt ? "contact.archive" : "contact.restore"], this.db.update(contact).set({ archivedAt, updatedAt: new Date() }).where(eq(contact.id, id)).returning());
+    const rows = await authorizedWrite(
+      this.db,
+      context,
+      [archivedAt ? "contact.archive" : "contact.restore"],
+      this.db
+        .update(contact)
+        .set({ archivedAt, updatedAt: new Date() })
+        .where(eq(contact.id, id))
+        .returning(),
+    );
     return rows[0];
   }
-  async bulkArchive(ids: string[], archivedAt: Date | null, context: RequestContext) {
-    const result = await authorizedWrite(this.db, context, [archivedAt ? "contact.archive" : "contact.restore"], this.db.update(contact).set({ archivedAt, updatedAt: new Date() }).where(inJsonArray(contact.id, ids)));
+  async bulkArchive(
+    ids: string[],
+    archivedAt: Date | null,
+    context: RequestContext,
+  ) {
+    const result = await authorizedWrite(
+      this.db,
+      context,
+      [archivedAt ? "contact.archive" : "contact.restore"],
+      this.db
+        .update(contact)
+        .set({ archivedAt, updatedAt: new Date() })
+        .where(inJsonArray(contact.id, ids)),
+    );
     return result.meta.changes;
   }
   activeMember(id: string) {

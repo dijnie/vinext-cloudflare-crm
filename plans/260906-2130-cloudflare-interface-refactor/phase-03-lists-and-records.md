@@ -17,4 +17,3 @@
 ## Risk and rollback
 
 Dense table and sheet changes can affect keyboard use and mobile overflow. Keep semantic table and dialog contracts intact.
-

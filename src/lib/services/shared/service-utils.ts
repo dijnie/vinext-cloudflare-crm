@@ -42,7 +42,11 @@ export function relationError(error: unknown, fallback: string): never {
   }
   const message = messages.join(" ").toLowerCase();
   if (message.includes("saved_view_owner_inactive")) {
-    throw new HttpError(403, "membership_required", "Active membership is required");
+    throw new HttpError(
+      403,
+      "membership_required",
+      "Active membership is required",
+    );
   }
   if (
     message.includes("catalog_owner_inactive") ||
