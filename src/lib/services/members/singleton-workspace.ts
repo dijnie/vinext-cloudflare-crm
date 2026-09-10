@@ -24,7 +24,6 @@ import {
   membershipAccess,
   memberBranch,
   leadMapping,
-  aiSetting,
   workspaceProfile,
 } from "@/lib/db/schema";
 import type { RequestContext } from "@/lib/http/request-context";
@@ -223,7 +222,6 @@ export async function reconcileSingletonMembership(
         revision: 0,
         updatedAt: now,
       }).onConflictDoNothing(),
-      db.insert(aiSetting).values({ id: "settings", enabled: false, monthlyBudgetMinor: 0, usedMinor: 0, revision: 0 }).onConflictDoNothing(),
       db.insert(workspaceProfile).values({ id: "workspace", name: "CRM Workspace", revision: 0, updatedAt: now }).onConflictDoNothing(),
     ]);
   }
