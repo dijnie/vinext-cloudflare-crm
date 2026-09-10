@@ -56,7 +56,7 @@
       "database_name": "saas-admin",
       "database_id": "aebda140-470f-4ee3-8564-3bbfcb64a609",
       "preview_database_id": "aebda140-470f-4ee3-8564-3bbfcb64a609",
-      "migrations_dir": "migrations/crm",
+      "migrations_dir": "migrations",
     },
   ],
 }
